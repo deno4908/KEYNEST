@@ -1,0 +1,166 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHash, randomUUID } from "node:crypto";
+import express from "express";
+import cookieParser from "cookie-parser";
+import { createOAuthRouter } from "../server/oauth.js";
+import { decrypt, encrypt, requireOrigin } from "../server/security.js";
+
+test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens off redirects", async (t) => {
+  const config = {
+    mode: "supabase",
+    production: false,
+    origin: "http://127.0.0.1:5173",
+    url: "https://test.supabase.co",
+    anon: "public-test-key",
+    encryption: "ab".repeat(32),
+    oauthProviders: { google: true, discord: true },
+  };
+  const key = createHash("sha256")
+    .update(Buffer.from(config.encryption, "hex"))
+    .update("keynest/oauth/v1")
+    .digest("hex");
+  const uid = randomUUID();
+  let exchanges = 0;
+  let expectedChallenge = "";
+  const used = new Set();
+  const app = express();
+  app.use(express.json());
+  app.use(cookieParser());
+  app.use((req, res, next) => {
+    try {
+      if (req.method === "POST")
+        requireOrigin(
+          req.headers.origin,
+          config.origin,
+          req.headers["x-app-request"],
+        );
+      next();
+    } catch (e) {
+      next(e);
+    }
+  });
+  app.use(
+    "/api/auth/oauth",
+    createOAuthRouter({
+      config,
+      store: {
+        profile: async (id) => (id === uid ? { id, name: "OAuth User" } : null),
+      },
+      setAuth: (res, session) => {
+        res.cookie("kn_access", session.access_token, { httpOnly: true });
+        res.cookie("kn_refresh", session.refresh_token, { httpOnly: true });
+      },
+      fetcher: async (url, options) => {
+        exchanges++;
+        assert.equal(
+          String(url),
+          "https://test.supabase.co/auth/v1/token?grant_type=pkce",
+        );
+        assert.equal(options.headers.apikey, "public-test-key");
+        const body = JSON.parse(options.body);
+        const challenge = createHash("sha256")
+          .update(body.code_verifier)
+          .digest("base64url");
+        if (
+          challenge !== expectedChallenge ||
+          used.has(body.auth_code) ||
+          body.auth_code !== "valid-code"
+        )
+          return new Response("{}", { status: 400 });
+        used.add(body.auth_code);
+        return Response.json({
+          access_token: "private-access-token",
+          refresh_token: "private-refresh-token",
+          user: { id: uid },
+        });
+      },
+    }),
+  );
+  app.use((e, req, res, next) =>
+    res.status(e.status || 400).json({ error: e.message }),
+  );
+  const server = app.listen(0, "127.0.0.1");
+  await new Promise((r) => server.once("listening", r));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}/api/auth/oauth`;
+  const headers = { Origin: config.origin, "X-App-Request": "keynest" };
+  async function start(provider = "google") {
+    const res = await fetch(`${base}/${provider}`, { method: "POST", headers });
+    const body = await res.json();
+    return {
+      res,
+      body,
+      cookie: res.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0])
+        .join("; "),
+    };
+  }
+  assert.equal((await fetch(`${base}/google`, { method: "POST" })).status, 403);
+  assert.equal((await start("unknown")).res.status, 400);
+  const flow = await start();
+  assert.equal(flow.res.status, 200);
+  const url = new URL(flow.body.url);
+  assert.equal(url.origin, config.url);
+  assert.equal(url.searchParams.get("provider"), "google");
+  assert.equal(
+    url.searchParams.get("redirect_to"),
+    `${config.origin}/api/auth/oauth/callback`,
+  );
+  assert.equal(url.searchParams.get("code_challenge_method"), "s256");
+  expectedChallenge = url.searchParams.get("code_challenge");
+  assert.match(flow.res.headers.get("set-cookie"), /HttpOnly/);
+  assert.match(flow.res.headers.get("set-cookie"), /SameSite=Lax/);
+  assert.match(flow.res.headers.get("set-cookie"), /Path=\/api\/auth\/oauth/);
+  const encoded = flow.cookie.slice("kn_oauth=".length);
+  const transaction = JSON.parse(decrypt(decodeURIComponent(encoded), key));
+  assert.ok(!flow.body.url.includes(transaction.verifier));
+  async function callback(query, cookie = "") {
+    return fetch(`${base}/callback${query}`, {
+      headers: { Cookie: cookie },
+      redirect: "manual",
+    });
+  }
+  for (const cookie of [
+    "",
+    "kn_oauth=broken",
+    `kn_oauth=${encodeURIComponent(encrypt(JSON.stringify({ ...transaction, expires: 0 }), key))}`,
+  ]) {
+    const res = await callback("?code=valid-code", cookie);
+    assert.equal(res.headers.get("location"), `${config.origin}/auth/error`);
+    assert.ok(
+      !res.headers.getSetCookie().some((c) => c.startsWith("kn_access=")),
+    );
+  }
+  assert.equal(exchanges, 0);
+  const denied = await callback(
+    "?error=access_denied&error_description=untrusted",
+    flow.cookie,
+  );
+  assert.equal(denied.headers.get("location"), `${config.origin}/auth/error`);
+  assert.equal(exchanges, 0);
+  const wrong = await callback("?code=wrong-code", flow.cookie);
+  assert.equal(wrong.headers.get("location"), `${config.origin}/auth/error`);
+  const good = await callback("?code=valid-code", flow.cookie);
+  assert.equal(good.status, 303);
+  assert.equal(good.headers.get("location"), `${config.origin}/account`);
+  assert.match(
+    good.headers.get("set-cookie"),
+    /kn_access=private-access-token/,
+  );
+  assert.equal(good.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(
+    (await callback("?code=valid-code", flow.cookie)).headers.get("location"),
+    `${config.origin}/auth/error`,
+  );
+  const discord = await start("discord");
+  assert.equal(
+    new URL(discord.body.url).searchParams.get("scopes"),
+    "identify email",
+  );
+  config.oauthProviders.discord = false;
+  assert.equal((await start("discord")).res.status, 503);
+  config.mode = "demo";
+  assert.equal((await start()).res.status, 503);
+});

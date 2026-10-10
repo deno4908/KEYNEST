@@ -1,0 +1,88 @@
+.admin-notifications {
+  display: grid;
+  gap: 20px;
+}
+.admin-notifications h2,
+.admin-notifications h3 {
+  margin: 0;
+}
+.admin-notifications header p {
+  margin: 10px 0 0;
+  color: #a3a9b5;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.notification-composer {
+  margin: 0;
+  padding: 24px;
+}
+.notification-composer fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+.notification-composer label {
+  display: grid;
+  gap: 9px;
+  font-size: 12px;
+}
+.notification-composer input:not([type="checkbox"]),
+.notification-composer select,
+.notification-composer textarea {
+  width: 100%;
+  padding: 12px;
+  background: #14161b;
+  color: #eceef3;
+  border: 1px solid #41444d;
+  border-radius: 7px;
+  font: inherit;
+}
+.notification-composer textarea {
+  resize: vertical;
+}
+.notification-composer .notification-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.7;
+}
+.notification-composer .notification-confirm input {
+  margin-top: 4px;
+}
+.notification-composer button {
+  justify-self: start;
+}
+.notification-auto-note {
+  display: flex;
+  gap: 12px;
+  color: #a8b4c5;
+  padding: 16px;
+  background: #1b222c;
+  border-radius: 8px;
+}
+.notification-auto-note svg {
+  flex-shrink: 0;
+}
+.notification-auto-note p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.notification-history {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+.notification-history small {
+  color: #a3a9b5;
+}
+.notification-history p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.8;
+}

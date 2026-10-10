@@ -1,0 +1,610 @@
+/* Wallet and bank transfers follow the storefront's charcoal palette. */
+.wallet-page .wallet-layout {
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.35fr);
+  gap: 22px;
+  align-items: stretch;
+  margin-bottom: 24px;
+}
+.wallet-page .wallet-card {
+  align-self: stretch;
+  min-width: 0;
+  padding: 30px;
+  background: #191a1e;
+  border: 1px solid #37383e;
+  border-radius: 10px;
+}
+.wallet-page .wallet-card-heading {
+  justify-content: flex-start;
+  gap: 12px;
+  margin-bottom: 32px;
+  color: #d2cfd3;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+.wallet-symbol,
+.transfer-bank-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ff80552e;
+  border-radius: 9px;
+  background: #ff80550c;
+  color: #ff986e;
+}
+.wallet-page .wallet-card > span {
+  color: #a5a3ac;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.wallet-page .wallet-card > strong {
+  color: #f6f3ee;
+  font-size: clamp(29px, 3.1vw, 42px);
+  font-weight: 600;
+  letter-spacing: -1.4px;
+  font-variant-numeric: tabular-nums;
+  margin: 12px 0 18px;
+  overflow-wrap: anywhere;
+}
+.wallet-card > p {
+  max-width: 290px;
+  color: #99979f;
+  font-size: 12px;
+  line-height: 1.85;
+  margin: 0 0 20px;
+}
+.wallet-shop-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  color: #f1d1c3;
+  font-size: 12px;
+  padding: 5px 0;
+  margin-bottom: 26px;
+}
+.wallet-shop-link:hover {
+  color: #ff986e;
+}
+.wallet-page .wallet-card-note {
+  justify-content: flex-start;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: auto;
+  border-top: 1px solid #303136;
+  color: #929099;
+  font-size: 10px;
+  line-height: 1.8;
+}
+.wallet-card-note svg {
+  flex-shrink: 0;
+}
+.wallet-page .topup-form {
+  min-width: 0;
+  margin: 0;
+  padding: 30px;
+  border: 1px solid #37383e;
+  border-radius: 10px;
+  background: #191a1e;
+}
+.wallet-topup-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+}
+.wallet-topup-heading > svg {
+  color: #8f8b94;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.wallet-page .wallet-topup-heading h2 {
+  font-size: 20px;
+  margin: 0 0 9px;
+  font-weight: 600;
+}
+.wallet-page .wallet-topup-heading p {
+  font-size: 12px;
+  color: #a5a2ac;
+  line-height: 1.8;
+  margin: 0;
+}
+.topup-label,
+.wallet-page .topup-form .field-title {
+  color: #ccc9d1;
+  font-size: 12px;
+  font-weight: 500;
+}
+.wallet-page .amounts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 11px 0 23px;
+  gap: 9px;
+}
+.wallet-page .amounts button {
+  min-height: 45px;
+  padding: 10px 6px;
+  background: #202126;
+  border: 1px solid #3a3b41;
+  border-radius: 6px;
+  color: #d5d2db;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition:
+    border-color 150ms,
+    background 150ms;
+}
+.wallet-page .amounts button:hover:not(:disabled) {
+  border-color: #81746e;
+}
+.wallet-page .amounts button.selected {
+  background: #ff80550f;
+  border-color: #ed885f;
+  color: #ffb897;
+}
+.topup-amount-input {
+  position: relative;
+  margin-top: 10px;
+}
+.topup-amount-input input {
+  width: 100%;
+  height: 50px;
+  padding: 0 72px 0 15px;
+  border: 1px solid #404047;
+  border-radius: 6px;
+  background: #121316;
+  color: #f0edf1;
+  font-size: 18px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  appearance: textfield;
+}
+.topup-amount-input input::-webkit-inner-spin-button,
+.topup-amount-input input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.topup-amount-input > span {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #93909c;
+  font-size: 11px;
+  pointer-events: none;
+}
+.wallet-page .topup-amount-hint {
+  font-size: 10px;
+  color: #94909c;
+  margin: 9px 0 0;
+  line-height: 1.8;
+}
+.topup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding-top: 23px;
+  margin-top: 23px;
+  border-top: 1px solid #303136;
+}
+.topup-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a7a3ae;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.topup-footer svg {
+  flex-shrink: 0;
+}
+.topup-footer .button {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.wallet-page .wallet-history,
+.wallet-page .wallet-requests {
+  padding: 26px 30px;
+  border-radius: 10px;
+  margin-bottom: 22px;
+}
+.wallet-page .wallet-history h2,
+.wallet-page .wallet-requests h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 0 15px;
+}
+.wallet-page .transaction-list > div > span:nth-child(2) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wallet-page .transaction-list > div > strong {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-page .transaction-icon {
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #29272b;
+  color: #c5a995;
+}
+.wallet-page .transaction-icon.positive {
+  background: #21312b;
+  color: #95bda8;
+}
+.wallet-page .wallet-requests th {
+  background: #222328;
+  color: #a5a1ac;
+  border-color: #37383e;
+}
+.wallet-page .wallet-requests td {
+  border-color: #303136;
+}
+
+.transfer-dialog {
+  width: min(760px, 100%);
+  max-width: 760px;
+  padding: 0;
+  border: 1px solid #39393f;
+  border-radius: 12px;
+}
+.transfer-dialog > .modal-title {
+  padding: 20px 26px;
+  margin: 0;
+  border-bottom: 1px solid #303136;
+}
+.transfer-dialog > .modal-title h2 {
+  font-size: 16px;
+  font-weight: 600;
+}
+.transfer-dialog > .modal-title .icon-button {
+  width: 34px;
+  height: 34px;
+  background: #24252a;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.transfer-dialog .payment-modal {
+  text-align: left;
+  padding: 26px;
+}
+.transfer-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.transfer-summary > div {
+  min-width: 0;
+}
+.transfer-summary > div > span {
+  display: block;
+  font-size: 11px;
+  color: #a6a1ae;
+  margin-bottom: 7px;
+}
+.transfer-summary h2 {
+  margin: 0;
+  font-size: 29px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  overflow-wrap: anywhere;
+}
+.transfer-label {
+  margin-left: auto;
+  padding: 5px 8px;
+  border: 1px solid #3c3b43;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #b5b0bd;
+  white-space: nowrap;
+}
+.transfer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1fr);
+  gap: 26px;
+}
+.transfer-visual {
+  min-width: 0;
+}
+.transfer-qr-frame {
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  max-width: 274px;
+  margin: 0 auto;
+}
+.transfer-dialog .payment-qr {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+}
+.transfer-visual > p {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  color: #a5a0ac;
+  font-size: 10px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+.transfer-visual > p svg {
+  flex-shrink: 0;
+}
+.transfer-dialog .demo-payment,
+.transfer-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 252px;
+  height: 100%;
+  margin: 0;
+  padding: 24px 18px;
+  border: 1px dashed #46434c;
+  border-radius: 8px;
+  background: #141519;
+  text-align: center;
+  color: #aba3b3;
+}
+.transfer-demo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 66px;
+  height: 66px;
+  border: 1px solid #37343d;
+  border-radius: 15px;
+  color: #baa79b;
+  background: #212024;
+}
+.transfer-dialog .demo-payment strong,
+.transfer-placeholder strong {
+  color: #e2dce4;
+  font-weight: 500;
+  font-size: 13px;
+  margin-top: 18px;
+}
+.transfer-dialog .demo-payment p,
+.transfer-placeholder p {
+  font-size: 11px;
+  line-height: 1.85;
+  color: #9a949f;
+  margin: 10px 0 0;
+  max-width: 235px;
+}
+.transfer-information {
+  min-width: 0;
+}
+.transfer-information h3 {
+  font-size: 12px;
+  color: #e5dfe7;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+.transfer-dialog .bank-details {
+  background: none;
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+  margin: 0;
+  gap: 15px;
+}
+.transfer-dialog .bank-details > span {
+  align-items: stretch;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 10px;
+  color: #9f98a8;
+}
+.transfer-dialog .bank-details strong {
+  color: #e8e2eb;
+  font-weight: 500;
+  font-size: 13px;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.transfer-dialog .bank-details .icon-button {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 5px;
+  background: #2d2b32;
+  color: #c7bdcc;
+}
+.transfer-dialog .bank-details .transfer-code {
+  border: 1px solid #5b453b;
+  padding: 12px;
+  border-radius: 6px;
+  background: #ff805508;
+}
+.transfer-dialog .transfer-code strong {
+  color: #ffbd9f;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+}
+.transfer-instruction {
+  font-size: 11px;
+  line-height: 1.9;
+  color: #a59daa;
+  margin: 15px 0 0;
+}
+.transfer-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 24px;
+  padding: 13px 14px;
+  border: 1px solid #3b383f;
+  border-radius: 6px;
+  background: #202126;
+  font-size: 12px;
+  color: #b5acb9;
+}
+.transfer-status svg {
+  flex-shrink: 0;
+}
+.transfer-status.is-pending {
+  color: #d2ba9d;
+}
+.transfer-status strong {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.transfer-dialog .payment-modal > .transfer-footnote {
+  margin: 12px 0 0;
+  font-size: 10px;
+  line-height: 1.8;
+  color: #98909f;
+}
+.transfer-demo-button {
+  margin-top: 22px;
+  min-height: 45px;
+}
+.transfer-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 25px 12px 16px;
+}
+.transfer-success-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: #95bda811;
+  border: 1px solid #95bda840;
+  color: #a6d1b7;
+}
+.transfer-success h2 {
+  font-size: 24px;
+  margin: 23px 0 12px;
+}
+.transfer-success p {
+  color: #a9a1b0;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0;
+}
+.transfer-success > strong {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 24px 0 30px;
+}
+.transfer-success .button {
+  min-width: 180px;
+}
+@media (max-width: 1050px) {
+  .wallet-page .wallet-layout {
+    grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1fr);
+  }
+  .wallet-page .wallet-card,
+  .wallet-page .topup-form {
+    padding: 24px;
+  }
+  .wallet-page .amounts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .topup-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .topup-footer .button {
+    justify-content: space-between;
+  }
+}
+@media (max-width: 700px) {
+  .wallet-page .wallet-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .wallet-page .wallet-card-heading {
+    margin-bottom: 23px;
+  }
+  .wallet-page .wallet-card > strong {
+    font-size: 36px;
+  }
+  .wallet-page .wallet-history,
+  .wallet-page .wallet-requests {
+    padding: 22px;
+  }
+  .wallet-page .transaction-list > div {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .wallet-page .transaction-list > div > strong {
+    margin-left: auto;
+  }
+  .transfer-dialog {
+    max-width: 470px;
+  }
+  .transfer-dialog > .modal-title {
+    padding: 17px 20px;
+  }
+  .transfer-dialog > .modal-title h2 {
+    font-size: 14px;
+  }
+  .transfer-dialog .payment-modal {
+    padding: 20px;
+  }
+  .transfer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .transfer-summary {
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .transfer-summary h2 {
+    font-size: 25px;
+  }
+  .transfer-label {
+    font-size: 9px;
+    padding: 4px 6px;
+  }
+  .transfer-dialog .demo-payment,
+  .transfer-placeholder {
+    min-height: 180px;
+    padding: 20px;
+  }
+  .transfer-demo-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+  }
+  .transfer-demo-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+  .transfer-dialog .demo-payment strong {
+    margin-top: 12px;
+  }
+  .transfer-bank-icon {
+    width: 36px;
+    height: 36px;
+  }
+  .transfer-status {
+    font-size: 11px;
+  }
+  .transfer-demo-button {
+    font-size: 11px;
+    padding: 12px 10px;
+    gap: 8px;
+  }
+}

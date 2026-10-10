@@ -1,0 +1,1088 @@
+import express from "express";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import { rateLimit, ipKeyGenerator } from "express-rate-limit";
+import { z, ZodError } from "zod";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { config } from "./config.js";
+import { createOAuthRouter } from "./oauth.js";
+import { mfaRouter, needsMfa } from "./mfa.js";
+import { createAdminOtp } from "./admin-otp.js";
+import { requirePasswordSession } from "./accounts.js";
+import { accountRouter, strongPassword } from "./accounts.js";
+import { catalogQuery } from "./catalog.js";
+import { categoryId, createCategories, categoriesRouter } from './categories.js';
+import { createOperations, operationsRouter } from "./operations.js";
+import { createBankPayments } from "./bank-payments.js";
+import { createPay2SRouter } from "./pay2s.js";
+import {
+  infrastructureConfig,
+  createInfrastructure,
+  createPaymentIngress,
+} from "./infrastructure.js";
+import { productImages } from "../shared/product-images.js";
+import { warrantyInfo } from "./warranty.js";
+import { isStoreImage, mediaRouter } from "./media.js";
+import { DemoStore } from "./demo-store.js";
+import { SupabaseStore, makeAuthClient } from "./supabase-store.js";
+import {
+  AppError,
+  digest,
+  opaque,
+  requireOrigin,
+  safeEqual,
+  verifyPassword,
+} from "./security.js";
+
+export const store =
+  config.mode === "demo"
+    ? new DemoStore(
+        config.encryption,
+        process.env.DEMO_DATA_PATH || ".data/demo.json",
+      )
+    : new SupabaseStore();
+export const bankPayments = createBankPayments({
+  config,
+  store,
+});
+const infraConfig = infrastructureConfig();
+export const infrastructure = await createInfrastructure(infraConfig);
+const paymentIngress = createPaymentIngress({
+  config,
+  bankPayments,
+  producer: infrastructure.producer,
+  topic: infraConfig.topic,
+});
+export const operations = createOperations(store);
+const categoryStore = createCategories(store);
+export const app = express();
+app.disable("x-powered-by");
+if (config.trustProxy) app.set("trust proxy", config.trustProxy);
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://shared.fastly.steamstatic.com",
+          "https://vietqr.app",
+          "https://*.googleusercontent.com",
+          "https://cdn.discordapp.com",
+          "https://media.discordapp.net",
+        ],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        ...(config.production ? {} : { upgradeInsecureRequests: null }),
+      },
+    },
+  }),
+);
+app.use(express.json({ limit: "100kb" }));
+app.use(cookieParser());
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+let limiterNumber = 0;
+const limiter = (limit, windowMs = 60000, scope = `route-${limiterNumber++}`) =>
+  rateLimit({
+    store: infrastructure.rateStore(scope),
+    passOnStoreError: false,
+    // Only auth middleware may set req.user; never trust a client-supplied ID.
+    keyGenerator: (req) => req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip || 'unknown')}`,
+    windowMs,
+    limit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    handler: (req, res) => {
+      const retryAfter = Math.max(
+        1,
+        Math.ceil(
+          ((req.rateLimit.resetTime?.getTime() || Date.now() + windowMs) -
+            Date.now()) /
+            1000,
+        ),
+      );
+      res.setHeader("Retry-After", String(retryAfter));
+      res.status(429).json({
+        error: `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${retryAfter < 60 ? `${retryAfter} giây` : `${Math.ceil(retryAfter / 60)} phút`}.`,
+        code: "RATE_LIMITED",
+        retry_after: retryAfter,
+      });
+    },
+  });
+const generalLimit = limiter(240, 60000, "general");
+const webhookLimit = limiter(6000, 60000, "webhooks");
+const sessionControlLimit = limiter(60, 60000, "session-control");
+app.use("/api", (req, res, next) => {
+  // Keep session status/logout available when ordinary API traffic is limited.
+  if (
+    (req.method === "GET" && req.path === "/auth/mfa/status") ||
+    (req.method === "POST" && req.path === "/auth/logout")
+  ) {
+    return sessionControlLimit(req, res, next);
+  }
+  return ["/webhooks/pay2s", "/webhooks/sepay"].includes(req.path)
+    ? webhookLimit(req, res, next)
+    : generalLimit(req, res, next);
+});
+const loginLimit = limiter(20, 15 * 60000, "auth-login");
+app.use("/api/auth", (req, res, next) => {
+  // MFA reads must not consume the password/OAuth login budget. MFA writes
+  // have their own limits; logout must remain available to a blocked session.
+  if (
+    (req.method === "GET" &&
+      ["/mfa/status", "/admin-otp/status"].includes(req.path)) ||
+    (req.method === "POST" &&
+      [
+        "/mfa/enroll",
+        "/mfa/verify",
+        "/admin-otp/send",
+        "/admin-otp/verify",
+        "/logout",
+      ].includes(req.path))
+  )
+    return next();
+  return loginLimit(req, res, next);
+});
+app.use("/api", (req, res, next) => {
+  try {
+    if (
+      !["GET", "HEAD", "OPTIONS"].includes(req.method) &&
+      !["/webhooks/sepay", "/webhooks/pay2s"].includes(req.path)
+    )
+      requireOrigin(
+        req.headers.origin,
+        config.origin,
+        req.headers["x-app-request"],
+      );
+    next();
+  } catch (e) {
+    next(e);
+  }
+});
+app.use("/api", createPay2SRouter({ config, bankPayments, paymentIngress }));
+const cookieOpts = {
+  httpOnly: true,
+  secure: config.production,
+  sameSite: "lax",
+  path: "/api",
+  maxAge: 7 * 86400000,
+};
+function setAuth(res, s) {
+  res.cookie("kn_access", s.access_token, cookieOpts);
+  res.cookie("kn_refresh", s.refresh_token, cookieOpts);
+}
+app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
+function clearAuth(res) {
+  adminOtp.clear(res);
+  for (const name of ["kn_session", "kn_access", "kn_refresh"])
+    res.clearCookie(name, { ...cookieOpts, maxAge: undefined });
+}
+function demoSession(res, id) {
+  const token = opaque();
+  store.db.sessions = store.db.sessions.filter((s) => s.expires > Date.now());
+  store.db.sessions.push({
+    token: digest(token),
+    user_id: id,
+    expires: Date.now() + 7 * 86400000,
+  });
+  store.save();
+  res.cookie("kn_session", token, cookieOpts);
+}
+const adminOtp = createAdminOtp({ config, makeAuthClient });
+const auth = async (req, res, next) => {
+  try {
+    let verifiedToken = req.cookies.kn_session;
+    if (config.mode === "demo") {
+      const s = store.db.sessions.find(
+        (s) =>
+          safeEqual(s.token, digest(req.cookies.kn_session || "")) &&
+          s.expires > Date.now(),
+      );
+      if (!s) throw new AppError("Vui lòng đăng nhập.", 401);
+      req.user = store.profile(s.user_id);
+    } else {
+      verifiedToken = req.cookies.kn_access;
+      const client = makeAuthClient();
+      let { data, error } = await client.auth.getUser(
+        req.cookies.kn_access || "",
+      );
+      if (error && req.cookies.kn_refresh) {
+        const refreshed = await client.auth.refreshSession({
+          refresh_token: req.cookies.kn_refresh,
+        });
+        if (!refreshed.error && refreshed.data.session) {
+          verifiedToken = refreshed.data.session.access_token;
+          setAuth(res, refreshed.data.session);
+          ({ data, error } = await client.auth.getUser(
+            refreshed.data.session.access_token,
+          ));
+        }
+      }
+      if (error || !data.user)
+        throw new AppError("Phiên đăng nhập đã hết hạn.", 401);
+      req.user = await store.profile(data.user.id);
+      req.authUser = data.user;
+      req.authToken = verifiedToken;
+    }
+    await operations.authorize(req, verifiedToken);
+    if (
+      req.authUser &&
+      needsMfa(req.authUser, verifiedToken) &&
+      !req.originalUrl.split("?")[0].startsWith("/api/auth/mfa/")
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Vui lòng xác minh hai bước.", code: "MFA_REQUIRED" });
+    }
+    return adminOtp.guard(req, res, next);
+  } catch (e) {
+    next(e);
+  }
+};
+const admin = (req, res, next) =>
+  req.user.role === "admin"
+    ? next()
+    : next(new AppError("Bạn không có quyền quản trị.", 403));
+const uuid = z.uuid();
+app.use("/api/auth/mfa", mfaRouter({ config, auth, limiter, setAuth }));
+app.use('/api', categoriesRouter({ categories: categoryStore, auth, admin, limiter, store }));
+app.use("/api/auth/admin-otp", adminOtp.router({ auth, limiter }));
+app.use("/api", operationsRouter({ operations, auth, admin, limiter }));
+app.use(
+  "/api",
+  mediaRouter({ store, mode: config.mode, auth, admin, limiter }),
+);
+const money = z.number().int().min(1000).max(100000000);
+const email = z
+  .email()
+  .max(254)
+  .transform((v) => v.toLowerCase());
+const password = strongPassword;
+app.use(
+  "/api",
+  accountRouter({
+    operations,
+    config,
+    store,
+    auth,
+    limiter,
+    makeAuthClient,
+    setAuth,
+    demoSession,
+  }),
+);
+const credentials = z
+  .object({ email, password: z.string().min(1).max(128) })
+  .strict();
+const orderSchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            variant_id: uuid,
+            quantity: z.number().int().min(1).max(10),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(20)
+      .refine(
+        (items) =>
+          new Set(items.map((i) => i.variant_id)).size === items.length,
+        "Gói sản phẩm bị trùng.",
+      ),
+    method: z.enum(["wallet", "sepay"]),
+    coupon: z
+      .string()
+      .max(32)
+      .transform((v) => v.trim().toUpperCase())
+      .default(""),
+    customer_note: z.string().max(1000).default(""),
+  })
+  .strict();
+const secretsSchema = z
+  .object({
+    secrets: z
+      .array(z.string().trim().min(1).max(2000))
+      .min(1)
+      .max(100)
+      .refine((a) => new Set(a).size === a.length, "Có mã trùng."),
+  })
+  .strict();
+const productSchema = z
+  .object({
+    id: uuid.optional(),
+    slug: z
+      .string()
+      .min(2)
+      .max(100)
+      .regex(/^[a-z0-9-]+$/),
+    name: z.string().trim().min(2).max(140),
+    category: categoryId,
+    platform: z.string().max(60),
+    subcategory: z.string().trim().max(60).default(""),
+    subtitle: z.string().max(200).default(""),
+    description: z.string().max(5000).default(""),
+    image: z
+      .string()
+      .max(600)
+      .refine(
+        (v) =>
+          v === "" ||
+          isStoreImage(v) ||
+          /^https:\/\/shared\.fastly\.steamstatic\.com\/[a-zA-Z0-9_./-]+$/.test(
+            v,
+          ),
+        "Chọn ảnh đã tải lên, ảnh có sẵn hoặc ảnh Steam CDN.",
+      ),
+    featured: z.boolean(),
+    active: z.boolean(),
+  })
+  .strict();
+const variantSchema = z
+  .object({
+    id: uuid.optional(),
+    name: z.string().trim().min(2).max(140),
+    price: money,
+    original_price: money,
+    delivery: z.enum(["key", "manual"]),
+    stock: z.number().int().min(0).max(100000),
+    region: z.string().min(1).max(60),
+    warranty_days: z.number().int().min(0).max(3650).optional(),
+  })
+  .strict();
+function paymentInfo(p) {
+  if (!p) return null;
+  const query = new URLSearchParams({
+    acc: config.account,
+    bank: config.bank,
+    amount: String(p.amount),
+    des: p.code,
+    template: "compact",
+    holder: config.accountName,
+  });
+  return {
+    ...p,
+    qr_url:
+      config.mode === "supabase" && config.account
+        ? `https://vietqr.app/img?${query}`
+        : null,
+    bank: config.bank,
+    account: config.account,
+    account_name: config.accountName,
+    demo: config.mode === "demo",
+  };
+}
+function orderInfo(o) {
+  const { fingerprint, idempotency, ...result } = o;
+  return {
+    ...result,
+    payment: paymentInfo(o.payment),
+    items: o.items.map((i) => ({
+      ...i,
+      product_image: i.product_image || productImages[i.product_slug] || "",
+      warranty_days: i.warranty_days ?? null,
+      delivered_at: i.delivered_at ?? null,
+      ...warrantyInfo(i, o.status),
+    })),
+  };
+}
+app.get("/api/health", (req, res) => res.json({ ok: true, mode: config.mode }));
+app.get("/api/config", (req, res) =>
+  res.json({
+    mode: config.mode,
+    payments_ready: config.mode === "demo" || bankPayments.status().ready,
+    demo_accounts:
+      config.mode === "demo"
+        ? { customer: "student@keynest.local", admin: "admin@keynest.local" }
+        : null,
+  }),
+);
+app.get("/api/products", async (req, res) => {
+  await store.expire();
+  res.json(await store.products());
+});
+app.get("/api/catalog", async (req, res) => {
+  const filters = catalogQuery.parse(req.query);
+  await store.expire();
+  res.json(await store.catalog(filters));
+});
+app.get("/api/products/:identifier", async (req, res) => {
+  const identifier = z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[a-z0-9-]+$/)
+    .parse(req.params.identifier);
+  await store.expire();
+  const product = await store.product(identifier);
+  if (!product) throw new AppError("Không tìm thấy sản phẩm.", 404);
+  res.json(product);
+});
+app.get("/api/promotions", async (req, res) =>
+  res.json(
+    (await store.promotions()).sort(
+      (a, b) =>
+        Number(!!b.pinned) - Number(!!a.pinned) || a.code.localeCompare(b.code),
+    ),
+  ),
+);
+app.get("/api/banners", async (req, res) => res.json(await store.banners()));
+app.get("/api/products/:id/reviews", async (req, res) =>
+  res.json(
+    await store.reviews(
+      uuid.parse(req.params.id),
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(10000)
+        .default(1)
+        .parse(req.query.page),
+    ),
+  ),
+);
+app.get("/api/products/:id/comments", async (req, res) =>
+  res.json(
+    await store.comments(
+      uuid.parse(req.params.id),
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(10000)
+        .default(1)
+        .parse(req.query.page),
+    ),
+  ),
+);
+app.post("/api/auth/login", async (req, res) => {
+  const input = credentials.parse(req.body);
+  let user;
+  if (config.mode === "demo") {
+    const u = store.db.users.find((u) => u.email === input.email);
+    if (!u || !verifyPassword(input.password, u.password_hash))
+      throw new AppError("Email hoặc mật khẩu không đúng.", 401);
+    await operations.checkAccess(u.id);
+    demoSession(res, u.id);
+    user = store.profile(u.id);
+  } else {
+    const { data, error } =
+      await makeAuthClient().auth.signInWithPassword(input);
+    if (error)
+      throw new AppError(
+        "Email/mật khẩu không đúng hoặc email chưa xác minh.",
+        401,
+      );
+    await operations.checkAccess(data.user.id);
+    setAuth(res, data.session);
+    user = await store.profile(data.user.id);
+    if (needsMfa(data.user, data.session.access_token))
+      return res.json({ mfa_required: true });
+    if (user.role === "admin" && config.adminOtpEnabled)
+      return res.json({ admin_otp_required: true });
+  }
+  res.json(user);
+});
+app.post("/api/auth/register", async (req, res) => {
+  const input = z
+    .object({ email, password, name: z.string().trim().min(2).max(80) })
+    .strict()
+    .parse(req.body);
+  if (config.mode === "demo") {
+    const u = store.register(input.email, input.password, input.name);
+    demoSession(res, u.id);
+    return res.json({ user: u });
+  }
+  const { data, error } = await makeAuthClient().auth.signUp({
+    email: input.email,
+    password: input.password,
+    options: { data: { name: input.name } },
+  });
+  if (error) throw new AppError("Không thể đăng ký tài khoản.");
+  if (data.session) {
+    setAuth(res, data.session);
+    return res.json({ user: await store.profile(data.user.id) });
+  }
+  res.json({ message: "Kiểm tra email để xác minh tài khoản, rồi đăng nhập." });
+});
+app.post(
+  "/api/auth/forgot",
+  (req, res, next) => {
+    if (
+      config.mode === "supabase" &&
+      (req.cookies.kn_access || req.cookies.kn_refresh)
+    )
+      return auth(req, res, next);
+    next();
+  },
+  requirePasswordSession,
+  async (req, res) => {
+    const input = z.object({ email }).strict().parse(req.body);
+    if (config.mode === "demo")
+      throw new AppError(
+        "Demo không gửi email. Hãy dùng tài khoản mẫu hoặc đăng ký mới.",
+      );
+    await makeAuthClient().auth.resetPasswordForEmail(input.email, {
+      redirectTo: `${config.origin}/reset-password`,
+    });
+    res.json({
+      message: "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi.",
+    });
+  },
+);
+app.post("/api/auth/reset", async (req, res) => {
+  if (config.mode === "demo")
+    throw new AppError("Chức năng này cần Supabase Auth.");
+  const input = z
+    .object({
+      access_token: z.string().min(20).max(8000),
+      refresh_token: z.string().min(10).max(1000),
+      password,
+    })
+    .strict()
+    .parse(req.body);
+  const client = makeAuthClient();
+  const { data, error } = await client.auth.setSession({
+    access_token: input.access_token,
+    refresh_token: input.refresh_token,
+  });
+  if (error || !data.user) throw new AppError("Liên kết đã hết hạn.", 401);
+  if (
+    !data.user.recovery_sent_at ||
+    Date.now() - Date.parse(data.user.recovery_sent_at) > 60 * 60000
+  )
+    throw new AppError("Liên kết đặt lại mật khẩu không hợp lệ.", 401);
+  const updated = await client.auth.updateUser({ password: input.password });
+  if (updated.error) throw new AppError("Không thể đặt mật khẩu mới.");
+  setAuth(res, data.session);
+  res.json({ message: "Mật khẩu đã được cập nhật." });
+});
+app.get("/api/me", auth, async (req, res) => res.json(req.user));
+app.patch("/api/me", auth, async (req, res) =>
+  res.json(
+    await store.updateProfile(
+      req.user.id,
+      z
+        .object({ name: z.string().trim().min(2).max(80) })
+        .strict()
+        .parse(req.body),
+    ),
+  ),
+);
+app.post("/api/auth/logout", async (req, res) => {
+  if (config.mode === "demo") {
+    store.db.sessions = store.db.sessions.filter(
+      (s) => !safeEqual(s.token, digest(req.cookies.kn_session || "")),
+    );
+    store.save();
+  } else if (req.cookies.kn_access && req.cookies.kn_refresh) {
+    const client = makeAuthClient();
+    const { error } = await client.auth.setSession({
+      access_token: req.cookies.kn_access,
+      refresh_token: req.cookies.kn_refresh,
+    });
+    if (!error) await client.auth.signOut({ scope: "local" });
+  }
+  clearAuth(res);
+  res.json({ ok: true });
+});
+app.get("/api/orders", auth, async (req, res) =>
+  res.json((await store.orders(req.user.id)).map(orderInfo)),
+);
+app.post("/api/coupons/preview", auth, limiter(40), async (req, res) => {
+  const input = z
+    .object({
+      code: z
+        .string()
+        .trim()
+        .min(3)
+        .max(32)
+        .transform((v) => v.toUpperCase()),
+      items: orderSchema.shape.items,
+    })
+    .strict()
+    .parse(req.body);
+  res.json(await store.quoteCoupon(req.user.id, input.code, input.items));
+});
+app.get("/api/orders/:id", auth, async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const order = (await store.orders(req.user.id, false, id))[0];
+  if (!order) throw new AppError("Không tìm thấy đơn hàng.", 404);
+  res.json({
+    ...orderInfo(order),
+    warranty_requests: (await store.tickets(req.user.id)).filter(
+      (t) => t.kind === "warranty" && t.order_id === id,
+    ),
+  });
+});
+app.post(
+  "/api/orders/:id/warranty",
+  auth,
+  limiter(8, 15 * 60000),
+  async (req, res) => {
+    const payload = z
+      .object({
+        key_ids: z
+          .array(uuid)
+          .min(1)
+          .max(200)
+          .refine((ids) => new Set(ids).size === ids.length),
+        message: z.string().trim().min(10).max(3000),
+      })
+      .strict()
+      .parse(req.body);
+    res
+      .status(201)
+      .json(
+        await store.createWarranty(
+          req.user.id,
+          uuid.parse(req.params.id),
+          payload,
+        ),
+      );
+  },
+);
+app.post("/api/orders", auth, limiter(15), async (req, res) => {
+  const payload = orderSchema.parse(req.body);
+  const idempotency = uuid.parse(req.headers["idempotency-key"]);
+  if (payload.method === "sepay") bankPayments.assertReady();
+  const o = await store.createOrder(req.user.id, payload, idempotency);
+  const result = (await store.orders(req.user.id)).find((x) => x.id === o.id);
+  res.status(201).json(orderInfo(result));
+});
+app.post("/api/orders/:id/cancel", auth, async (req, res) => {
+  await store.cancel(req.user.id, uuid.parse(req.params.id));
+  res.json({ ok: true });
+});
+app.get("/api/wallet", auth, async (req, res) =>
+  res.json({
+    balance: (await store.profile(req.user.id)).balance,
+    ledger: await store.ledger(req.user.id),
+    payments: (await store.payments(req.user.id))
+      .filter((p) => !p.order_id)
+      .map(paymentInfo),
+  }),
+);
+app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
+  const { amount } = z
+    .object({ amount: z.number().int().min(10000).max(50000000) })
+    .strict()
+    .parse(req.body);
+  bankPayments.assertReady();
+  res
+    .status(201)
+    .json(paymentInfo(await store.createTopup(req.user.id, amount)));
+});
+app.post("/api/demo/pay/:id", auth, async (req, res) => {
+  if (config.mode !== "demo") throw new AppError("Không tìm thấy.", 404);
+  const p = store.db.payments.find(
+    (p) => p.id === uuid.parse(req.params.id) && p.user_id === req.user.id,
+  );
+  if (!p) throw new AppError("Không tìm thấy giao dịch.", 404);
+  res.json(await store.settle(`demo-${p.id}`, p.code, p.amount));
+});
+app.post("/api/webhooks/sepay", async (req, res) => {
+  if (
+    config.mode !== "supabase" ||
+    config.paymentProvider !== "sepay" ||
+    !config.webhook
+  )
+    throw new AppError("Webhook chưa cấu hình.", 503);
+  if (!safeEqual(req.headers.authorization, `Apikey ${config.webhook}`))
+    throw new AppError("Webhook không hợp lệ.", 401);
+  const payload = z
+    .object({
+      id: z.number().int().positive(),
+      accountNumber: z.string(),
+      transferType: z.enum(["in", "out"]),
+      transferAmount: z.number().int().positive().max(1000000000000),
+      code: z.string().nullable().optional(),
+      content: z.string().max(5000),
+    })
+    .passthrough()
+    .parse(req.body);
+  const result = await paymentIngress.accept("sepay", {
+    id: String(payload.id),
+    account: payload.accountNumber,
+    direction: payload.transferType,
+    currency: "VND",
+    amount: payload.transferAmount,
+    content: payload.content,
+    code: payload.code,
+  });
+  res.json({ success: true, ...result });
+});
+app.get("/api/tickets", auth, async (req, res) =>
+  res.json(await store.tickets(req.user.id)),
+);
+app.get("/api/tickets/:id", auth, async (req, res) => {
+  const ticket = (
+    await store.tickets(req.user.id, false, uuid.parse(req.params.id))
+  )[0];
+  if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ.", 404);
+  res.json(ticket);
+});
+app.post(
+  "/api/tickets/:id/messages",
+  auth,
+  limiter(15, 15 * 60000),
+  async (req, res) => {
+    const { body } = z
+      .object({ body: z.string().trim().min(3).max(3000) })
+      .strict()
+      .parse(req.body);
+    await store.addTicketMessage(req.user.id, uuid.parse(req.params.id), body);
+    res.status(201).json({ ok: true });
+  },
+);
+app.post("/api/tickets", auth, limiter(5), async (req, res) =>
+  res.status(201).json(
+    await store.createTicket(
+      req.user.id,
+      z
+        .object({
+          subject: z.string().trim().min(3).max(120),
+          message: z.string().trim().min(10).max(3000),
+        })
+        .strict()
+        .parse(req.body),
+    ),
+  ),
+);
+app.post("/api/comments", auth, limiter(12, 15 * 60000), async (req, res) =>
+  res.status(201).json(
+    await store.createComment(
+      req.user.id,
+      z
+        .object({
+          product_id: uuid,
+          body: z.string().trim().min(3).max(1000),
+        })
+        .strict()
+        .parse(req.body),
+    ),
+  ),
+);
+app.post("/api/comments/:id/delete", auth, async (req, res) =>
+  res.json(
+    await store.deleteComment(
+      req.user.id,
+      req.user.role === "admin",
+      uuid.parse(req.params.id),
+    ),
+  ),
+);
+app.post("/api/reviews", auth, limiter(12, 15 * 60000), async (req, res) =>
+  res.status(201).json(
+    await store.createReview(
+      req.user.id,
+      z
+        .object({
+          product_id: uuid,
+          rating: z.number().int().min(1).max(5),
+          comment: z.string().trim().min(3).max(1000),
+        })
+        .strict()
+        .parse(req.body),
+    ),
+  ),
+);
+app.use("/api/admin", auth, admin);
+app.get("/api/admin/bank-payments/status", (req, res) =>
+  res.json({
+    ...bankPayments.status(),
+    infrastructure: infrastructure.status(),
+  }),
+);
+app.get("/api/admin/orders/:id", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const order = (await store.orders(req.user.id, true, id))[0];
+  if (!order) throw new AppError("Không tìm thấy đơn hàng.", 404);
+  const [customer, tickets] = await Promise.all([
+    store.profile(order.user_id),
+    store.tickets(order.user_id),
+  ]);
+  res.json({
+    ...orderInfo(order),
+    customer,
+    warranty_requests: tickets.filter(
+      (t) => t.kind === "warranty" && t.order_id === id,
+    ),
+  });
+});
+app.get("/api/admin/tickets/:id", async (req, res) => {
+  const ticket = (
+    await store.tickets(req.user.id, true, uuid.parse(req.params.id))
+  )[0];
+  if (!ticket) throw new AppError("Không tìm thấy yêu cầu hỗ trợ.", 404);
+  res.json({ ...ticket, customer: await store.profile(ticket.user_id) });
+});
+app.get("/api/admin/inventory/:id", async (req, res) => {
+  const filters = z
+    .object({
+      state: z.enum(["all", "available", "assigned"]).default("all"),
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+      page_size: z.coerce.number().int().min(1).max(100).default(25),
+    })
+    .strict()
+    .parse(req.query);
+  res.json(await store.inventory(uuid.parse(req.params.id), filters));
+});
+app.get("/api/admin/overview", async (req, res) => {
+  const data = await store.overview();
+  res.json({
+    ...data,
+    orders: data.orders.map(orderInfo),
+    products: await store.products(true),
+  });
+});
+app.post("/api/admin/reconcile/:transaction", async (req, res) => {
+  const transaction = z.string().min(1).max(100).parse(req.params.transaction);
+  const input = z
+    .object({ user_id: uuid, reason: z.string().trim().min(10).max(1000) })
+    .strict()
+    .parse(req.body);
+  await store.reconcile(transaction, input.user_id, input.reason, req.user.id);
+  res.json({ ok: true });
+});
+app.post("/api/admin/coupons", async (req, res) => {
+  const input = z
+    .object({
+      code: z
+        .string()
+        .trim()
+        .min(3)
+        .max(32)
+        .regex(/^[A-Z0-9_-]+$/),
+      percent: z.number().int().min(1).max(90),
+      max_discount: money,
+      active: z.boolean(),
+      expires_at: z.iso.datetime().nullable(),
+      discount_type: z.enum(["percent", "fixed"]).default("percent"),
+      fixed_amount: z.number().int().min(0).max(100000000).default(0),
+      min_subtotal: z.number().int().min(0).max(100000000).default(0),
+      total_limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000000)
+        .nullable()
+        .default(null),
+      per_user_limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000000)
+        .nullable()
+        .default(null),
+      starts_at: z.iso.datetime().nullable().default(null),
+      category: categoryId.default("all"),
+      product_ids: z.array(uuid).max(100).default([]),
+      first_order_only: z.boolean().default(false),
+    })
+    .strict()
+    .refine(
+      (c) => c.discount_type !== "fixed" || c.fixed_amount >= 1000,
+      "Số tiền giảm cố định tối thiểu 1.000đ.",
+    )
+    .refine(
+      (c) =>
+        !c.starts_at ||
+        !c.expires_at ||
+        Date.parse(c.starts_at) < Date.parse(c.expires_at),
+      "Ngày kết thúc phải sau ngày bắt đầu.",
+    )
+    .parse(req.body);
+  if (input.category !== 'all') await categoryStore.require(input.category);
+  const result = await store.saveCoupon(input);
+  await store.audit(req.user.id, "save_coupon", input.code);
+  res.json(result);
+});
+app.post("/api/admin/products", async (req, res) => {
+  const input = productSchema.parse(req.body);
+  await categoryStore.require(input.category);
+  const result = await store.saveProduct(input);
+  await store.audit(req.user.id, "save_product", result.id);
+  res.json(result);
+});
+app.get("/api/admin/banners", async (req, res) =>
+  res.json(await store.banners(true)),
+);
+app.post("/api/admin/banners", async (req, res) => {
+  const input = z
+    .object({
+      id: uuid.optional(),
+      title: z.string().trim().min(2).max(100),
+      eyebrow: z.string().trim().max(60),
+      description: z.string().trim().max(240),
+      image: z
+        .string()
+        .max(600)
+        .refine(isStoreImage, "Chọn ảnh đã tải lên hoặc ảnh Steam CDN hợp lệ."),
+      href: z
+        .string()
+        .max(300)
+        .refine(
+          (v) =>
+            /^\/(?:products\/[a-z0-9-]+|catalog(?:\?[^\s\\#]*)?|promotions|guide|wallet|support)$/.test(
+              v,
+            ) && !/[<>]/.test(v),
+          "Liên kết phải trỏ tới một trang trong cửa hàng.",
+        ),
+      cta: z.string().trim().min(2).max(40),
+      active: z.boolean(),
+      sort_order: z.number().int().min(0).max(999),
+    })
+    .strict()
+    .parse(req.body);
+  const result = await store.saveBanner(input);
+  await store.audit(req.user.id, "save_banner", result.id);
+  res.json(result);
+});
+app.post("/api/admin/products/:id/variants", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const result = await store.saveVariant(id, variantSchema.parse(req.body));
+  await store.audit(req.user.id, "save_variant", id);
+  res.json(result);
+});
+app.post("/api/admin/inventory/:id", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const result = await store.importKeys(
+    id,
+    secretsSchema.parse(req.body).secrets,
+  );
+  await store.audit(req.user.id, "import_inventory", id);
+  res.json(result);
+});
+app.post("/api/admin/orders/:id/fulfill", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  await store.fulfill(id, secretsSchema.parse(req.body).secrets);
+  await store.audit(req.user.id, "fulfill_order", id);
+  res.json({ ok: true });
+});
+app.post("/api/admin/orders/:id/refund", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const input = z
+    .object({
+      ticket_id: uuid,
+      method: z.enum(["wallet", "external"]),
+      reason: z.string().trim().min(10).max(2000),
+      reference: z.string().trim().max(200).default(""),
+    })
+    .strict()
+    .refine(
+      (v) => v.method !== "external" || v.reference.length >= 3,
+      "Nhập mã giao dịch đã hoàn bên ngoài.",
+    )
+    .parse(req.body);
+  await store.refund(id, { ...input, actor: req.user.id });
+  res.json({ ok: true });
+});
+app.post("/api/admin/coupons/:code/pin", async (req, res) => {
+  const code = z.string().min(3).max(32).parse(req.params.code);
+  const { pinned } = z.object({ pinned: z.boolean() }).strict().parse(req.body);
+  if (config.mode === "demo") {
+    const coupon = store.db.coupons.find((c) => c.code === code);
+    if (!coupon) throw new AppError("Không tìm thấy mã giảm giá.", 404);
+    coupon.pinned = pinned;
+    store.save();
+  } else {
+    const rows = await store.query(
+      store.client
+        .from("coupons")
+        .update({ pinned })
+        .eq("code", code)
+        .select("code"),
+    );
+    if (!rows.length) throw new AppError("Không tìm thấy mã giảm giá.", 404);
+  }
+  await store.audit(req.user.id, pinned ? "pin_coupon" : "unpin_coupon", code);
+  res.json({ pinned });
+});
+app.post("/api/admin/tickets/:id/reply", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const { reply, status, priority } = z
+    .object({
+      reply: z.string().trim().min(3).max(3000),
+      status: z.enum(["open", "in_progress", "closed"]).default("closed"),
+      priority: z.enum(["low", "normal", "high"]).default("normal"),
+    })
+    .strict()
+    .parse(req.body);
+  await store.replyTicket(id, reply, req.user.id, status, priority);
+  await store.audit(req.user.id, "reply_ticket", id);
+  res.json({ ok: true });
+});
+app.use("/api", (req, res) =>
+  res.status(404).json({ error: "Không tìm thấy API." }),
+);
+if (existsSync(resolve("dist/index.html"))) {
+  app.use(express.static(resolve("dist")));
+  app.get("/{*path}", (req, res) => res.sendFile(resolve("dist/index.html")));
+}
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  if (err.type === "entity.too.large")
+    return res
+      .status(413)
+      .json({ error: "Tập tin quá lớn. Ảnh tải lên tối đa 8 MB." });
+  if (err instanceof ZodError)
+    return res
+      .status(400)
+      .json({ error: err.issues.map((i) => i.message).join(" ") });
+  if (err.type === "entity.parse.failed")
+    return res.status(400).json({ error: "JSON không hợp lệ." });
+  if (err.type === "entity.too.large")
+    return res.status(413).json({ error: "Dữ liệu quá lớn." });
+  if (!(err instanceof AppError))
+    console.error("Unexpected error:", err.message);
+  res.status(err.status || 500).json({
+    error:
+      err instanceof AppError
+        ? err.message
+        : "Có lỗi hệ thống. Vui lòng thử lại.",
+  });
+});
+if (process.env.NODE_ENV !== "test") {
+  const server = app.listen(
+    config.port,
+    config.production ? "0.0.0.0" : "127.0.0.1",
+    () =>
+      console.log(
+        `KEYNEST API http://127.0.0.1:${config.port} [${config.mode}]`,
+      ),
+  );
+  const timer = setInterval(
+    () =>
+      Promise.resolve(store.expire()).catch((e) =>
+        console.error("Expiry failed:", e.message),
+      ),
+    60000,
+  );
+  timer.unref();
+  let shuttingDown = false;
+  const shutdown = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    clearInterval(timer);
+    const force = setTimeout(() => process.exit(1), 30000);
+    force.unref();
+    await new Promise((done) => server.close(done));
+    await infrastructure.close();
+    clearTimeout(force);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+}

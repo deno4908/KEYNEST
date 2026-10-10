@@ -1,0 +1,120 @@
+.admin-customers {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+}
+.admin-customers .customers-heading h2 {
+  margin: 0 0 8px;
+}
+.customers-heading p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.admin-customers > .field-title {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin: 0;
+}
+.admin-customers > .field-title input {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid #41444c;
+  background: #15171c;
+  border-radius: 7px;
+  color: #e7e9ee;
+  font: inherit;
+}
+.admin-customers > .field-title input:focus {
+  outline: none;
+  border-color: #bf805f;
+  box-shadow: 0 0 0 3px #bf805f18;
+}
+.admin-customers .customers-table {
+  margin: 0;
+  padding: 0;
+  border-radius: 9px;
+}
+.admin-customers .customers-table table {
+  margin: 0;
+  width: 100%;
+}
+.customers-table th,
+.customers-table td {
+  padding: 16px 18px;
+}
+.customers-table td small {
+  display: block;
+  margin-top: 5px;
+  color: #9ca3af;
+}
+.customers-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 44px 20px;
+  text-align: center;
+}
+.customers-empty > svg {
+  color: #838b9a;
+  margin-bottom: 4px;
+}
+.customers-empty strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.customers-empty p {
+  margin: 0;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.customers-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.customers-pagination span {
+  color: #a3aab8;
+  font-size: 12px;
+  text-align: center;
+}
+.customers-pagination .button {
+  margin: 0;
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
+.customer-access-form {
+  display: grid;
+  gap: 18px;
+}
+.customer-access-form p {
+  margin: 0;
+  line-height: 1.7;
+}
+.customer-access-form .field-title {
+  display: grid;
+  gap: 10px;
+}
+.customer-access-form textarea {
+  min-height: 110px;
+  width: 100%;
+}
+@media (max-width: 540px) {
+  .admin-customers {
+    gap: 20px;
+  }
+  .customers-pagination {
+    gap: 8px;
+  }
+  .customers-pagination span {
+    font-size: 11px;
+  }
+}

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#272036"/><stop offset="1" stop-color="#4d3962"/></linearGradient>
+    <linearGradient id="card" x2="1" y2="1"><stop stop-color="#a696c5"/><stop offset=".5" stop-color="#8b79af"/><stop offset="1" stop-color="#6c5890"/></linearGradient>
+    <linearGradient id="orb" x2=".8" y2="1"><stop stop-color="#f4efff"/><stop offset="1" stop-color="#c1afe3"/></linearGradient>
+  </defs>
+  <rect width="600" height="800" fill="url(#bg)"/>
+  <path d="M650-100L320 540H530L860-100Z" fill="#c9b4ed" opacity=".035"/>
+  <g transform="translate(266 333) rotate(14 135 190)"><rect x="5" y="15" width="260" height="354" rx="20" fill="#16121e" opacity=".45"/><rect width="260" height="354" rx="20" fill="#504360" stroke="#9580b0"/><path d="M26 36h28" stroke="#d5c4e9" stroke-width="4"/><text x="26" y="319" font-family="Arial,sans-serif" font-size="15" fill="#b9a5cf" letter-spacing="3">KEYNEST</text></g>
+  <g transform="translate(149 370) rotate(-9 137 181)">
+    <rect x="5" y="13" width="274" height="360" rx="19" fill="#17111f" opacity=".3"/>
+    <rect width="274" height="360" rx="19" fill="url(#card)" stroke="#bca5da" stroke-width="2"/>
+    <text x="25" y="42" fill="#f3eafb" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="3">KEYNEST</text>
+    <circle cx="137" cy="168" r="76" fill="url(#orb)"/>
+    <g fill="none" stroke="#786393" stroke-width="3"><circle cx="137" cy="168" r="47"/><ellipse cx="137" cy="168" rx="20" ry="47"/><path d="M91 168h92M98 143h78M98 193h78"/></g>
+    <text x="137" y="292" text-anchor="middle" fill="#faf5ff" font-family="Arial,sans-serif" font-size="24" font-weight="700" letter-spacing="2">RESIDENTIAL</text>
+    <text x="137" y="318" text-anchor="middle" fill="#e0d4ee" font-family="Arial,sans-serif" font-size="12" letter-spacing="4">PROXY ACCESS</text>
+  </g>
+  <g font-family="Arial,Helvetica,sans-serif"><text x="44" y="105" fill="#c1b1d5" font-size="16" letter-spacing="3">KEYNEST / MMO</text><text x="39" y="227" fill="#fbf7ff" font-size="82" font-weight="800" letter-spacing="-2">PROXY</text><text x="44" y="277" fill="#cebae7" font-size="25" letter-spacing="4">RESIDENTIAL</text><path d="M44 323h42" stroke="#ad8bce" stroke-width="3"/></g>
+</svg>

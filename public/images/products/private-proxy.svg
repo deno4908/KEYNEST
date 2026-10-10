@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#132e39"/><stop offset="1" stop-color="#2a5764"/></linearGradient>
+    <linearGradient id="card" x2="1" y2="1"><stop stop-color="#9fc5c8"/><stop offset=".55" stop-color="#70a4b0"/><stop offset="1" stop-color="#4c859a"/></linearGradient>
+    <linearGradient id="orb" x2=".8" y2="1"><stop stop-color="#f1ffff"/><stop offset="1" stop-color="#afdadc"/></linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <path d="M650-100L320 540H530L860-100Z" fill="#b4e4ed" opacity=".035"/>
+  <g transform="translate(590 82) rotate(14 135 190)"><rect x="5" y="15" width="260" height="354" rx="20" fill="#0c1d24" opacity=".45"/><rect width="260" height="354" rx="20" fill="#2f5260" stroke="#709aa7"/><path d="M26 36h28" stroke="#b9dce2" stroke-width="4"/><text x="26" y="319" font-family="Arial,sans-serif" font-size="15" fill="#a5cad3" letter-spacing="3">KEYNEST</text></g>
+  <g transform="translate(510 112) rotate(-9 137 181)">
+    <rect x="5" y="13" width="274" height="360" rx="19" fill="#0c1b20" opacity=".3"/>
+    <rect width="274" height="360" rx="19" fill="url(#card)" stroke="#a6d0d7" stroke-width="2"/>
+    <text x="25" y="42" fill="#e9fafb" font-family="Arial,sans-serif" font-size="13" font-weight="700" letter-spacing="3">KEYNEST</text>
+    <circle cx="137" cy="168" r="76" fill="url(#orb)"/>
+    <g fill="none" stroke="#477989" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="99" y="149" width="76" height="60" rx="12"/><path d="M115 149v-17a22 22 0 0 1 44 0v17"/><circle cx="137" cy="175" r="5"/><path d="M137 180v10"/></g>
+    <text x="137" y="292" text-anchor="middle" fill="#f2feff" font-family="Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="2">PRIVATE IPv4</text>
+    <text x="137" y="318" text-anchor="middle" fill="#d2ecf0" font-family="Arial,sans-serif" font-size="12" letter-spacing="4">PROXY ACCESS</text>
+  </g>
+  <g font-family="Arial,Helvetica,sans-serif"><text x="52" y="150" fill="#9ebfcb" font-size="16" letter-spacing="3">KEYNEST / MMO</text><text x="48" y="259" fill="#f0fafc" font-size="82" font-weight="800" letter-spacing="-2">PROXY</text><text x="52" y="305" fill="#aed6e0" font-size="25" letter-spacing="4">PRIVATE IPv4</text><path d="M52 347h42" stroke="#79acbb" stroke-width="3"/></g>
+</svg>

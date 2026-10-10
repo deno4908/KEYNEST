@@ -1,0 +1,354 @@
+.rating-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-size: inherit;
+  line-height: inherit;
+  color: #d5b68c;
+}
+.rating-stars > svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+.product-rating-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #99949d;
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.rating-separator {
+  color: #615b65;
+}
+.product-card > .product-rating-line {
+  padding: 0;
+  margin: 4px 0 6px;
+  font-size: 10px;
+  line-height: 16px;
+}
+.detail-rating-button {
+  display: block;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  margin: 12px 0;
+  text-align: left;
+}
+.detail-rating-button:hover .product-rating-line {
+  color: #e3c0a4;
+}
+#product-feedback-tabs {
+  scroll-margin-top: 165px;
+  overflow-x: auto;
+}
+#product-feedback-tabs button {
+  white-space: nowrap;
+}
+.product-feedback {
+  color: #e2dce6;
+}
+.rating-overview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #343039;
+}
+.rating-overview > .button {
+  margin-left: auto;
+  min-height: 34px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+.rating-breakdown {
+  position: relative;
+  font-size: 11px;
+  color: #9c919f;
+}
+.rating-breakdown summary {
+  cursor: pointer;
+}
+.rating-breakdown[open] {
+  flex-basis: 100%;
+  order: 3;
+}
+.rating-breakdown .rating-distribution {
+  max-width: 300px;
+  padding-top: 16px;
+}
+.rating-distribution {
+  display: grid;
+  gap: 11px;
+}
+.rating-distribution > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rating-distribution > div > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #b8afb9;
+  font-size: 11px;
+}
+.rating-distribution small {
+  width: 30px;
+  font-size: 11px;
+  color: #aaa0af;
+  text-align: right;
+}
+.rating-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 5px;
+  background: #343039;
+  overflow: hidden;
+}
+.rating-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #dba563;
+}
+.feedback-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+}
+.product-feedback h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: #e7e0e9;
+}
+.feedback-compose {
+  min-width: 0;
+  padding: 25px;
+  border: 1px solid #36323d;
+  border-radius: 8px;
+  background: #19191e;
+}
+.product-feedback .feedback-compose p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: #a9a0af;
+}
+.feedback-compose form {
+  display: flex;
+  flex-direction: column;
+}
+.feedback-compose label,
+.rating-picker legend {
+  font-size: 12px;
+  color: #cec3d2;
+  margin-bottom: 10px;
+}
+.rating-picker {
+  border: 0;
+  padding: 0;
+  margin: 0 0 23px;
+  display: flex;
+  gap: 6px;
+}
+.rating-picker label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  position: relative;
+  margin: 0;
+}
+.rating-picker input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+}
+.rating-picker label:has(input:focus-visible) {
+  outline: 2px solid #ff9566;
+  outline-offset: 2px;
+}
+.rating-picker label:hover {
+  background: #302820;
+}
+.rating-picker svg {
+  color: #5d5363;
+}
+.rating-picker svg.filled {
+  color: #e8b071;
+  fill: #e8b071;
+}
+.feedback-compose textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.8;
+  padding: 12px;
+}
+.feedback-counter {
+  color: #8f8698;
+  font-size: 10px;
+  text-align: right;
+  margin-top: 7px;
+}
+.product-feedback p.feedback-guideline {
+  font-size: 10px;
+  margin: 12px 0 18px;
+}
+.feedback-thanks {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+}
+.feedback-thanks svg {
+  flex-shrink: 0;
+  color: #98baa7;
+  margin-top: 3px;
+}
+.feedback-entry {
+  border-bottom: 1px solid #302c35;
+  padding: 22px 0;
+}
+.feedback-entry:first-of-type {
+  padding-top: 0;
+}
+.feedback-author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.feedback-avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #332b29;
+  color: #d7b39d;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.feedback-author > div {
+  min-width: 0;
+}
+.feedback-author strong {
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+  display: block;
+}
+.feedback-author time {
+  display: block;
+  color: #9a8fa1;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.verified-buyer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #9bb7a7;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.feedback-author > .icon-button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.product-feedback p.feedback-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+  font-size: 13px;
+  color: #c6bdce;
+  margin: 12px 0 0;
+}
+.feedback-empty {
+  border: 1px dashed #3b3342;
+  border-radius: 8px;
+  padding: 30px 20px;
+  text-align: center;
+  color: #91869d;
+}
+.product-feedback .feedback-empty p {
+  font-size: 12px;
+  color: #a699b2;
+  margin: 15px 0 0;
+}
+.feedback-more {
+  margin-top: 20px;
+}
+.feedback-error {
+  margin-bottom: 18px;
+  color: #efaea4;
+}
+.feedback-error p {
+  color: inherit;
+}
+.comments-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 30px;
+}
+.comments-heading > svg {
+  color: #d4b392;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.product-feedback .comments-heading h2 {
+  font-size: 21px;
+  margin: 0 0 8px;
+}
+.comments-heading h2 span {
+  font-size: 15px;
+  color: #ab9cb8;
+  font-weight: 400;
+}
+.product-feedback .comments-heading p {
+  color: #a99bb3;
+  font-size: 12px;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .feedback-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .feedback-compose {
+    order: -1;
+  }
+}
+@media (max-width: 480px) {
+  .feedback-compose {
+    padding: 20px;
+  }
+  .feedback-compose textarea {
+    font-size: 16px;
+  }
+  .verified-buyer {
+    font-size: 9px;
+    gap: 4px;
+  }
+}

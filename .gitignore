@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.data/
+*.log
+*.tsbuildinfo
+test-results/
+playwright-report/
+*.tar.gz
+*.pem
+*.key
+*.ppk

@@ -1,0 +1,112 @@
+.home-announcements {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.announcement-admin-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.home-announcements details {
+  background: #191b20;
+  border: 0;
+  border-radius: 4px;
+}
+.home-announcements summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  cursor: pointer;
+  list-style: none;
+  color: #d8dbe3;
+}
+.home-announcements summary::-webkit-details-marker {
+  display: none;
+}
+.home-announcements summary strong {
+  flex: 1;
+  font-weight: 500;
+  font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.home-announcements summary svg {
+  flex-shrink: 0;
+}
+.home-announcements details[open] .announcement-toggle svg {
+  transform: rotate(180deg);
+}
+.home-announcements details > div {
+  padding: 16px 20px;
+  border-top: 1px solid #30333b;
+}
+.home-announcements small {
+  color: #939aa9;
+  font-size: 11px;
+}
+.home-announcements p {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  font-size: 13px;
+  color: #bec3ce;
+}
+.announcement-label {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 7px;
+  color: #dda27e;
+  padding-right: 16px;
+  border-right: 1px solid #393b43;
+  font-size: 11px;
+  font-weight: 500;
+}
+.announcement-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  color: #969eae;
+  font-size: 11px;
+}
+.announcement-toggle svg {
+  transition: transform 180ms ease;
+}
+.home-announcements summary:hover {
+  background: #ffffff03;
+}
+.home-announcements summary:hover .announcement-toggle {
+  color: #d7dce6;
+}
+.home-announcements summary:focus-visible {
+  outline: 2px solid #dba582;
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+@media (max-width: 540px) {
+  .home-announcements summary {
+    padding: 6px 10px;
+    gap: 10px;
+  }
+  .announcement-label {
+    padding-right: 10px;
+  }
+  .announcement-label > span,
+  .announcement-more {
+    display: none;
+  }
+  .home-announcements details > div {
+    padding: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .announcement-toggle svg {
+    transition: none;
+  }
+}

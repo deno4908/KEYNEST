@@ -1,0 +1,22 @@
+[Unit]
+Description=KEYNEST website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keynest
+Group=keynest
+WorkingDirectory=/opt/keynest/current
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=384
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=35
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
