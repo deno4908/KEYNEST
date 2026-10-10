@@ -160,6 +160,8 @@ export function StoreNavigation({
         </Link>
       </div>
       {open && (
+        <>
+        <div className="department-mobile-backdrop" aria-hidden="true" onClick={() => { onOpenChange(false); focusTrigger(); }} />
         <div className="container department-panel" id="shop-departments">
           <div className="department-heading">
             <div>
@@ -244,6 +246,7 @@ export function StoreNavigation({
             </Link>
           </div>
         </div>
+        </>
       )}
     </nav>
   );

@@ -1,5 +1,24 @@
 .department-mobile-toggle { display: none; }
+.department-mobile-backdrop { display: none; }
 @media (max-width: 760px) {
+  .footer-bottom {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 0 max(20px, env(safe-area-inset-bottom));
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #939ba9;
+  }
+  .footer-bottom > span { max-width: 100%; }
+  .footer-bottom > span:last-child {
+    justify-content: center;
+    gap: 7px;
+    font-size: 10px;
+    color: #a6aeba;
+  }
+  .footer-bottom > span:last-child > svg { width: 14px; height: 14px; flex-shrink: 0; }
   .modal-backdrop { padding: 0; align-items: stretch; background: #15161a; backdrop-filter: none; }
   .modal-backdrop > .modal { width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; border-radius: 0; padding: 0 20px max(24px, env(safe-area-inset-bottom)); box-shadow: none; overflow-y: auto; }
   .modal > .modal-title { position: sticky; top: 0; z-index: 5; background: #191a1e; padding: max(14px, env(safe-area-inset-top)) 0 14px; margin: 0 0 22px; border-bottom: 1px solid #303238; min-height: 62px; }
@@ -15,20 +34,21 @@
   .auth-dialog .auth-heading h2 { font-size: 25px; }
   .modal input:not([type=checkbox]):not([type=radio]), .modal select, .modal textarea { font-size: 16px; }
 
-  .department-panel { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0 20px max(24px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; z-index: 40; }
-  .department-heading { position: sticky; top: 0; z-index: 2; background: #1b1c20; padding: max(16px, env(safe-area-inset-top)) 0 16px; }
-  .department-heading strong { font-size: 18px; }
+  .department-mobile-backdrop { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 48%); z-index: 39; }
+  .department-panel { position: fixed; inset: max(72px, env(safe-area-inset-top)) 12px auto; width: calc(100% - 24px); max-width: 400px; height: auto; max-height: min(75dvh, calc(100dvh - 96px)); margin: 0 auto; padding: 0 16px; border: 1px solid #35373e; border-radius: 14px; z-index: 40; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 18px 50px rgb(0 0 0 / 35%); }
+  .department-heading { position: sticky; top: 0; z-index: 2; background: #1b1c20; padding: 10px 0; }
+  .department-heading strong { font-size: 15px; }
   .department-heading span { display: none; }
   .department-heading button { width: 44px; height: 44px; }
-  .department-columns { display: block; padding: 8px 0 20px; }
+  .department-columns { display: block; padding: 0; }
   .department-columns > section, .department-columns > section:not(:last-child) { padding: 0; border-bottom: 1px solid #303239; }
   .department-title { display: none; }
-  .department-mobile-toggle { display: flex; width: 100%; align-items: center; gap: 12px; min-height: 66px; text-align: left; background: none; border: 0; color: #eceef2; padding: 14px 0; }
+  .department-mobile-toggle { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 52px; text-align: left; background: none; border: 0; color: #eceef2; padding: 10px 0; }
   .department-mobile-toggle > svg:first-child { color: #e5946b; flex-shrink: 0; }
   .department-mobile-toggle > svg:last-child { margin-left: auto; color: #9299a7; transition: transform .15s; }
   .department-mobile-toggle[aria-expanded=true] > svg:last-child { transform: rotate(180deg); }
   .department-mobile-toggle strong { font-size: 14px; font-weight: 600; }
-  .department-mobile-toggle small { display: block; color: #9299a7; font-size: 11px; margin-top: 4px; }
+  .department-mobile-toggle small { display: none; }
   .department-body { display: none; padding: 0 0 18px 33px; }
   .department-body.is-expanded { display: block; }
   .department-children { display: grid; grid-template-columns: 1fr; margin: 0; gap: 0; }
