@@ -34,6 +34,8 @@ npm ci --omit=dev --no-audit --no-fund
 node --check server/index.js
 test -s dist/index.html
 previous="$(previous_release "$base")"
+worker_enabled=false
+if systemctl is-enabled --quiet keynest-payments.service; then worker_enabled=true; fi
 activated=false
 rollback() {
   code=$?
@@ -42,9 +44,11 @@ rollback() {
       ln -sfn "$previous" "$base/current.next"
       mv -Tf "$base/current.next" "$base/current"
       sudo -n /usr/bin/systemctl restart keynest
+      if [[ "$worker_enabled" == true ]]; then sudo -n /usr/bin/systemctl restart keynest-payments; fi
       echo 'Deployment failed; previous release restored. Check service logs.'
     else
       sudo -n /usr/bin/systemctl stop keynest
+      if [[ "$worker_enabled" == true ]]; then sudo -n /usr/bin/systemctl stop keynest-payments; fi
       echo 'First deployment failed. Check service logs and .env.'
     fi
   fi
@@ -55,6 +59,7 @@ ln -sfn "$release" "$base/current.next"
 mv -Tf "$base/current.next" "$base/current"
 activated=true
 sudo -n /usr/bin/systemctl restart keynest
+if [[ "$worker_enabled" == true ]]; then sudo -n /usr/bin/systemctl restart keynest-payments; fi
 for attempt in {1..20}; do
   if curl --fail --silent --max-time 5 http://127.0.0.1:3001/api/health > /dev/null &&
      [[ "$(curl --fail --silent --max-time 5 http://127.0.0.1:3001/release.txt)" == "${release_id:0:40}" ]]; then

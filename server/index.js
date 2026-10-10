@@ -10,6 +10,8 @@ import { createOAuthRouter } from "./oauth.js";
 import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
 import { requirePasswordSession } from "./accounts.js";
+import { registerSupabase } from "./registration.js";
+import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
@@ -126,7 +128,7 @@ app.use("/api", (req, res, next) => {
   // Keep session status/logout available when ordinary API traffic is limited.
   if (
     (req.method === "GET" && req.path === "/auth/mfa/status") ||
-    (req.method === "POST" && req.path === "/auth/logout")
+    (req.method === "POST" && ["/auth/logout", "/auth/refresh"].includes(req.path))
   ) {
     return sessionControlLimit(req, res, next);
   }
@@ -148,6 +150,7 @@ app.use("/api/auth", (req, res, next) => {
         "/admin-otp/send",
         "/admin-otp/verify",
         "/logout",
+        "/refresh",
       ].includes(req.path))
   )
     return next();
@@ -178,8 +181,7 @@ const cookieOpts = {
   maxAge: 7 * 86400000,
 };
 function setAuth(res, s) {
-  res.cookie("kn_access", s.access_token, cookieOpts);
-  res.cookie("kn_refresh", s.refresh_token, cookieOpts);
+  sendSession(res, s, cookieOpts);
 }
 app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
 function clearAuth(res) {
@@ -199,6 +201,25 @@ function demoSession(res, id) {
   res.cookie("kn_session", token, cookieOpts);
 }
 const adminOtp = createAdminOtp({ config, makeAuthClient });
+app.post('/api/auth/refresh', async (req, res) => {
+  if (config.mode === 'demo') return res.json({ ok: true });
+  if (!req.cookies.kn_refresh) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
+  const client = makeAuthClient();
+  const { data, error } = await client.auth.refreshSession({ refresh_token: req.cookies.kn_refresh });
+  if (error || !data.session || !data.user) {
+    clearAuth(res);
+    return res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn.' });
+  }
+  req.user = await store.profile(data.user.id);
+  try {
+    await operations.authorize(req, data.session.access_token);
+  } catch (error) {
+    if ([401, 403].includes(error.status)) clearAuth(res);
+    throw error;
+  }
+  setAuth(res, data.session);
+  res.json({ ok: true });
+});
 const auth = async (req, res, next) => {
   try {
     let verifiedToken = req.cookies.kn_session;
@@ -211,27 +232,10 @@ const auth = async (req, res, next) => {
       if (!s) throw new AppError("Vui lòng đăng nhập.", 401);
       req.user = store.profile(s.user_id);
     } else {
-      verifiedToken = req.cookies.kn_access;
-      const client = makeAuthClient();
-      let { data, error } = await client.auth.getUser(
-        req.cookies.kn_access || "",
-      );
-      if (error && req.cookies.kn_refresh) {
-        const refreshed = await client.auth.refreshSession({
-          refresh_token: req.cookies.kn_refresh,
-        });
-        if (!refreshed.error && refreshed.data.session) {
-          verifiedToken = refreshed.data.session.access_token;
-          setAuth(res, refreshed.data.session);
-          ({ data, error } = await client.auth.getUser(
-            refreshed.data.session.access_token,
-          ));
-        }
-      }
-      if (error || !data.user)
-        throw new AppError("Phiên đăng nhập đã hết hạn.", 401);
-      req.user = await store.profile(data.user.id);
-      req.authUser = data.user;
+      const verified = await verifyBearer(req, makeAuthClient());
+      verifiedToken = verified.token;
+      req.user = await store.profile(verified.user.id);
+      req.authUser = verified.user;
       req.authToken = verifiedToken;
     }
     await operations.authorize(req, verifiedToken);
@@ -246,6 +250,7 @@ const auth = async (req, res, next) => {
     }
     return adminOtp.guard(req, res, next);
   } catch (e) {
+    if (e.status === 401) return res.status(401).json({ error: e.message, code: 'AUTH_REQUIRED' });
     next(e);
   }
 };
@@ -505,24 +510,16 @@ app.post("/api/auth/register", async (req, res) => {
     demoSession(res, u.id);
     return res.json({ user: u });
   }
-  const { data, error } = await makeAuthClient().auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: { data: { name: input.name } },
-  });
-  if (error) throw new AppError("Không thể đăng ký tài khoản.");
-  if (data.session) {
-    setAuth(res, data.session);
-    return res.json({ user: await store.profile(data.user.id) });
-  }
-  res.json({ message: "Kiểm tra email để xác minh tài khoản, rồi đăng nhập." });
+  const result = await registerSupabase(store, makeAuthClient(), input);
+  if (result.session) setAuth(res, result.session);
+  res.json(result.user ? { user: result.user } : { message: result.message });
 });
 app.post(
   "/api/auth/forgot",
   (req, res, next) => {
     if (
       config.mode === "supabase" &&
-      (req.cookies.kn_access || req.cookies.kn_refresh)
+      (req.headers.authorization || req.cookies.kn_refresh)
     )
       return auth(req, res, next);
     next();
@@ -587,10 +584,10 @@ app.post("/api/auth/logout", async (req, res) => {
       (s) => !safeEqual(s.token, digest(req.cookies.kn_session || "")),
     );
     store.save();
-  } else if (req.cookies.kn_access && req.cookies.kn_refresh) {
+  } else if (bearerToken(req) && req.cookies.kn_refresh) {
     const client = makeAuthClient();
     const { error } = await client.auth.setSession({
-      access_token: req.cookies.kn_access,
+      access_token: bearerToken(req),
       refresh_token: req.cookies.kn_refresh,
     });
     if (!error) await client.auth.signOut({ scope: "local" });

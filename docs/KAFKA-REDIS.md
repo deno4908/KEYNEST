@@ -27,6 +27,8 @@ Nguồn: [KafkaJS producer](https://kafka.js.org/docs/producing), [consumer và 
 
 ## Chạy thử trên máy
 
+Máy local cần chạy broker thật trước khi đổi `KAFKA_ENABLED=true`. Bật biến này một mình không cài Kafka. Nếu chỉ muốn thử giao diện/đăng ký, giữ `KAFKA_ENABLED=false`.
+
 1. Cài/chạy Docker Desktop với Linux containers và Docker Compose. Máy phải có đủ bộ nhớ cho Kafka; file compose này chỉ phục vụ phát triển, không có HA/TLS/auth, chỉ bind cổng ra localhost.
 
 ```powershell
@@ -94,6 +96,68 @@ npm run infra:status
 Đầu ra hiển thị group state, số worker member, committed offset, high offset và lag theo partition. Admin → Thanh toán cũng hiển thị chế độ Kafka/Redis; đây không phải health check worker. Bật cảnh báo bên vận hành khi group không có member hoặc lag tăng liên tục.
 
 ## Vận hành nhiều instance
+
+### VPS 1 core / 1 GB đang chạy KEYNEST
+
+Dùng Kafka bên ngoài VPS (broker riêng hoặc dịch vụ Kafka có TLS/SASL). VPS này chỉ chạy API và worker; bắt đầu concurrency 1. Cần có địa chỉ broker, tài khoản SASL và topic trước. Không bật Kafka khi chưa có broker vì API sẽ không khởi động được.
+
+1. Deploy phiên bản mới chứa `deploy/keynest-payments.service`, `scripts/kafka-topics.js` và `scripts/kafka-status.js`.
+2. Trong Bitvise terminal **root**, sửa `nano /opt/keynest/.env`. Điền thông tin thật do bên cung cấp Kafka cấp (không dùng nguyên placeholder):
+
+```dotenv
+KAFKA_ENABLED=true
+KAFKA_BROKERS=broker1.example:9093,broker2.example:9093,broker3.example:9093
+KAFKA_SSL=true
+KAFKA_USERNAME=your-username
+KAFKA_PASSWORD=your-password
+KAFKA_SASL_MECHANISM=scram-sha-512
+KAFKA_PAYMENT_TOPIC=keynest.payments.v1
+KAFKA_PAYMENT_GROUP=keynest-settlement-v1
+KAFKA_CLIENT_ID=keynest-vps
+KAFKA_WORKER_CONCURRENCY=1
+KAFKA_TOPIC_REPLICATION_FACTOR=3
+KAFKA_TOPIC_MIN_ISR=2
+```
+
+Cơ chế SASL phải đúng nhà cung cấp (`plain`, `scram-sha-256` hoặc `scram-sha-512`). Redis là tùy chọn riêng; giữ cấu hình Redis hiện tại. API đang chạy chưa đọc env mới đến khi restart.
+
+3. Tạo topic (cần quyền quản trị topic; nếu tài khoản không có quyền này, tạo trong dashboard broker với 12 partitions, replication 3, min ISR 2 và retention 7 ngày):
+
+```bash
+sudo -u keynest bash -c 'cd /opt/keynest/current && NODE_ENV=production npm run infra:topics'
+```
+
+4. Cài service, trong Bitvise root:
+
+```bash
+cp /opt/keynest/current/deploy/keynest-payments.service /etc/systemd/system/keynest-payments.service
+systemctl daemon-reload
+```
+
+5. Cho CI/CD khởi động lại worker sau mỗi release. Mở `visudo -f /etc/sudoers.d/keynest`, giữ các quyền cũ và thêm dòng:
+
+```sudoers
+keynest ALL=(root) NOPASSWD: /usr/bin/systemctl restart keynest-payments, /usr/bin/systemctl stop keynest-payments
+```
+
+6. Chạy worker trước, kiểm tra đã kết nối Kafka rồi mới restart API:
+
+```bash
+systemctl enable --now keynest-payments
+journalctl -u keynest-payments -n 40 --no-pager
+sudo -u keynest bash -c 'cd /opt/keynest/current && npm run infra:status'
+```
+
+Khi log có `Payment worker running` và group có member:
+
+```bash
+systemctl restart keynest
+curl -f http://127.0.0.1:3001/api/health
+```
+
+7. Theo dõi `journalctl -u keynest-payments -f`, `free -h` và `npm run infra:status` trong `/opt/keynest/current`. Test webhook staging, xác nhận lag về 0 và chỉ cộng ví một lần. Workflow mới restart worker đã enable khi deploy/rollback; health API không chứng minh worker đã xử lý được giao dịch. Chưa kiểm thử broker ngoài hoặc bộ nhớ trên VPS của bạn.
+
+Nếu chưa restart API mà worker không kết nối được, sửa endpoint/TLS/SASL/topic rồi thử lại; API vẫn dùng cấu hình cũ. Khi Kafka đã nhận thanh toán, không tắt Kafka để bỏ qua lỗi: cần xử lý hết backlog trước khi chuyển về chế độ trực tiếp.
 
 - Chạy API và worker thành service riêng, có supervisor tự restart khi worker exit 1. Có thể chạy nhiều worker **cùng group ID**; tổng khả năng song song bị giới hạn bởi số partition (12 mặc định) và tài nguyên DB. Tăng từ từ theo số đo DB latency/locks/consumer lag.
 - Tất cả API cùng môi trường dùng chung Redis endpoint/prefix và cùng phiên bản route; các môi trường staging/production dùng prefix/topic/group khác nhau. Giới hạn chung trước xác thực theo IP; limiter sau xác thực theo user ID do server xác minh. Cần cấu hình đúng trusted proxy.

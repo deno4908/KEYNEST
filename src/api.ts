@@ -1,17 +1,52 @@
+let accessToken: string | null = null;
+let initialized = false;
+let refreshing: Promise<boolean> | null = null;
+
+function receiveToken(res: Response) {
+  const token = res.headers.get('X-Access-Token');
+  if (token) accessToken = token;
+}
+
+async function refreshAccess(): Promise<boolean> {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'X-App-Request': 'keynest' },
+    });
+    if (!res.ok && res.status !== 401) throw new Error('Không thể khôi phục phiên đăng nhập. Vui lòng thử lại.');
+    accessToken = null;
+    receiveToken(res);
+    initialized = true;
+    return res.ok;
+  })().finally(() => { refreshing = null; });
+  return refreshing;
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  if (!initialized) await refreshAccess();
+  const send = () => {
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+    headers.set('X-App-Request', 'keynest');
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    return fetch(`/api${path}`, {
     ...options,
     credentials: "same-origin",
-    headers: {
-      "Content-Type": "application/json",
-      "X-App-Request": "keynest",
-      ...options.headers,
-    },
-  });
-  const body = await res.json();
+    headers,
+    });
+  };
+  let res = await send();
+  let body = await res.json();
+  if (res.status === 401 && body.code === 'AUTH_REQUIRED' && await refreshAccess()) {
+    res = await send();
+    body = await res.json();
+  }
+  receiveToken(res);
+  if (path === '/auth/logout' && res.ok) accessToken = null;
   if (body.code === "ADMIN_OTP_REQUIRED" || body.admin_otp_required) {
     if (
       !["/admin-verification", "/two-factor"].includes(window.location.pathname)

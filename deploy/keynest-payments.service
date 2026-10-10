@@ -1,0 +1,22 @@
+[Unit]
+Description=KEYNEST Kafka payment worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=keynest
+Group=keynest
+WorkingDirectory=/opt/keynest/current
+ExecStart=/usr/bin/node server/payment-worker.js
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=192
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=35
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

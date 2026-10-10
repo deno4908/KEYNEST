@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, Upload, X } from "lucide-react";
+import { api } from './api';
 
 export function ImageUpload({
   initial = "",
@@ -39,15 +40,13 @@ export function ImageUpload({
     const request = new AbortController();
     controller.current = request;
     try {
-      const response = await fetch("/api/admin/media", {
+      const data = await api<{ url: string }>("/admin/media", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": file.type, "X-App-Request": "keynest" },
         body: file,
         signal: request.signal,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Không thể tải ảnh lên.");
       setUrl(data.url);
     } catch (e) {
       if (!request.signal.aborted) setError((e as Error).message);

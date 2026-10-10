@@ -42,6 +42,15 @@ try {
     );
   pass("migration compiles with pgcrypto and all functions");
   await db.exec('begin');
+  const registrationId = randomUUID();
+  await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,'Duplicate@example.test',$2)",
+    [registrationId, JSON.stringify({ name: 'Reserved Name', registration_name: ' Reserved Name ' })]);
+  assert.deepEqual(await scalar("select registration_conflicts('duplicate@EXAMPLE.test','reserved name')"), { email: true, name: true });
+  await fails("insert into auth.users(id,email,raw_user_meta_data) values($1,'another@example.test',$2)",
+    [randomUUID(), JSON.stringify({ name: 'reserved name', registration_name: 'RESERVED NAME' })]);
+  await db.exec('rollback');
+  pass('registration rejects normalized duplicate names in the database and detects existing emails');
+  await db.exec('begin');
   await db.exec("insert into categories(id,name) values('phan-mem','Software')");
   const categoryProduct = randomUUID();
   await db.query("insert into products(id,slug,name,category,platform) values($1,'dynamic-category-test','Software','phan-mem','PC')", [categoryProduct]);

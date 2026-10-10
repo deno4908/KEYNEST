@@ -1,4 +1,5 @@
 import test from "node:test";
+import { sendSession } from '../server/bearer.js';
 import assert from "node:assert/strict";
 import express from "express";
 import { mfaRouter, needsMfa } from "../server/mfa.js";
@@ -41,7 +42,7 @@ test("MFA routes bind factors to user, reject enrollment bypass and verify befor
       },
       limiter: () => (req, res, next) => next(),
       setAuth(res, session) {
-        res.cookie("kn_access", session.access_token, { httpOnly: true });
+        sendSession(res, session, { httpOnly: true, path: '/api' });
       },
       fetcher: async (url, opts) => {
         calls.push({ path: url.pathname, ...opts });
@@ -111,6 +112,7 @@ test("MFA routes bind factors to user, reject enrollment bypass and verify befor
   });
   assert.equal(result.status, 200);
   assert.match(result.headers.get("set-cookie"), /HttpOnly/);
+  assert.equal(result.headers.get('X-Access-Token'), token('aal2'));
   assert.equal(calls.at(-1).method, "DELETE");
   assert.equal(calls.at(-1).headers.Authorization, `Bearer ${token("aal2")}`);
   assert.deepEqual(await result.json(), { success: true });

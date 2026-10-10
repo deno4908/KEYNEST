@@ -20,10 +20,8 @@ import type { Banner } from "./types";
 export function BannerSlider() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [hover, setHover] = useState(false);
+  const [paused, setPaused] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [focused, setFocused] = useState(false);
-  const [reduced, setReduced] = useState(false);
   const [hidden, setHidden] = useState(document.hidden);
   useEffect(() => {
     const controller = new AbortController();
@@ -31,7 +29,7 @@ export function BannerSlider() {
       .then(setBanners)
       .catch(() => {});
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setReduced(media.matches);
+    const sync = () => setPaused(media.matches);
     sync();
     media.addEventListener("change", sync);
     const visibility = () => setHidden(document.hidden);
@@ -43,14 +41,19 @@ export function BannerSlider() {
     };
   }, []);
   useEffect(() => {
-    if (banners.length < 2 || paused || hover || focused || reduced || hidden)
+    if (banners.length < 2 || paused || focused || hidden)
       return;
     const timer = window.setInterval(
       () => setIndex((i) => (i + 1) % banners.length),
-      6000,
+      4000,
     );
     return () => clearInterval(timer);
-  }, [banners.length, paused, hover, focused, reduced, hidden, index]);
+  }, [banners.length, paused, focused, hidden, index]);
+  useEffect(() => {
+    if (banners.length < 2) return;
+    const nextImage = new window.Image();
+    nextImage.src = banners[(index + 1) % banners.length].image;
+  }, [banners, index]);
   if (!banners.length)
     return (
       <div className="banner-fallback">
@@ -75,14 +78,14 @@ export function BannerSlider() {
       className="campaign-slider"
       aria-label="Banner nổi bật"
       aria-roledescription="carousel"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onFocusCapture={() => setFocused(true)}
+      onPointerDown={() => setFocused(false)}
+      onFocusCapture={(e) => setFocused(e.target.matches(":focus-visible"))}
       onBlurCapture={(e) => {
         if (!e.currentTarget.contains(e.relatedTarget as Node))
           setFocused(false);
       }}
       onKeyDown={(e) => {
+        if (e.key === "Tab") setFocused(true);
         if (e.key === "ArrowRight") {
           e.preventDefault();
           move(index + 1);
@@ -139,7 +142,10 @@ export function BannerSlider() {
             aria-label={
               paused ? "Tiếp tục chuyển banner" : "Tạm dừng chuyển banner"
             }
-            onClick={() => setPaused(!paused)}
+            onClick={() => {
+              setPaused(!paused);
+              setFocused(false);
+            }}
           >
             {paused ? <Play size={14} /> : <Pause size={14} />}
           </button>

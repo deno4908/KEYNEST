@@ -127,7 +127,7 @@ export function AuthModal({ close }: { close: () => void }) {
           notify("Tài khoản đã sẵn sàng.");
           close();
         } else
-          setMessage(result.message || "Kiểm tra email để xác nhận tài khoản.");
+          setMessage(result.message || "Đã tạo tài khoản. Hãy đăng nhập bằng email và mật khẩu.");
       } else {
         setUser(
           await post<User>("/auth/login", { email: email.trim(), password }),

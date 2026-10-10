@@ -43,7 +43,7 @@ jobs:
       - name: Package runtime (no credentials or node_modules)
         run: |
           printf '%s\n' "$GITHUB_SHA" > dist/release.txt
-          tar -czf release.tar.gz dist server shared package.json package-lock.json deploy/release.sh
+          tar -czf release.tar.gz dist server shared package.json package-lock.json deploy/release.sh deploy/keynest-payments.service scripts/kafka-topics.js scripts/kafka-status.js
           sha256sum release.tar.gz > release.sha256
       - uses: actions/upload-artifact@v4
         with:

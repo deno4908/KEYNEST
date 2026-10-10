@@ -1,4 +1,5 @@
 import test from "node:test";
+import { sendSession } from '../server/bearer.js';
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import express from "express";
@@ -48,8 +49,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
         profile: async (id) => (id === uid ? { id, name: "OAuth User" } : null),
       },
       setAuth: (res, session) => {
-        res.cookie("kn_access", session.access_token, { httpOnly: true });
-        res.cookie("kn_refresh", session.refresh_token, { httpOnly: true });
+        sendSession(res, session, { httpOnly: true, path: '/api', sameSite: 'lax' });
       },
       fetcher: async (url, options) => {
         exchanges++;
@@ -145,10 +145,8 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   const good = await callback("?code=valid-code", flow.cookie);
   assert.equal(good.status, 303);
   assert.equal(good.headers.get("location"), `${config.origin}/account`);
-  assert.match(
-    good.headers.get("set-cookie"),
-    /kn_access=private-access-token/,
-  );
+  assert.equal(good.headers.get('X-Access-Token'), 'private-access-token');
+  assert.doesNotMatch(good.headers.get('set-cookie'), /kn_access=private-access-token/);
   assert.equal(good.headers.get("referrer-policy"), "no-referrer");
   assert.equal(
     (await callback("?code=valid-code", flow.cookie)).headers.get("location"),

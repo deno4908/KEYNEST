@@ -1321,11 +1321,24 @@ export function PaymentModal({
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(payment.status),
     [remaining, setRemaining] = useState(
-      Math.max(0, Date.parse(payment.expires_at) - Date.now()),
+      Math.max(0, Math.ceil((Date.parse(payment.expires_at) - Date.now()) / 1000)) * 1000,
     );
   useEffect(() => {
+    const updateCountdown = () => {
+      setRemaining(
+        Math.max(0, Math.ceil((Date.parse(payment.expires_at) - Date.now()) / 1000)) * 1000,
+      );
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    document.addEventListener("visibilitychange", updateCountdown);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", updateCountdown);
+    };
+  }, [payment.id, payment.expires_at]);
+  useEffect(() => {
     const id = setInterval(() => {
-      setRemaining(Math.max(0, Date.parse(payment.expires_at) - Date.now()));
       api<{ payments: Payment[] }>("/wallet")
         .then(async (w) => {
           let p = w.payments.find((p) => p.id === payment.id);

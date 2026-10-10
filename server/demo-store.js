@@ -152,12 +152,16 @@ export class DemoStore {
     return this.publicUser(this.db.users.find((u) => u.id === id));
   }
   register(email, password, name) {
-    if (this.db.users.some((u) => u.email === email))
-      throw new AppError("Email đã được sử dụng.");
+    const normalizedName = name.trim().toLowerCase();
+    if (this.db.users.some((u) => u.email.toLowerCase() === email.toLowerCase()))
+      throw new AppError("Email đã được sử dụng.", 409);
+    if (this.db.users.some((u) => (u.registration_name || u.name).trim().toLowerCase() === normalizedName || u.name.trim().toLowerCase() === normalizedName))
+      throw new AppError("Tên đăng ký đã được sử dụng.", 409);
     const u = {
       id: randomUUID(),
       email,
       name,
+      registration_name: normalizedName,
       role: "customer",
       balance: 0,
       password_hash: hashPassword(password),
