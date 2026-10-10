@@ -964,13 +964,20 @@
   background: #23201e;
   min-width: 0;
 }
-.coupon-card > div:first-child {
+.coupon-heading {
   display: flex;
   align-items: center;
   gap: 10px;
   color: #c3a080;
   font-size: 10px;
   letter-spacing: 1px;
+}
+.coupon-heading svg {
+  flex-shrink: 0;
+}
+.coupon-pinned {
+  display: block;
+  margin-bottom: 14px;
 }
 .coupon-card h2 {
   font-size: 29px;

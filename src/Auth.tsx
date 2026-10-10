@@ -82,7 +82,7 @@ export function AuthModal({ close }: { close: () => void }) {
     provider: "google" | "discord",
     button: HTMLButtonElement,
   ) {
-    if (busy || oauthRequest.current || captchaBlocked) return;
+    if (busy || oauthRequest.current) return;
     const source = button.querySelector("svg")?.getBoundingClientRect();
     const target = layoutRef.current?.getBoundingClientRect();
     if (source && target)
@@ -104,7 +104,6 @@ export function AuthModal({ close }: { close: () => void }) {
         api<{ url: string }>(`/auth/oauth/${provider}`, {
           method: "POST",
           body: "{}",
-          headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : {},
           signal: controller.signal,
         }),
         new Promise((resolve) => window.setTimeout(resolve, duration)),
@@ -296,14 +295,11 @@ export function AuthModal({ close }: { close: () => void }) {
               </div>
               {tab !== "forgot" && !message && (
                 <>
-                  {captchaConfigError && <p className="form-error" role="alert">{captchaConfigError}</p>}
-                  {!captcha && !captchaConfigError && <p role="status">Đang tải cấu hình đăng nhập…</p>}
-                  {captcha?.enabled && captcha.site_key && <Recaptcha key={`${tab}-${captchaVersion}`} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
                   <div className="auth-social">
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Google"
-                      disabled={busy || captchaBlocked}
+                      disabled={busy}
                       onClick={(e) => socialLogin("google", e.currentTarget)}
                     >
                       <GoogleIcon />
@@ -314,7 +310,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Discord"
-                      disabled={busy || captchaBlocked}
+                      disabled={busy}
                       onClick={(e) => socialLogin("discord", e.currentTarget)}
                     >
                       <DiscordIcon />
@@ -493,6 +489,11 @@ export function AuthModal({ close }: { close: () => void }) {
                         )}
                       </div>
                     )}
+                    {tab !== 'forgot' && <>
+                      {captchaConfigError && <p className="form-error" role="alert">{captchaConfigError}</p>}
+                      {!captcha && !captchaConfigError && <p role="status">Đang tải cấu hình đăng nhập…</p>}
+                      {captcha?.enabled && captcha.site_key && <Recaptcha key={`${tab}-${captchaVersion}`} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
+                    </>}
                     {error && (
                       <p className="form-error" role="alert">
                         {error}

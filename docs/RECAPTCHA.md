@@ -1,6 +1,6 @@
 # Bật Google reCAPTCHA cho KEYNEST
 
-Đã tích hợp **reCAPTCHA v2 Checkbox** (ô “Tôi không phải người máy”). Kiểm tra ở backend cho đăng nhập email, đăng ký và POST bắt đầu OAuth Google/Discord. Callback OAuth, làm mới token và 2FA không yêu cầu CAPTCHA mới. Rate limit và CSRF vẫn hoạt động. Không sử dụng Turnstile, reCAPTCHA v3 hoặc Enterprise Assessments API.
+Đã tích hợp **reCAPTCHA v2 Checkbox** (ô “Tôi không phải người máy”). Chỉ kiểm tra ở backend cho đăng nhập email và đăng ký email. Widget nằm dưới mật khẩu khi đăng nhập, dưới nhập lại mật khẩu khi đăng ký. Google/Discord không cần CAPTCHA; làm mới token và 2FA cũng không yêu cầu CAPTCHA mới. Rate limit và CSRF vẫn hoạt động. Không sử dụng Turnstile, reCAPTCHA v3 hoặc Enterprise Assessments API.
 
 ## 1. Tạo key cho website
 
@@ -42,7 +42,7 @@ Site key được frontend lấy từ `/api/config`, nên thay key không cần 
 ## 3. Kiểm tra
 
 1. Tải lại website, mở Đăng nhập: phải có widget tiếng Việt, nền tối.
-2. Nút đăng nhập/đăng ký/Google/Discord chờ hoàn tất xác minh.
+2. Nút đăng nhập/đăng ký email chờ hoàn tất xác minh. Google/Discord bấm được ngay mà không cần CAPTCHA.
 3. Tích checkbox rồi đăng nhập. Nếu sai mật khẩu, widget được làm mới để xác minh lại.
 4. Thử đăng ký mới. Vẫn không gửi OTP/xác nhận email đăng ký.
 5. Gọi API đăng nhập/đăng ký thiếu header `X-Captcha-Token`: backend trả lỗi trước khi kiểm tra mật khẩu/tạo tài khoản. Chỉ ẩn widget phía frontend không bỏ qua được backend.

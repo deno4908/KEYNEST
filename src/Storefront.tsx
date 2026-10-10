@@ -325,9 +325,9 @@ export function PromotionsPage() {
           {promotions.map((c) => (
             <article className="coupon-card" key={c.code}>
               {c.pinned && (
-                <span className="eyebrow orange">Ưu đãi được ghim</span>
+                <span className="eyebrow orange coupon-pinned">Ưu đãi được ghim</span>
               )}
-              <div>
+              <div className="coupon-heading">
                 <TicketPercent size={23} />
                 <span>MÃ GIẢM GIÁ</span>
               </div>
