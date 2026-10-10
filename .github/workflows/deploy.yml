@@ -37,7 +37,9 @@ jobs:
           VITE_DISCORD_URL: ${{ vars.VITE_DISCORD_URL }}
           VITE_FACEBOOK_URL: ${{ vars.VITE_FACEBOOK_URL }}
       - name: Validate deployment script
-        run: bash -n deploy/release.sh
+        run: |
+          bash -n deploy/release.sh
+          bash deploy/test-release-paths.sh
       - name: Package runtime (no credentials or node_modules)
         run: |
           printf '%s\n' "$GITHUB_SHA" > dist/release.txt

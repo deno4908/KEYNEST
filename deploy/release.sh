@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
+# readlink -f can return a nonexistent path. Only an existing, complete release
+# resolved before activation is a valid rollback target.
+previous_release() {
+  local root="$1" candidate
+  [[ -L "$root/current" ]] || return 0
+  candidate="$(readlink -e "$root/current" 2>/dev/null || true)"
+  case "$candidate" in
+    "$root/releases/"*)
+      if [[ -d "$candidate" && -s "$candidate/server/index.js" && -s "$candidate/dist/index.html" ]]; then
+        printf '%s\n' "$candidate"
+      fi
+      ;;
+  esac
+}
 release_id="${1:?Missing release ID}"
 [[ "$release_id" =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+$ ]] || exit 2
 base=/opt/keynest
@@ -19,7 +33,7 @@ cd "$release"
 npm ci --omit=dev --no-audit --no-fund
 node --check server/index.js
 test -s dist/index.html
-previous="$(readlink -f "$base/current" || true)"
+previous="$(previous_release "$base")"
 activated=false
 rollback() {
   code=$?
@@ -51,4 +65,6 @@ for attempt in {1..20}; do
   sleep 2
 done
 echo 'Health or release check failed.'
+systemctl show keynest -p ActiveState -p SubState -p Result -p ExecMainStatus -p WorkingDirectory || true
+echo 'Read startup logs on the VPS: sudo journalctl -u keynest -n 100 --no-pager'
 exit 1
