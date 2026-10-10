@@ -186,7 +186,7 @@ function setAuth(res, s) {
   sendSession(res, s, cookieOpts);
 }
 const verifyCaptcha = captchaGuard(config.captcha);
-app.post(['/api/auth/login', '/api/auth/register'], verifyCaptcha);
+app.post(['/api/auth/login', '/api/auth/register', '/api/auth/forgot'], verifyCaptcha);
 app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
 function clearAuth(res) {
   adminOtp.clear(res);

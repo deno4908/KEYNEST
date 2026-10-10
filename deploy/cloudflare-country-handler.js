@@ -9,7 +9,7 @@ export default {
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',
-      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; font-src data:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
     };
     const api = url.pathname === '/api' || url.pathname.startsWith('/api/');
     headers['Content-Type'] = api ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8';

@@ -23,12 +23,24 @@ import { ChangePassword } from "./ChangePassword";
 import { Avatar } from "./Avatar";
 import { AvatarUpload } from "./AvatarUpload";
 import { TwoFactor } from "./TwoFactor";
+import { Recaptcha } from './Recaptcha';
 import { NotificationInbox, SessionManager } from "./AccountOperations";
 
 type AccountData = { orders: Order[]; balance: number; ledger: Ledger[] };
 export function AccountPage({ logout }: { logout: () => void }) {
   const { user, setUser, mode, notify } = useStore();
   const [passwordLocked, setPasswordLocked] = useState(true);
+  const [captcha, setCaptcha] = useState<{ enabled: boolean; site_key: string | null } | null>(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaVersion, setCaptchaVersion] = useState(0);
+  const [captchaError, setCaptchaError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    api<{ captcha: { enabled: boolean; site_key: string | null } }>('/config', { signal: controller.signal })
+      .then(data => setCaptcha(data.captcha))
+      .catch(error => { if (!controller.signal.aborted) setCaptchaError(error.message); });
+    return () => controller.abort();
+  }, []);
   useEffect(() => {
     const controller = new AbortController();
     api<{ locked: boolean }>("/me/password-policy", {
@@ -90,6 +102,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
     }
   }
   async function sendRecovery() {
+    if (busy || passwordLocked || !captcha || (captcha.enabled && !captchaToken)) return;
     setBusy(true);
     setError("");
     setRecovery("");
@@ -98,13 +111,15 @@ export function AccountPage({ logout }: { logout: () => void }) {
         (
           await post<{ message: string }>("/auth/forgot", {
             email: user!.email,
-          })
+          }, captchaToken ? { 'X-Captcha-Token': captchaToken } : {})
         ).message,
       );
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setCaptchaToken('');
+      setCaptchaVersion(n => n + 1);
     }
   }
   const pending = data?.orders.filter(
@@ -498,11 +513,15 @@ export function AccountPage({ logout }: { logout: () => void }) {
                         ? "Bản demo chưa gửi email khôi phục. Tính năng này hoạt động khi cửa hàng kết nối Supabase."
                         : "Nhận liên kết qua email để thiết lập mật khẩu mới cho tài khoản."}
                   </p>
+                  {!passwordLocked && mode !== 'demo' && !recovery && <>
+                    {captchaError && <p className="form-error" role="alert">{captchaError}</p>}
+                    {captcha?.enabled && captcha.site_key && <Recaptcha key={captchaVersion} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
+                  </>}
                   <button
                     className="button button-outline"
                     onClick={sendRecovery}
                     disabled={
-                      passwordLocked || busy || mode === "demo" || !!recovery
+                      passwordLocked || busy || mode === "demo" || !!recovery || !captcha || (captcha.enabled && !captchaToken)
                     }
                   >
                     {passwordLocked

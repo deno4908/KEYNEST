@@ -1,6 +1,6 @@
 # Bật Google reCAPTCHA cho KEYNEST
 
-Đã tích hợp **reCAPTCHA v2 Checkbox** (ô “Tôi không phải người máy”). Chỉ kiểm tra ở backend cho đăng nhập email và đăng ký email. Widget nằm dưới mật khẩu khi đăng nhập, dưới nhập lại mật khẩu khi đăng ký. Google/Discord không cần CAPTCHA; làm mới token và 2FA cũng không yêu cầu CAPTCHA mới. Rate limit và CSRF vẫn hoạt động. Không sử dụng Turnstile, reCAPTCHA v3 hoặc Enterprise Assessments API.
+Đã tích hợp **reCAPTCHA v2 Checkbox** (ô “Tôi không phải người máy”) cho đăng nhập email, đăng ký email và yêu cầu khôi phục mật khẩu. Backend xác minh CAPTCHA cho cả ba API. Widget nằm dưới mật khẩu khi đăng nhập, dưới nhập lại mật khẩu khi đăng ký và dưới email khi quên mật khẩu. Mục khôi phục qua email trong tài khoản cũng yêu cầu CAPTCHA. Google/Discord không cần CAPTCHA; làm mới token và 2FA cũng không yêu cầu CAPTCHA mới. Rate limit và CSRF vẫn hoạt động. Không sử dụng Turnstile, reCAPTCHA v3 hoặc Enterprise Assessments API.
 
 ## 1. Tạo key cho website
 
@@ -45,7 +45,8 @@ Site key được frontend lấy từ `/api/config`, nên thay key không cần 
 2. Nút đăng nhập/đăng ký email chờ hoàn tất xác minh. Google/Discord bấm được ngay mà không cần CAPTCHA.
 3. Tích checkbox rồi đăng nhập. Nếu sai mật khẩu, widget được làm mới để xác minh lại.
 4. Thử đăng ký mới. Vẫn không gửi OTP/xác nhận email đăng ký.
-5. Gọi API đăng nhập/đăng ký thiếu header `X-Captcha-Token`: backend trả lỗi trước khi kiểm tra mật khẩu/tạo tài khoản. Chỉ ẩn widget phía frontend không bỏ qua được backend.
+5. Mở Quên mật khẩu: xác minh CAPTCHA trước khi gửi email khôi phục. Kiểm tra tương tự tại Tài khoản → Bảo mật → Khôi phục qua email.
+6. Gọi API đăng nhập/đăng ký/quên mật khẩu thiếu header `X-Captcha-Token`: backend trả lỗi trước khi kiểm tra mật khẩu/tạo tài khoản/gửi email. Chỉ ẩn widget phía frontend không bỏ qua được backend.
 
 Backend gọi Google Siteverify, kiểm tra success và hostname khớp APP_ORIGIN. Token reCAPTCHA chỉ dùng một lần, hết hạn sau 2 phút theo Google. Khi Google lỗi/mất mạng, không cho qua xác minh.
 

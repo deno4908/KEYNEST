@@ -122,7 +122,7 @@ export function AuthModal({ close }: { close: () => void }) {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy || (tab !== 'forgot' && captchaBlocked)) return;
+    if (busy || captchaBlocked) return;
     if (tab === "register" && password !== confirmation) {
       setConfirmationTouched(true);
       confirmationRef.current?.focus();
@@ -134,7 +134,7 @@ export function AuthModal({ close }: { close: () => void }) {
       if (tab === "forgot") {
         const result = await post<{ message: string }>("/auth/forgot", {
           email: email.trim(),
-        });
+        }, captchaToken ? { 'X-Captcha-Token': captchaToken } : {});
         setMessage(result.message);
       } else if (tab === "register") {
         const result = await post<{ user?: User; message?: string }>(
@@ -159,7 +159,7 @@ export function AuthModal({ close }: { close: () => void }) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
-      if (tab !== 'forgot') resetCaptcha();
+      resetCaptcha();
     }
   }
   const title =
@@ -489,17 +489,17 @@ export function AuthModal({ close }: { close: () => void }) {
                         )}
                       </div>
                     )}
-                    {tab !== 'forgot' && <>
+                    <>
                       {captchaConfigError && <p className="form-error" role="alert">{captchaConfigError}</p>}
                       {!captcha && !captchaConfigError && <p role="status">Đang tải cấu hình đăng nhập…</p>}
                       {captcha?.enabled && captcha.site_key && <Recaptcha key={`${tab}-${captchaVersion}`} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
-                    </>}
+                    </>
                     {error && (
                       <p className="form-error" role="alert">
                         {error}
                       </p>
                     )}
-                    <button className="button full auth-submit" disabled={busy || (tab !== 'forgot' && captchaBlocked)}>
+                    <button className="button full auth-submit" disabled={busy || captchaBlocked}>
                       {busy
                         ? "Đang xử lý…"
                         : tab === "register"

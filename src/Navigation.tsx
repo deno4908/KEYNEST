@@ -48,6 +48,7 @@ export function StoreNavigation({
   const location = useLocation();
   const root = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const focusTrigger = () => {
     const button = trigger.current?.getClientRects().length
       ? trigger.current
@@ -57,7 +58,24 @@ export function StoreNavigation({
   const category = new URLSearchParams(location.search).get("category");
   useEffect(() => {
     onOpenChange(false);
+    setExpanded(null);
   }, [location.pathname, location.search]);
+  useEffect(() => {
+    if (!open || !window.matchMedia('(max-width: 760px)').matches) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const panel = document.getElementById('shop-departments');
+    panel?.querySelector<HTMLButtonElement>('button')?.focus();
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const items = [...(panel?.querySelectorAll<HTMLElement>('a[href],button') || [])].filter(el => el.getClientRects().length && !el.matches(':disabled'));
+      const first = items[0], last = items.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', trap);
+    return () => { document.body.style.overflow = previous; document.removeEventListener('keydown', trap); };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const pointer = (e: PointerEvent) => {
@@ -145,7 +163,7 @@ export function StoreNavigation({
         <div className="container department-panel" id="shop-departments">
           <div className="department-heading">
             <div>
-              <strong>Tìm đúng thứ bạn cần</strong>
+              <strong>Danh mục sản phẩm</strong>
               <span>Game, thẻ quà tặng và dịch vụ số</span>
             </div>
             <button
@@ -167,6 +185,11 @@ export function StoreNavigation({
                 const groups = [...new Set(items.map(productGroup))];
                 return (
                   <section key={c}>
+                    <button className="department-mobile-toggle" type="button" aria-expanded={expanded === c} aria-controls={`department-group-${c}`} onClick={() => setExpanded(expanded === c ? null : c)}>
+                      <Icon size={21} />
+                      <span><strong>{categories[c]}</strong><small>{groups.length} nhóm sản phẩm</small></span>
+                      <ChevronDown size={17} />
+                    </button>
                     <Link
                       className="department-title"
                       to={catalogHref({ category: c })}
@@ -178,6 +201,7 @@ export function StoreNavigation({
                       </div>
                       <ChevronRight size={15} />
                     </Link>
+                    <div id={`department-group-${c}`} className={`department-body ${expanded === c ? 'is-expanded' : ''}`}>
                     <div className="department-children">
                       {groups.map((group) => (
                         <Link
@@ -202,6 +226,7 @@ export function StoreNavigation({
                       Tất cả {categories[c]}
                       <ArrowRight size={13} />
                     </Link>
+                    </div>
                   </section>
                 );
               },
