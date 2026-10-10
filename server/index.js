@@ -3,7 +3,8 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { z, ZodError } from "zod";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { socialMetadata, metadataHead, injectMetadata } from './social-preview.js';
 import { resolve } from "node:path";
 import { config } from "./config.js";
 import { createOAuthRouter } from "./oauth.js";
@@ -343,6 +344,7 @@ const productSchema = z
     subcategory: z.string().trim().max(60).default(""),
     subtitle: z.string().max(200).default(""),
     description: z.string().max(5000).default(""),
+    usage_notes: z.string().trim().max(10000).optional(),
     image: z
       .string()
       .max(600)
@@ -1031,8 +1033,20 @@ app.use("/api", (req, res) =>
   res.status(404).json({ error: "Không tìm thấy API." }),
 );
 if (existsSync(resolve("dist/index.html"))) {
-  app.use(express.static(resolve("dist")));
-  app.get("/{*path}", (req, res) => res.sendFile(resolve("dist/index.html")));
+  const pageTemplate = readFileSync(resolve('dist/index.html'), 'utf8');
+  app.get(['/share-preview', '/share-preview/products/:slug'], async (req, res) => {
+    const path = req.params.slug ? `/products/${req.params.slug}` : '/';
+    if (req.params.slug && !/^[a-z0-9-]{1,120}$/.test(req.params.slug)) return res.sendStatus(404);
+    const meta = await socialMetadata(path, config.origin, store);
+    if (!meta) return res.sendStatus(404);
+    res.type('html').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8">${metadataHead(meta)}</head><body></body></html>`);
+  });
+  app.use(express.static(resolve("dist"), { index: false }));
+  app.get("/{*path}", async (req, res) => {
+    const meta = await socialMetadata(req.path, config.origin, store);
+    if (!meta) return res.status(404).type('html').send(pageTemplate);
+    res.type('html').send(injectMetadata(pageTemplate, meta));
+  });
 }
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);

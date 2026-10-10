@@ -600,6 +600,7 @@ function ProductEditor({
         subcategory: f.get("subcategory"),
         subtitle: f.get("subtitle"),
         description: f.get("description"),
+        usage_notes: f.get("usage_notes"),
         image: f.get("image"),
         featured: f.get("featured") === "on",
         active: f.get("active") === "on",
@@ -716,6 +717,12 @@ function ProductEditor({
             rows={3}
             maxLength={5000}
           />
+        </label>
+        <label>
+          Hướng dẫn sử dụng / lưu ý (không bắt buộc)
+          <textarea name="usage_notes" defaultValue={product.usage_notes || ''} rows={6} maxLength={10000}
+            placeholder={'Ví dụ:\n1. Đăng nhập đúng khu vực tài khoản.\n2. Mở trang kích hoạt và nhập mã.\nLưu ý: Chỉ dùng cho tài khoản đáp ứng điều kiện của gói.'} />
+          <small className="muted">Hiển thị công khai trên trang sản phẩm. Không nhập key hoặc mật khẩu khách hàng.</small>
         </label>
         <div className="button-row">
           <label className="checkbox">

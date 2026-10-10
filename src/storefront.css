@@ -1671,3 +1671,6 @@
     animation: none;
   }
 }
+.product-usage-notes { margin: 24px 0; padding: 20px; border: 1px solid #393b42; border-left: 3px solid #e5946b; border-radius: 8px; background: #191a1e; }
+.product-usage-notes h3 { margin: 0 0 12px; font-size: 15px; color: #eceef2; }
+.product-usage-notes p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }

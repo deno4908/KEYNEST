@@ -18,6 +18,7 @@ export type Product = {
   subcategory: string;
   subtitle: string;
   description: string;
+  usage_notes?: string;
   image: string;
   featured: boolean;
   active: boolean;

@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../deploy/cloudflare-vietnam-worker.js';
+test('foreign social agents get metadata only and never customer APIs', async t => {
+  t.mock.method(globalThis, 'fetch', async req => new Response(req.url));
+  const req = new Request('https://keynest.store/products/steam', { headers: { 'User-Agent': 'facebookexternalhit/1.1', Cookie: 'private=value' } });
+  assert.equal(await (await worker.fetch(req)).text(), 'https://keynest.store/share-preview/products/steam');
+  assert.equal((await worker.fetch(new Request('https://keynest.store/api/me', { headers: { 'User-Agent': 'facebookexternalhit/1.1' } }))).status, 403);
+});
 function request(path = '/', country, method = 'GET') {
   const req = new Request('https://keynest.store' + path, { method, headers: { 'CF-IPCountry': 'VN' } });
   if (country) Object.defineProperty(req, 'cf', { value: { country } });

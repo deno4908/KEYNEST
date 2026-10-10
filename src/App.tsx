@@ -940,6 +940,7 @@ function ProductPage() {
           <>
             <h2>Về {p.name}</h2>
             <p className="pre-wrap">{p.description}</p>
+            {p.usage_notes && <section className="product-usage-notes"><h3>Hướng dẫn sử dụng & lưu ý</h3><p>{p.usage_notes}</p></section>}
             <p>
               Mỗi gói hiển thị rõ nền tảng và khu vực sử dụng. Hãy kiểm tra các
               thông tin này trước khi thanh toán.
@@ -947,6 +948,7 @@ function ProductPage() {
           </>
         ) : tab === "guide" ? (
           <>
+            {p.usage_notes && <section className="product-usage-notes"><h3>Hướng dẫn dành cho {p.name}</h3><p>{p.usage_notes}</p></section>}
             <h2>Từ giỏ hàng đến trải nghiệm của bạn.</h2>
             <ol>
               <li>Chọn gói và kiểm tra khu vực.</li>
