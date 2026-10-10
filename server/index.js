@@ -1041,7 +1041,9 @@ if (existsSync(resolve("dist/index.html"))) {
     if (!meta) return res.sendStatus(404);
     res.type('html').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8">${metadataHead(meta)}</head><body></body></html>`);
   });
-  app.use(express.static(resolve("dist"), { index: false }));
+  app.use(express.static(resolve("dist"), { index: false, setHeaders(res, path) {
+    if (/[\\/]images[\\/](share|products)[\\/]/.test(path)) res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  } }));
   app.get("/{*path}", async (req, res) => {
     const meta = await socialMetadata(req.path, config.origin, store);
     if (!meta) return res.status(404).type('html').send(pageTemplate);

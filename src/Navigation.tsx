@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -56,6 +56,20 @@ export function StoreNavigation({
     button?.focus();
   };
   const category = new URLSearchParams(location.search).get("category");
+  useLayoutEffect(() => {
+    if (!open) return;
+    const position = () => {
+      if (!window.matchMedia('(max-width: 760px)').matches) return;
+      const panel = document.getElementById('shop-departments');
+      const anchor = document.querySelector<HTMLElement>('.mobile-toggle');
+      const bounds = (anchor?.getClientRects().length ? anchor : trigger.current)?.getBoundingClientRect();
+      const top = Math.max(12, Math.min((bounds?.bottom ?? 62) + 10, window.innerHeight - 220));
+      panel?.style.setProperty('--department-top', `${top}px`);
+    };
+    position();
+    window.addEventListener('resize', position);
+    return () => window.removeEventListener('resize', position);
+  }, [open]);
   useEffect(() => {
     onOpenChange(false);
     setExpanded(null);

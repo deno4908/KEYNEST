@@ -1,6 +1,26 @@
 .department-mobile-toggle { display: none; }
 .department-mobile-backdrop { display: none; }
 @media (max-width: 760px) {
+  .footer-main > div:last-child {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-top: 22px;
+  }
+  .footer-main > div:last-child > strong { font-size: 15px; line-height: 1.5; }
+  .footer-main > div:last-child > p { font-size: 12px !important; line-height: 1.8; margin: 0; }
+  .footer-main > div:last-child > p br { display: none; }
+  .footer-main > div:last-child > .footer-support {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: 8px;
+    min-height: 44px;
+    margin: 0 !important;
+    font-size: 12px !important;
+  }
+  .footer-main .footer-support svg { flex-shrink: 0; width: 16px; height: 16px; }
   .footer-bottom {
     flex-direction: column;
     align-items: center;
@@ -34,28 +54,29 @@
   .auth-dialog .auth-heading h2 { font-size: 25px; }
   .modal input:not([type=checkbox]):not([type=radio]), .modal select, .modal textarea { font-size: 16px; }
 
-  .department-mobile-backdrop { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 48%); z-index: 39; }
-  .department-panel { position: fixed; inset: max(72px, env(safe-area-inset-top)) 12px auto; width: calc(100% - 24px); max-width: 400px; height: auto; max-height: min(75dvh, calc(100dvh - 96px)); margin: 0 auto; padding: 0 16px; border: 1px solid #35373e; border-radius: 14px; z-index: 40; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 18px 50px rgb(0 0 0 / 35%); }
-  .department-heading { position: sticky; top: 0; z-index: 2; background: #1b1c20; padding: 10px 0; }
+  .department-mobile-backdrop { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 32%); z-index: 39; }
+  .department-panel { position: fixed; inset: var(--department-top, 82px) 12px auto auto; width: calc(100% - 24px); max-width: 360px; height: auto; max-height: min(70dvh, calc(100dvh - var(--department-top, 82px) - 16px)); margin: 0; padding: 0 14px; border: 1px solid #35373e; border-radius: 10px; z-index: 40; overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 12px 36px rgb(0 0 0 / 35%); }
+  .department-heading { position: sticky; top: 0; z-index: 2; background: #1b1c20; padding: 6px 0; }
   .department-heading strong { font-size: 15px; }
   .department-heading span { display: none; }
   .department-heading button { width: 44px; height: 44px; }
   .department-columns { display: block; padding: 0; }
   .department-columns > section, .department-columns > section:not(:last-child) { padding: 0; border-bottom: 1px solid #303239; }
   .department-title { display: none; }
-  .department-mobile-toggle { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 52px; text-align: left; background: none; border: 0; color: #eceef2; padding: 10px 0; }
+  .department-mobile-toggle { display: flex; width: 100%; align-items: center; gap: 12px; min-height: 52px; text-align: left; background: none; border: 0; color: #eceef2; padding: 10px 4px; }
+  .department-mobile-toggle[aria-expanded=true] { color: #f3ad88; }
   .department-mobile-toggle > svg:first-child { color: #e5946b; flex-shrink: 0; }
   .department-mobile-toggle > svg:last-child { margin-left: auto; color: #9299a7; transition: transform .15s; }
   .department-mobile-toggle[aria-expanded=true] > svg:last-child { transform: rotate(180deg); }
   .department-mobile-toggle strong { font-size: 14px; font-weight: 600; }
   .department-mobile-toggle small { display: none; }
-  .department-body { display: none; padding: 0 0 18px 33px; }
+  .department-body { display: none; padding: 0 0 12px 37px; }
   .department-body.is-expanded { display: block; }
   .department-children { display: grid; grid-template-columns: 1fr; margin: 0; gap: 0; }
   .department-children a { min-height: 44px; padding: 10px 0; font-size: 13px; }
   .department-all { min-height: 44px; margin-top: 8px; }
-  .department-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 16px 0; }
-  .department-footer a { min-height: 44px; font-size: 12px; }
+  .department-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 6px 0; }
+  .department-footer a { min-height: 44px; font-size: 11px; margin: 0; }
   .department-footer a:first-child { grid-column: 1 / -1; }
   .category-directory { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
   .category-directory > article { min-width: 0; padding: 16px 12px; }

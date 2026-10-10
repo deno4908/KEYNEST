@@ -40,6 +40,7 @@ export function mediaRouter({ store, mode, auth, admin, limiter }) {
     res
       .set({
         "Content-Type": "image/webp",
+        "Cross-Origin-Resource-Policy": "cross-origin",
         "Cache-Control": "public, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       })
