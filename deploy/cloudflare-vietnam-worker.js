@@ -4,23 +4,34 @@ const PAGE = "<!doctype html>\n<html lang=\"vi\">\n<head>\n<meta charset=\"utf-8
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+    const read = request.method === 'GET' || request.method === 'HEAD';
+    // Crawlers may fetch robots.txt before requesting a social preview.
+    if (read && url.pathname === '/robots.txt') {
+      return new Response(request.method === 'HEAD' ? null : 'User-agent: *\nAllow: /\nDisallow: /api/\nAllow: /api/media/\nDisallow: /admin\nDisallow: /account\nDisallow: /orders\nDisallow: /wallet\n', {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=300', 'X-Keynest-Region-Worker': 'social-preview-v2' },
+      });
+    }
     // These POST endpoints still authenticate provider signatures/tokens in Node.
     const webhook = request.method === 'POST' && ['/api/webhooks/pay2s', '/api/webhooks/sepay'].includes(url.pathname);
     if (webhook || request.cf?.country === 'VN') return fetch(request);
     // User-Agent is only a preview hint, never authentication. Foreign visitors
     // matching it receive metadata only, not the application or customer APIs.
-    const read = request.method === 'GET' || request.method === 'HEAD';
     const previewBot = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Discordbot|TelegramBot|WhatsApp|Zalo/i.test(request.headers.get('User-Agent') || '');
     if (read && previewBot && (url.pathname === '/' || /^\/products\/[a-z0-9-]{1,120}\/?$/.test(url.pathname))) {
       url.pathname = url.pathname === '/' ? '/share-preview' : '/share-preview' + url.pathname.replace(/\/$/, '');
       url.search = '';
-      return fetch(new Request(url, { method: request.method, headers: { Accept: 'text/html' } }));
+      const response = await fetch(new Request(url, { method: request.method, headers: { Accept: 'text/html' } }));
+      const preview = new Response(response.body, response);
+      preview.headers.set('X-Keynest-Region-Worker', 'social-preview-v2');
+      preview.headers.set('Cache-Control', 'private, no-store');
+      return preview;
     }
     // Only public product/share images, not arbitrary API paths or user data.
     const publicImage = /^\/images\/(share|products)\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/.test(url.pathname)
       || /^\/api\/media\/[a-zA-Z0-9_-]+\.webp$/.test(url.pathname);
     if (read && publicImage) return fetch(request);
     const headers = {
+      'X-Keynest-Region-Worker': 'social-preview-v2',
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',

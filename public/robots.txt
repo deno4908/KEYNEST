@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Allow: /api/media/
+Disallow: /admin
+Disallow: /account
+Disallow: /orders
+Disallow: /wallet

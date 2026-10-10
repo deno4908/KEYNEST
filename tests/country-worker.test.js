@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../deploy/cloudflare-vietnam-worker.js';
+test('robots.txt remains available to foreign crawlers before preview lookup', async () => {
+  const response = await worker.fetch(new Request('https://keynest.store/robots.txt'));
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Allow: \/\n/);
+  assert.equal(response.headers.get('X-Keynest-Region-Worker'), 'social-preview-v2');
+});
 test('foreign social agents get metadata only and never customer APIs', async t => {
   t.mock.method(globalThis, 'fetch', async req => new Response(req.url));
   const req = new Request('https://keynest.store/products/steam', { headers: { 'User-Agent': 'facebookexternalhit/1.1', Cookie: 'private=value' } });

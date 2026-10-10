@@ -60,20 +60,19 @@
   .department-heading strong { font-size: 15px; }
   .department-heading span { display: none; }
   .department-heading button { width: 44px; height: 44px; }
-  .department-columns { display: block; padding: 0; }
-  .department-columns > section, .department-columns > section:not(:last-child) { padding: 0; border-bottom: 1px solid #303239; }
+  .department-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 0; }
+  .department-columns > section, .department-columns > section:not(:last-child) { display: contents; }
   .department-title { display: none; }
-  .department-mobile-toggle { display: flex; width: 100%; align-items: center; gap: 12px; min-height: 52px; text-align: left; background: none; border: 0; color: #eceef2; padding: 10px 4px; }
-  .department-mobile-toggle[aria-expanded=true] { color: #f3ad88; }
+  .department-mobile-toggle { display: flex; flex-direction: column; width: 100%; align-items: flex-start; justify-content: center; gap: 9px; min-height: 86px; text-align: left; background: #24252b; border: 1px solid #34363e; border-radius: 8px; color: #eceef2; padding: 12px; order: 0; }
+  .department-mobile-toggle[aria-expanded=true] { color: #f3ad88; border-color: #b27d60; background: #302823; }
   .department-mobile-toggle > svg:first-child { color: #e5946b; flex-shrink: 0; }
-  .department-mobile-toggle > svg:last-child { margin-left: auto; color: #9299a7; transition: transform .15s; }
-  .department-mobile-toggle[aria-expanded=true] > svg:last-child { transform: rotate(180deg); }
-  .department-mobile-toggle strong { font-size: 14px; font-weight: 600; }
+  .department-mobile-toggle > svg:last-child { display: none; }
+  .department-mobile-toggle strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
   .department-mobile-toggle small { display: none; }
-  .department-body { display: none; padding: 0 0 12px 37px; }
+  .department-body { display: none; padding: 8px 12px; order: 1; grid-column: 1 / -1; min-width: 0; border: 1px solid #35373e; border-radius: 8px; background: #15161a; }
   .department-body.is-expanded { display: block; }
   .department-children { display: grid; grid-template-columns: 1fr; margin: 0; gap: 0; }
-  .department-children a { min-height: 44px; padding: 10px 0; font-size: 13px; }
+  .department-children a { min-height: 44px; padding: 10px 0; font-size: 13px; overflow-wrap: anywhere; }
   .department-all { min-height: 44px; margin-top: 8px; }
   .department-footer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 12px; padding: 6px 0; }
   .department-footer a { min-height: 44px; font-size: 11px; margin: 0; }
