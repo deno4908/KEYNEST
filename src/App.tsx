@@ -1561,6 +1561,7 @@ export function PaymentModal({
 }
 function WalletPage() {
   const { refresh, notify } = useStore();
+  const amountInput = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<{
       balance: number;
       ledger: Ledger[];
@@ -1570,6 +1571,12 @@ function WalletPage() {
     [payment, setPayment] = useState<Payment | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  useEffect(() => {
+    amountInput.current?.setCustomValidity(
+      amount && (amount < 10000 || amount > 50000000 || amount % 1000 !== 0)
+        ? 'Nhập từ 10.000 đến 50.000.000 VND, theo bước 1.000 VND.' : '',
+    );
+  }, [amount, data]);
   const load = () =>
     api<typeof data>("/wallet")
       .then(setData)
@@ -1579,6 +1586,11 @@ function WalletPage() {
   }, []);
   async function topup(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    if (!Number.isSafeInteger(amount) || amount < 10000 || amount > 50000000 || amount % 1000 !== 0) {
+      notify('Nhập từ 10.000 đến 50.000.000 VND, theo bước 1.000 VND.', true);
+      return;
+    }
     setBusy(true);
     try {
       setPayment(await post<Payment>("/wallet/topup", { amount }));
@@ -1657,15 +1669,38 @@ function WalletPage() {
               <div className="topup-amount-input">
                 <input
                   id="topup-amount"
+                  ref={amountInput}
                   aria-describedby="topup-amount-hint"
                   disabled={busy}
-                  type="number"
-                  value={amount}
-                  min={10000}
-                  max={50000000}
-                  step={1000}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={15}
+                  placeholder="Nhập số tiền"
+                  value={amount ? amount.toLocaleString('vi-VN') : ''}
                   required
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  onKeyDown={(e) => {
+                    const input = e.currentTarget;
+                    const caret = input.selectionStart ?? 0;
+                    if (caret !== input.selectionEnd) return;
+                    // Skip the visual separator so deletion still removes a digit.
+                    if (e.key === 'Backspace' && input.value[caret - 1] === '.') input.setSelectionRange(caret - 1, caret - 1);
+                    if (e.key === 'Delete' && input.value[caret] === '.') input.setSelectionRange(caret + 1, caret + 1);
+                  }}
+                  onChange={(e) => {
+                    const input = e.currentTarget;
+                    const before = input.value.slice(0, input.selectionStart ?? input.value.length).replace(/\D/g, '').length;
+                    const next = Number(input.value.replace(/\D/g, ''));
+                    const formatted = next ? next.toLocaleString('vi-VN') : '';
+                    setAmount(next);
+                    input.value = formatted;
+                    let caret = 0, digits = 0;
+                    while (caret < formatted.length && digits < before) {
+                      if (/\d/.test(formatted[caret])) digits++;
+                      caret++;
+                    }
+                    input.setSelectionRange(caret, caret);
+                  }}
                 />
                 <span aria-hidden="true">VND</span>
               </div>
