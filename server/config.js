@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
+import { captchaConfig } from './captcha.js';
 export const config = {
+  captcha: captchaConfig(),
   mode: process.env.APP_MODE || "demo",
   production: process.env.NODE_ENV === "production",
   adminOtpEnabled: process.env.ADMIN_OTP_ENABLED !== "false",

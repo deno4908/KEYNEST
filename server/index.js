@@ -12,6 +12,7 @@ import { createAdminOtp } from "./admin-otp.js";
 import { requirePasswordSession } from "./accounts.js";
 import { registerSupabase } from "./registration.js";
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
+import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
@@ -66,7 +67,8 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", ...(config.captcha.enabled ? ['https://www.google.com/recaptcha/', 'https://www.gstatic.com/recaptcha/'] : [])],
+        frameSrc: ["'self'", ...(config.captcha.enabled ? ['https://www.google.com/recaptcha/', 'https://recaptcha.google.com/recaptcha/'] : [])],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: [
           "'self'",
@@ -78,7 +80,7 @@ app.use(
           "https://cdn.discordapp.com",
           "https://media.discordapp.net",
         ],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", ...(config.captcha.enabled ? ['https://www.google.com/recaptcha/'] : [])],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -183,6 +185,9 @@ const cookieOpts = {
 function setAuth(res, s) {
   sendSession(res, s, cookieOpts);
 }
+const verifyCaptcha = captchaGuard(config.captcha);
+app.post(['/api/auth/login', '/api/auth/register'], verifyCaptcha);
+app.use('/api/auth/oauth', (req, res, next) => req.method === 'POST' ? verifyCaptcha(req, res, next) : next());
 app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
 function clearAuth(res) {
   adminOtp.clear(res);
@@ -407,6 +412,7 @@ app.get("/api/health", (req, res) => res.json({ ok: true, mode: config.mode }));
 app.get("/api/config", (req, res) =>
   res.json({
     mode: config.mode,
+    captcha: { enabled: config.captcha.enabled, site_key: config.captcha.enabled ? config.captcha.siteKey : null },
     payments_ready: config.mode === "demo" || bankPayments.status().ready,
     demo_accounts:
       config.mode === "demo"

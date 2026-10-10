@@ -1,0 +1,5 @@
+.auth-captcha { margin: 0 0 20px; min-width: 0; }
+.auth-captcha > div:first-child { min-height: 78px; }
+.auth-captcha p { margin: 8px 0; color: #a8aab4; font-size: 12px; line-height: 1.6; }
+.auth-captcha [role="alert"] p { color: #efa58d; }
+.auth-captcha button { padding: 6px 0; background: transparent; border: 0; color: #f3a078; font-size: 12px; text-decoration: underline; cursor: pointer; }

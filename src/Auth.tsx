@@ -16,6 +16,7 @@ import { Modal, useStore } from "./App";
 import { api, post } from "./api";
 import type { User } from "./types";
 import { GoogleIcon, DiscordIcon } from "./AuthProviders";
+import { Recaptcha } from './Recaptcha';
 
 export function AuthModal({ close }: { close: () => void }) {
   const { mode, setUser, notify } = useStore();
@@ -23,6 +24,21 @@ export function AuthModal({ close }: { close: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [captcha, setCaptcha] = useState<{ enabled: boolean; site_key: string | null } | null>(null);
+  const [captchaConfigError, setCaptchaConfigError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaVersion, setCaptchaVersion] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<{ captcha: { enabled: boolean; site_key: string | null } }>('/config', { signal: controller.signal })
+      .then(data => {
+        if (!data.captcha || (data.captcha.enabled && !data.captcha.site_key)) throw new Error('Cấu hình xác minh chưa sẵn sàng. Vui lòng tải lại trang.');
+        setCaptcha(data.captcha);
+      }).catch(error => { if (!controller.signal.aborted) setCaptchaConfigError(error.message); });
+    return () => controller.abort();
+  }, []);
+  const captchaBlocked = !captcha || (captcha.enabled && !captchaToken);
+  const resetCaptcha = () => { setCaptchaToken(''); setCaptchaVersion(n => n + 1); };
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -54,6 +70,7 @@ export function AuthModal({ close }: { close: () => void }) {
     if (busy || tab === next) return;
     setDirection(next === "login" ? "backward" : "forward");
     setTab(next);
+    resetCaptcha();
     setError("");
     setMessage("");
     setVisible(false);
@@ -65,7 +82,7 @@ export function AuthModal({ close }: { close: () => void }) {
     provider: "google" | "discord",
     button: HTMLButtonElement,
   ) {
-    if (busy || oauthRequest.current) return;
+    if (busy || oauthRequest.current || captchaBlocked) return;
     const source = button.querySelector("svg")?.getBoundingClientRect();
     const target = layoutRef.current?.getBoundingClientRect();
     if (source && target)
@@ -87,6 +104,7 @@ export function AuthModal({ close }: { close: () => void }) {
         api<{ url: string }>(`/auth/oauth/${provider}`, {
           method: "POST",
           body: "{}",
+          headers: captchaToken ? { 'X-Captcha-Token': captchaToken } : {},
           signal: controller.signal,
         }),
         new Promise((resolve) => window.setTimeout(resolve, duration)),
@@ -96,6 +114,7 @@ export function AuthModal({ close }: { close: () => void }) {
     } catch (e) {
       if (controller.signal.aborted) return;
       setError((e as Error).message);
+      resetCaptcha();
       setBusy(false);
       setOAuthBusy("");
       oauthRequest.current = null;
@@ -104,6 +123,7 @@ export function AuthModal({ close }: { close: () => void }) {
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busy || (tab !== 'forgot' && captchaBlocked)) return;
     if (tab === "register" && password !== confirmation) {
       setConfirmationTouched(true);
       confirmationRef.current?.focus();
@@ -121,6 +141,7 @@ export function AuthModal({ close }: { close: () => void }) {
         const result = await post<{ user?: User; message?: string }>(
           "/auth/register",
           { email: email.trim(), password, name: name.trim() },
+          captchaToken ? { 'X-Captcha-Token': captchaToken } : {},
         );
         if (result.user) {
           setUser(result.user);
@@ -130,7 +151,7 @@ export function AuthModal({ close }: { close: () => void }) {
           setMessage(result.message || "Đã tạo tài khoản. Hãy đăng nhập bằng email và mật khẩu.");
       } else {
         setUser(
-          await post<User>("/auth/login", { email: email.trim(), password }),
+          await post<User>("/auth/login", { email: email.trim(), password }, captchaToken ? { 'X-Captcha-Token': captchaToken } : {}),
         );
         notify("Chào mừng bạn trở lại.");
         close();
@@ -139,6 +160,7 @@ export function AuthModal({ close }: { close: () => void }) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      if (tab !== 'forgot') resetCaptcha();
     }
   }
   const title =
@@ -274,11 +296,14 @@ export function AuthModal({ close }: { close: () => void }) {
               </div>
               {tab !== "forgot" && !message && (
                 <>
+                  {captchaConfigError && <p className="form-error" role="alert">{captchaConfigError}</p>}
+                  {!captcha && !captchaConfigError && <p role="status">Đang tải cấu hình đăng nhập…</p>}
+                  {captcha?.enabled && captcha.site_key && <Recaptcha key={`${tab}-${captchaVersion}`} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
                   <div className="auth-social">
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Google"
-                      disabled={busy}
+                      disabled={busy || captchaBlocked}
                       onClick={(e) => socialLogin("google", e.currentTarget)}
                     >
                       <GoogleIcon />
@@ -289,7 +314,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Discord"
-                      disabled={busy}
+                      disabled={busy || captchaBlocked}
                       onClick={(e) => socialLogin("discord", e.currentTarget)}
                     >
                       <DiscordIcon />
@@ -473,7 +498,7 @@ export function AuthModal({ close }: { close: () => void }) {
                         {error}
                       </p>
                     )}
-                    <button className="button full auth-submit" disabled={busy}>
+                    <button className="button full auth-submit" disabled={busy || (tab !== 'forgot' && captchaBlocked)}>
                       {busy
                         ? "Đang xử lý…"
                         : tab === "register"
