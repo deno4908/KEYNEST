@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('social welcome requires a session, works on mobile and does not replay after refresh', async ({ page }) => {
+  await expect.poll(async () => (await page.request.get('/api/health')).status()).toBe(200);
   expect((await (await page.request.get('/api/health')).json()).mode).toBe('demo');
   await page.goto('/account?welcome=google');
   await expect(page.getByRole('heading', { name: 'Chào bạn, đăng nhập nhé.' })).toBeVisible();

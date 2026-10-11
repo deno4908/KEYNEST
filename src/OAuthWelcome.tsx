@@ -59,11 +59,19 @@ export function OAuthWelcome() {
   }, [visible]);
   useEffect(() => {
     if (!closing) return;
-    const timer = window.setTimeout(() => setProvider(null), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 360);
+    const timer = window.setTimeout(() => setProvider(null), window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 600);
     return () => window.clearTimeout(timer);
   }, [closing]);
   if (!visible || !user) return null;
   return <Modal title="Đăng nhập thành công" className={`oauth-welcome ${closing ? 'is-leaving' : ''}`} close={() => setClosing(true)}>
+    <div className="oauth-welcome-layout">
+    <aside className="oauth-welcome-brand">
+      <span className="oauth-welcome-wordmark"><b>//</b> KEYNEST</span>
+      <div><span className="oauth-welcome-kicker">CHÀO MỪNG TRỞ LẠI</span>
+      <h3>Game mới.<br />Trải nghiệm mới.</h3>
+      <p>Khám phá game yêu thích, theo dõi đơn hàng và quản lý ví trong tài khoản của bạn.</p></div>
+      <small>GAME KEY · GIFT CARD · DỊCH VỤ SỐ</small>
+    </aside>
     <div className="oauth-welcome-body">
     <div className="oauth-welcome-connection" aria-hidden="true">
       <span className={`oauth-welcome-provider ${provider}`}>{provider === 'google' ? <GoogleIcon /> : <DiscordIcon />}</span>
@@ -75,7 +83,14 @@ export function OAuthWelcome() {
       <h2>Xin chào, <strong>{user.name}</strong></h2>
       <p>Chào mừng bạn đến với KEYNEST.</p>
     </div>
+    <div className="oauth-welcome-account">
+      <span>Đã đăng nhập bằng {provider === 'google' ? 'Google' : 'Discord'}</span>
+      <strong>{user.email}</strong>
+    </div>
     <button className="button oauth-welcome-continue" disabled={closing} onClick={() => setClosing(true)}>Tiếp tục vào cửa hàng <span className="oauth-welcome-countdown">{remaining}s</span></button>
+    <div className="oauth-welcome-progress" aria-hidden="true"><span style={{ transform: `scaleX(${remaining / 10})` }} /></div>
+    <small className="oauth-welcome-hint">Bạn có thể tiếp tục ngay hoặc chờ tự động đóng.</small>
+    </div>
     </div>
   </Modal>;
 }
