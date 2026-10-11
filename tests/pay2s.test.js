@@ -211,6 +211,7 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
       late.expires_at = new Date(Date.now() - 1000).toISOString();
       const wrong = store.createTopup(uid, 20000);
       const beforeReview = store.profile(uid).balance;
+      const existingReviewIds = new Set(store.db.events.filter(e => e.outcome === 'needs_review').map(e => e.transaction_id));
       assert.equal(
         (
           await send({
@@ -224,10 +225,11 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
         ).status,
         200,
       );
-      assert.equal(
-        store.db.events.filter((e) => e.outcome === "needs_review").length,
-        4,
-      );
+      const newReviews = store.db.events.filter(e => e.outcome === 'needs_review' && !existingReviewIds.has(e.transaction_id));
+      assert.equal(newReviews.length, 4);
+      for (const id of [30, 31, 32, 33]) {
+        assert.equal(newReviews.filter(e => e.transaction_id.endsWith(`:${id}`)).length, 1);
+      }
       assert.equal(store.profile(uid).balance, beforeReview);
     },
   );
