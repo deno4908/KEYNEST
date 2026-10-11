@@ -7,6 +7,12 @@ import { GoogleIcon, DiscordIcon } from './AuthProviders';
 import './oauth-welcome.css';
 
 const storageKey = 'kn-oauth-welcome';
+const fallbackArt = { name: 'ELDEN RING', src: '/images/products/elden-ring-welcome.jpg' };
+const steamArt = [
+  { name: 'ELDEN RING', app: '1245620' },
+  { name: 'BLACK MYTH: WUKONG', app: '2358720' },
+  { name: 'CYBERPUNK 2077', app: '1091500' },
+].map(game => ({ name: game.name, src: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.app}/library_hero.jpg` }));
 // Cosmetic marker only. The authenticated /me response controls the greeting.
 function pendingWelcome(): 'google' | 'discord' | null {
   const provider = new URLSearchParams(window.location.search).get('welcome');
@@ -31,6 +37,8 @@ export function OAuthWelcome() {
   const [provider, setProvider] = useState(pendingWelcome);
   const [remaining, setRemaining] = useState(10);
   const [closing, setClosing] = useState(false);
+  // Pick once; countdown updates must not replace the background mid-animation.
+  const [art, setArt] = useState(() => steamArt[Math.floor(Math.random() * steamArt.length)]);
   const location = useLocation();
   const navigate = useNavigate();
   const visible = !!user && !!provider && !['/two-factor', '/admin-verification', '/auth/error'].includes(location.pathname);
@@ -66,11 +74,13 @@ export function OAuthWelcome() {
   return <Modal title="Đăng nhập thành công" className={`oauth-welcome ${closing ? 'is-leaving' : ''}`} close={() => setClosing(true)}>
     <div className="oauth-welcome-layout">
     <aside className="oauth-welcome-brand">
+      <img className="oauth-welcome-game" src={art.src} alt="" aria-hidden="true" referrerPolicy="no-referrer"
+        onError={() => { if (art.src !== fallbackArt.src) setArt(fallbackArt); }} />
       <span className="oauth-welcome-wordmark"><b>//</b> KEYNEST</span>
       <div><span className="oauth-welcome-kicker">CHÀO MỪNG TRỞ LẠI</span>
       <h3>Game mới.<br />Trải nghiệm mới.</h3>
       <p>Khám phá game yêu thích, theo dõi đơn hàng và quản lý ví trong tài khoản của bạn.</p></div>
-      <small>GAME KEY · GIFT CARD · DỊCH VỤ SỐ</small>
+      <small>{art.name} · PC / STEAM</small>
     </aside>
     <div className="oauth-welcome-body">
     <div className="oauth-welcome-connection" aria-hidden="true">

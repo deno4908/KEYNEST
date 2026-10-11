@@ -13,10 +13,12 @@ test('social welcome requires a session, works on mobile and does not replay aft
   expect(login.ok()).toBe(true);
   await page.clock.install();
   for (const provider of ['google', 'discord']) {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: provider === 'google' ? 1440 : 390, height: 900 });
     await page.goto(`/account?welcome=${provider}`);
     const welcome = page.locator('.oauth-welcome');
     await expect(welcome).toBeVisible();
+    const gameImage = welcome.locator('.oauth-welcome-game');
+    await expect.poll(() => gameImage.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
     await expect(welcome.locator(`.oauth-welcome-provider.${provider}`)).toBeVisible();
     await expect(welcome.locator('.oauth-welcome-copy')).toContainText('Xin chào,');
     await expect(page).toHaveURL(/\/account$/);
