@@ -11,8 +11,6 @@ import {
   Headphones,
   KeyRound,
   Package,
-  Pause,
-  Play,
   Server,
   ShieldCheck,
   Smartphone,
@@ -30,7 +28,6 @@ export function Home() {
   const [category, setCategory] = useState<Category>("all");
   const [promotions, setPromotions] = useState<Coupon[]>([]);
   const [offerIndex, setOfferIndex] = useState(0);
-  const [offerPaused, setOfferPaused] = useState(false);
   const [offerFocused, setOfferFocused] = useState(false);
   const [offerHidden, setOfferHidden] = useState(document.hidden);
   const [reduceMotion, setReduceMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -61,10 +58,10 @@ export function Home() {
   const offers = pinnedOffers.length ? pinnedOffers : promotions.slice(0, 1);
   const promotion = offers[offerIndex % (offers.length || 1)];
   useEffect(() => {
-    if (offers.length < 2 || offerPaused || offerFocused || offerHidden || reduceMotion) return;
+    if (offers.length < 2 || offerFocused || offerHidden || reduceMotion) return;
     const timer = window.setTimeout(() => setOfferIndex(i => (i + 1) % offers.length), 8000);
     return () => window.clearTimeout(timer);
-  }, [offers.length, offerIndex, offerPaused, offerFocused, offerHidden, reduceMotion]);
+  }, [offers.length, offerIndex, offerFocused, offerHidden, reduceMotion]);
   const icons: Record<string, typeof Package> = { game: Gamepad2, gift: Gift, topup: Smartphone, mmo: Server };
   const groups = Object.keys(categories).filter((c) => c !== 'all').map((category) => ({ category, icon: icons[category] || Package }));
   return (
@@ -228,10 +225,6 @@ export function Home() {
             <ArrowRight size={15} />
           </Link>
           {offers.length > 1 && <div className="offer-pagination" aria-label="Chọn mã giảm giá">
-            <button type="button" aria-label={offerPaused || reduceMotion ? 'Tiếp tục chuyển mã' : 'Tạm dừng chuyển mã'}
-              onClick={() => { setOfferPaused(!(offerPaused || reduceMotion)); setReduceMotion(false); setOfferFocused(false); }}>
-              {offerPaused || reduceMotion ? <Play size={13} /> : <Pause size={13} />}
-            </button>
             {offers.map((offer, i) => <button key={offer.code} type="button"
               aria-label={`Xem mã ${offer.code}`} aria-pressed={offerIndex % offers.length === i}
               onClick={() => setOfferIndex(i)}><span /></button>)}
