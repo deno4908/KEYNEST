@@ -18,19 +18,23 @@ const terms = [
   ],
   [
     "Giao sản phẩm",
-    "Theo dõi trạng thái và thông tin giao hàng trong mục Đơn hàng. Thời gian xử lý phụ thuộc sản phẩm và tình trạng thanh toán. Không chia sẻ key hoặc thông tin tài khoản được giao. Nếu đơn chưa giao hoặc có sai lệch, gửi yêu cầu gắn với đơn hàng để được kiểm tra.",
+    "Sản phẩm được giao trực tuyến và có thể theo dõi trong mục Đơn hàng. Với sản phẩm dạng mã hoặc tài khoản, thông tin nhận hàng xuất hiện trong chi tiết đơn khi được giao. Dịch vụ nạp game được thực hiện theo thông tin người chơi đã cung cấp, không giao key. Thời gian xử lý phụ thuộc từng gói và trạng thái thanh toán; không phải mọi đơn đều được giao ngay. Nếu đơn chưa giao hoặc có sai lệch, gửi yêu cầu gắn với đơn hàng để được kiểm tra. Không công khai mã hoặc thông tin tài khoản được giao.",
   ],
   [
     "Bảo hành và hoàn tiền",
-    "Thời hạn bảo hành áp dụng theo gói và thông tin được lưu trong đơn hàng. Gửi mô tả lỗi và bằng chứng trong chi tiết đơn hàng để yêu cầu bảo hành. Yêu cầu hoàn tiền cần được xét duyệt; tạo yêu cầu không đồng nghĩa đã được hoàn tiền. Kết quả và phương thức hoàn tiền được ghi nhận trong quá trình xử lý.",
+    "Thời hạn bảo hành áp dụng theo từng gói và thông tin được lưu trong đơn hàng. Khi sản phẩm gặp lỗi, hãy gửi yêu cầu trong chi tiết đơn, kèm mô tả và bằng chứng đã che thông tin nhạy cảm. KEYNEST kiểm tra tình trạng giao hàng, lỗi sản phẩm và điều kiện của gói để thông báo phương án xử lý. Việc gửi yêu cầu không đồng nghĩa yêu cầu đã được duyệt. Khoản hoàn tiền được xử lý qua chức năng hoàn tiền của website sẽ được ghi có vào số dư ví KEYNEST và thể hiện trong lịch sử giao dịch; nếu cần phương án khác, hãy trao đổi với hỗ trợ trước khi xác nhận. Điều kiện bảo hành không loại trừ quyền của khách hàng theo pháp luật áp dụng.",
   ],
   [
     "Ví và mã giảm giá",
-    "Ví KEYNEST dùng để mua hàng trên website. Các giới hạn về thời gian, sản phẩm, giá trị đơn và số lượt dùng của mã giảm giá được kiểm tra khi áp dụng. Nếu số dư hoặc lịch sử giao dịch có sai lệch, liên hệ hỗ trợ kèm mã giao dịch.",
+    "Số dư ví KEYNEST là số dư tài khoản mua hàng trên website, không phải tài khoản ngân hàng. Kiểm tra số tiền trước khi nạp và theo dõi kết quả trong lịch sử giao dịch. Các giới hạn về thời gian, sản phẩm, giá trị đơn và số lượt dùng của mã giảm giá được kiểm tra khi áp dụng. Nếu số dư hoặc lịch sử giao dịch có sai lệch, liên hệ hỗ trợ kèm mã giao dịch; không chuyển thêm tiền để thử lại khi giao dịch cũ đang được đối soát.",
   ],
   [
-    "Hỗ trợ và cập nhật",
-    "Bạn có thể gửi yêu cầu và theo dõi phản hồi tại Trung tâm hỗ trợ. Trang này mô tả quy tắc sử dụng của phiên bản đồ án hiện tại; các thay đổi về điều kiện mua hàng cần được thể hiện trước khi bạn xác nhận giao dịch.",
+    "Hỗ trợ và giải quyết khiếu nại",
+    "Gửi yêu cầu tại Trung tâm hỗ trợ kèm mã đơn hoặc mã giao dịch, mô tả vấn đề và kết quả bạn mong muốn. Bạn có thể theo dõi phản hồi ngay trong tài khoản. KEYNEST sẽ kiểm tra thông tin và trao đổi phương án xử lý qua yêu cầu đó. Nếu chưa thống nhất được kết quả, bạn có thể tiếp tục phản hồi hoặc sử dụng các phương thức giải quyết tranh chấp theo pháp luật Việt Nam.",
+  ],
+  [
+    "Cập nhật điều khoản",
+    "Điều khoản và điều kiện của từng gói được công bố để bạn xem trước khi xác nhận mua hàng. Các thay đổi được cập nhật tại trang này cùng ngày cập nhật; thay đổi không tự động làm mất quyền lợi đã được xác nhận cho đơn hàng trước đó. Nếu có nội dung chưa rõ, hãy liên hệ hỗ trợ trước khi thanh toán.",
   ],
 ];
 const privacy = [
@@ -48,19 +52,23 @@ const privacy = [
   ],
   [
     "Cookie và bộ nhớ trình duyệt",
-    "Cookie phiên dùng để duy trì đăng nhập và được đặt HttpOnly. Trình duyệt còn lưu giỏ hàng trong localStorage. Bạn có thể xóa dữ liệu website trong trình duyệt; thao tác này có thể làm mất giỏ hàng cục bộ và yêu cầu đăng nhập lại.",
+    "Website sử dụng cookie xác thực có thuộc tính HttpOnly để duy trì và làm mới phiên đăng nhập. Token truy cập có thể được giữ trong bộ nhớ ứng dụng để xác thực yêu cầu đến máy chủ. Trình duyệt còn lưu giỏ hàng và trạng thái giao diện trong bộ nhớ cục bộ hoặc bộ nhớ phiên. Bạn có thể xóa dữ liệu website trong trình duyệt; thao tác này có thể làm mất giỏ hàng cục bộ và yêu cầu đăng nhập lại.",
   ],
   [
     "Dịch vụ tham gia xử lý",
-    "Supabase được dùng cho xác thực, cơ sở dữ liệu và lưu trữ tệp khi website chạy ở chế độ Supabase. Nhà cung cấp đăng nhập và dịch vụ thanh toán được cấu hình tham gia xử lý phần dữ liệu cần cho chức năng tương ứng. Các dịch vụ bên ngoài có chính sách riêng; hãy đọc trước khi sử dụng.",
+    "KEYNEST sử dụng Supabase cho xác thực, cơ sở dữ liệu và lưu trữ tệp; Google hoặc Discord khi bạn chọn đăng nhập qua các dịch vụ này; Pay2S và ngân hàng cho đối soát chuyển khoản. Cloudflare tham gia bảo vệ và phân phối truy cập website; Google reCAPTCHA được dùng ở các biểu mẫu có bật xác minh chống spam. Khi trình duyệt tải ảnh từ Steam hoặc nhà cung cấp ảnh đại diện, nhà cung cấp đó nhận thông tin kết nối cần thiết như địa chỉ IP. Tùy dịch vụ, dữ liệu có thể được xử lý trên máy chủ ngoài Việt Nam. Mỗi nhà cung cấp có chính sách quyền riêng tư riêng.",
   ],
   [
     "Bảo vệ và quản lý dữ liệu",
-    "Bạn có thể cập nhật tên, ảnh đại diện, bật xác thực hai bước và thu hồi các phiên khác trong tài khoản. Dữ liệu đơn hàng, giao dịch và hỗ trợ có thể cần được giữ để xử lý nghiệp vụ. Website chưa cung cấp công cụ tự xóa toàn bộ tài khoản; hãy gửi yêu cầu hỗ trợ để được xem xét.",
+    "Bạn có thể cập nhật tên, ảnh đại diện, bật xác thực hai bước và thu hồi các phiên khác trong tài khoản. Dữ liệu được lưu phục vụ hoạt động tài khoản, thực hiện đơn hàng, đối soát, bảo hành, giải quyết khiếu nại và nghĩa vụ lưu trữ áp dụng. Việc xóa tài khoản không đồng nghĩa mọi chứng từ giao dịch có thể được xóa ngay. Khi nhận yêu cầu xóa, KEYNEST sẽ kiểm tra dữ liệu liên quan và thông báo phạm vi có thể xử lý, cùng lý do nếu cần tiếp tục lưu giữ.",
   ],
   [
     "Liên hệ về quyền riêng tư",
-    "Gửi yêu cầu tại Trung tâm hỗ trợ nếu muốn hỏi về thông tin đã lưu, chỉnh sửa dữ liệu hoặc yêu cầu xóa. Không gửi dữ liệu nhạy cảm qua các kênh công khai. Trang này mô tả cách xử lý dữ liệu của phiên bản đồ án hiện tại.",
+    "Bạn có thể gửi yêu cầu tại Trung tâm hỗ trợ để hỏi về dữ liệu đã lưu, yêu cầu truy cập, chỉnh sửa, xóa hoặc hạn chế xử lý thông tin cá nhân. KEYNEST có thể yêu cầu xác minh chủ tài khoản trước khi xử lý để tránh cung cấp dữ liệu cho người khác. Việc hạn chế dữ liệu cần thiết có thể ảnh hưởng đến khả năng đăng nhập, giao hàng hoặc hỗ trợ; tác động cụ thể sẽ được trao đổi khi xử lý yêu cầu. Không gửi mật khẩu hoặc mã xác thực qua yêu cầu hỗ trợ.",
+  ],
+  [
+    "Cập nhật chính sách",
+    "Các thay đổi về cách xử lý dữ liệu được cập nhật tại trang này cùng ngày cập nhật. Hãy xem lại chính sách khi sử dụng tính năng mới hoặc cung cấp thêm thông tin cho cửa hàng. Bạn có thể hỏi về nội dung chính sách qua Trung tâm hỗ trợ.",
   ],
 ];
 export function LegalPage({
@@ -83,6 +91,7 @@ export function LegalPage({
             ? "Thông tin chúng tôi xử lý và cách bạn quản lý dữ liệu của mình."
             : "Những điều cần biết khi sử dụng tài khoản và mua sản phẩm tại KEYNEST."}
         </p>
+        <p>Cập nhật ngày <time dateTime="2026-10-11">11/10/2026</time> · Áp dụng tại keynest.store</p>
       </header>
       <div className="legal-layout">
         <nav aria-label="Mục lục">

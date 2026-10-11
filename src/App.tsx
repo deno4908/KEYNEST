@@ -466,7 +466,7 @@ export function App() {
         </header>
         {mode === "demo" && (
           <div className="demo-strip">
-            Bản demo đồ án · Tiền và mã sản phẩm là dữ liệu mô phỏng.
+            Chế độ thử nghiệm · Tiền và mã sản phẩm là dữ liệu mô phỏng.
             <button onClick={() => setAuthOpen(true)}>
               Dùng tài khoản mẫu <ArrowRight size={13} />
             </button>
@@ -615,7 +615,7 @@ export function App() {
           </div>
           <div className="container footer-bottom">
             <span>
-              © {new Date().getFullYear()} KEYNEST. Đồ án cửa hàng số.
+              © {new Date().getFullYear()} KEYNEST. Cửa hàng sản phẩm số.
             </span>
             <span>
               <ShieldCheck size={15} />

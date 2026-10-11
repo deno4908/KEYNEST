@@ -494,8 +494,8 @@ export function GuidePage() {
               gửi yêu cầu hỗ trợ để đối soát.
             </li>
             <li>
-              Trong bản demo, tiền, key và thanh toán đều là dữ liệu mô phỏng
-              cho đồ án.
+              Kiểm tra thời hạn bảo hành và hướng dẫn sử dụng của từng gói.
+              Bạn có thể gửi yêu cầu bảo hành trong chi tiết đơn hàng.
             </li>
           </ul>
           <Link to="/support">
