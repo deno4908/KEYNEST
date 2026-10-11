@@ -21,6 +21,7 @@ import { api, categories, date, money } from "./api";
 import { Empty, ProductCard, useStore } from "./App";
 import type { Category, Coupon } from "./types";
 import { BannerSlider } from "./Banners";
+import { storeDescription, signInDescription } from '../shared/store-description.js';
 import { catalogHref, productGroup, readRecent } from "./discovery";
 
 export function Home() {
@@ -143,6 +144,12 @@ export function Home() {
           <ChevronRight size={15} />
         </Link>
       </div>
+      <section className="store-about" aria-labelledby="store-about-title">
+        <h2 id="store-about-title">Về KEYNEST</h2>
+        <p>{storeDescription}</p>
+        <p>{signInDescription}</p>
+        <div><Link to="/privacy">Chính sách bảo mật</Link><Link to="/terms">Điều khoản dịch vụ</Link></div>
+      </section>
       <section className="home-section directory-section">
         <div className="section-title">
           <div>

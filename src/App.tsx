@@ -475,7 +475,9 @@ export function App() {
           </div>
         )}
         <main>
-          {loadError ? (
+          {['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
+            <LegalPage privacy={location.pathname.startsWith('/privacy')} />
+          ) : loadError ? (
             <div className="container">
               <Empty title="Chưa kết nối được cửa hàng" description={loadError}>
                 <button

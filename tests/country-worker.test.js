@@ -20,14 +20,26 @@ function request(path = '/', country, method = 'GET') {
 }
 test('foreign and unknown countries receive standalone 403; spoofed country header is ignored', async () => {
   for (const country of ['US','SG','XX',undefined]) {
-    const res = await worker.fetch(request('/', country));
+    const res = await worker.fetch(request('/account', country));
     assert.equal(res.status, 403);
     assert.match(await res.text(), /KEYNEST hiện chỉ hoạt động tại Việt Nam/);
     assert.match(res.headers.get('Cache-Control'), /no-store/);
   }
   const api = await worker.fetch(request('/api/me', 'US'));
   assert.equal((await api.json()).code, 'REGION_RESTRICTED');
-  assert.equal(await (await worker.fetch(request('/', 'US', 'HEAD'))).text(), '');
+  assert.equal(await (await worker.fetch(request('/account', 'US', 'HEAD'))).text(), '');
+});
+
+test('public information and its assets are accessible worldwide, private and write routes are not', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response('public origin'));
+  for (const path of ['/', '/privacy', '/terms/', '/assets/index-abc.js', '/api/products', '/api/categories']) {
+    assert.equal(await (await worker.fetch(request(path, 'US'))).text(), 'public origin');
+  }
+  for (const path of ['/api/me', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/secret.json']) {
+    assert.equal((await worker.fetch(request(path, 'US'))).status, 403);
+  }
+  assert.equal((await worker.fetch(request('/api/products', 'US', 'POST'))).status, 403);
+  assert.equal((await worker.fetch(request('/privacy', 'US', 'POST'))).status, 403);
 });
 test('Vietnam requests and exact payment POST webhooks reach origin, no broad path exemption', async t => {
   let calls = 0;

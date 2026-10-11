@@ -1,0 +1,2 @@
+export const storeDescription = 'KEYNEST là cửa hàng game key, gift card, dịch vụ nạp game và công cụ số dành cho khách hàng tại Việt Nam. Bạn có thể xem sản phẩm và chính sách mà không cần đăng nhập. Tài khoản dùng để mua hàng, quản lý số dư mua hàng, nhận sản phẩm và theo dõi hỗ trợ, bảo hành.';
+export const signInDescription = 'Đăng nhập bằng Google sử dụng email và mã định danh để nhận diện tài khoản KEYNEST, cùng tên và ảnh đại diện để hiển thị hồ sơ của bạn. Bạn cũng có thể đăng nhập bằng email hoặc Discord.';

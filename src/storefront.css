@@ -1683,3 +1683,9 @@
 .offer-pagination button[aria-pressed=true] span { width: 20px; background: #f3a078; }
 @keyframes offer-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .offer-slide { animation: none; } }
+
+.store-about { margin: 28px 0 36px; padding: 24px 0; border-block: 1px solid #303138; }
+.store-about h2 { margin: 0 0 14px; font-size: 20px; }
+.store-about p { max-width: 860px; color: #afb3bf; font-size: 13px; line-height: 1.9; margin: 10px 0; }
+.store-about > div { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-top: 16px; font-size: 12px; color: #f3a078; }
+.store-about a { text-decoration: underline; text-underline-offset: 4px; }

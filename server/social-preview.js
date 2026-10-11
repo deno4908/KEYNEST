@@ -5,6 +5,11 @@ export async function socialMetadata(path, origin, store) {
   let description = 'Khám phá game key, gift card, nạp game và dịch vụ MMO tại KEYNEST.';
   let image = '/images/share/keynest-v2.jpg';
   let canonical = '/';
+  if (['/privacy', '/privacy/', '/terms', '/terms/'].includes(path)) {
+    canonical = path.replace(/\/$/, '');
+    title = `${canonical === '/privacy' ? 'Chính sách bảo mật' : 'Điều khoản dịch vụ'} | KEYNEST`;
+    description = canonical === '/privacy' ? 'Cách KEYNEST thu thập, sử dụng và quản lý dữ liệu tài khoản, Google và giao dịch.' : 'Điều kiện mua hàng, giao sản phẩm, bảo hành và hỗ trợ tại KEYNEST.';
+  }
   const match = /^\/products\/([a-z0-9-]{1,120})\/?$/.exec(path);
   if (match) {
     const product = await store.product(match[1]);

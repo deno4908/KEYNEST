@@ -5,6 +5,7 @@ import { rateLimit, ipKeyGenerator } from "express-rate-limit";
 import { z, ZodError } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import { socialMetadata, metadataHead, injectMetadata } from './social-preview.js';
+import { injectPublicInformation } from './public-information.js';
 import { resolve } from "node:path";
 import { config } from "./config.js";
 import { createOAuthRouter } from "./oauth.js";
@@ -1063,7 +1064,7 @@ if (existsSync(resolve("dist/index.html"))) {
   app.get("/{*path}", async (req, res) => {
     const meta = await socialMetadata(req.path, config.origin, store);
     if (!meta) return res.status(404).type('html').send(pageTemplate);
-    res.type('html').send(injectMetadata(pageTemplate, meta));
+    res.type('html').send(injectPublicInformation(injectMetadata(pageTemplate, meta), req.path));
   });
 }
 app.use((err, req, res, next) => {

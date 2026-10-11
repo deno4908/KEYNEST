@@ -30,6 +30,12 @@ export default {
     const publicImage = /^\/images\/(share|products)\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/.test(url.pathname)
       || /^\/api\/media\/[a-zA-Z0-9_-]+\.webp$/.test(url.pathname);
     if (read && publicImage) return fetch(request);
+    // Public information must be readable by everyone, not only named crawlers.
+    // No authentication, account, checkout or payment API is exempted here.
+    const publicPage = ['/', '/privacy', '/privacy/', '/terms', '/terms/'].includes(url.pathname);
+    const publicData = ['/api/config', '/api/products', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements'].includes(url.pathname);
+    const publicAsset = /^\/assets\/[a-zA-Z0-9_.-]+\.(js|css|woff2?|png|jpg|webp|svg)$/.test(url.pathname);
+    if (read && (publicPage || publicData || publicAsset)) return fetch(request);
     const headers = {
       'X-Keynest-Region-Worker': 'social-preview-v2',
       'Cache-Control': 'private, no-store',
