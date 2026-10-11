@@ -20,7 +20,7 @@ const transactionSchema = z.object({
 });
 const normalizeBank = (value) => {
   const bank = value.toUpperCase().replace(/[\s_-]/g, "");
-  return ["MBBANK", "970422"].includes(bank) ? "MB" : bank;
+  return ["MBB", "MBBANK", "970422"].includes(bank) ? "MB" : bank;
 };
 
 // Technical docs describe {transactions: [...]}; the Create Hook guide also
