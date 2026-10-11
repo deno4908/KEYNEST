@@ -1,6 +1,6 @@
 # Ảnh khi chia sẻ link
 
-> **Cấu hình hiện tại: strict-vietnam-v3.** Theo yêu cầu chặn chặt ngoài Việt Nam, Worker đã bỏ ngoại lệ bot và ảnh công khai. Facebook/Discord ngoài VN không lấy được ảnh hoặc preview sản phẩm. Hướng dẫn mở preview bên dưới thuộc cấu hình cũ `social-preview-v2`, không áp dụng khi giữ chế độ chặn chặt. Push Git không tự thay đổi Worker trên Cloudflare.
+> **C?u h?nh hi?n t?i: vietnam-social-v4.** ?? m? l?i GET/HEAD robots.txt, ?nh c?ng khai v? metadata chia s? cho Discord/Facebook c?ng c?c bot preview ???c li?t k? trong handler. Bot ngo?i VN ch? nh?n HTML metadata t? /share-preview, kh?ng ???c v?o ?ng d?ng ho?c API t?i kho?n. C?n copy to?n b? deploy/cloudflare-vietnam-worker.js l?n Cloudflare v? Deploy; Git push kh?ng t? c?p nh?t Worker.
 
 ## Facebook báo 403 và tiêu đề “Khu vực chưa được hỗ trợ”
 
@@ -13,7 +13,7 @@ Facebook đang nhận trang chặn khu vực. Đây không chỉ là vấn đề
 5. Mở `https://keynest.store/robots.txt`: phải trả văn bản bắt đầu `User-agent: *`, không phải trang chặn khu vực.
 6. Quay lại Facebook Sharing Debugger, bấm Scrape Again. Kết quả cần là HTTP 200 và tiêu đề KEYNEST, không còn “Khu vực chưa được hỗ trợ”.
 
-Bản Worker mới trả `X-Keynest-Region-Worker: social-preview-v2` trên robots.txt, preview dành cho bot nước ngoài và trang chặn. Có thể kiểm tra `curl -I https://keynest.store/robots.txt`. Nếu không thấy header này, kiểm tra lại code Deploy và route. Push code lên GitHub chỉ cập nhật VPS theo workflow hiện tại, không tự dán code lên Worker.
+Bản Worker mới trả `X-Keynest-Region-Worker: vietnam-social-v4` trên robots.txt, preview dành cho bot nước ngoài và trang chặn. Có thể kiểm tra `curl -I https://keynest.store/robots.txt`. Nếu không thấy header này, kiểm tra lại code Deploy và route. Push code lên GitHub chỉ cập nhật VPS theo workflow hiện tại, không tự dán code lên Worker.
 
 Nếu vẫn bị 403 sau khi cập nhật đúng Worker, xem Cloudflare Security Events để kiểm tra rule WAF chặn trước Worker. Chỉ bỏ rule chặn quốc gia trùng với Worker, không tắt toàn bộ bảo vệ website.
 

@@ -9,22 +9,44 @@ export default {
     // These POST endpoints still authenticate provider signatures/tokens in Node.
     const webhook = request.method === 'POST' && ['/api/webhooks/pay2s', '/api/webhooks/sepay'].includes(url.pathname);
     if (webhook || request.cf?.country === 'VN') return fetch(request);
+    if (read && url.pathname === '/robots.txt') {
+      return new Response(request.method === 'HEAD' ? null : 'User-agent: *\nAllow: /\nDisallow: /api/\nAllow: /api/media/\nDisallow: /account\nDisallow: /admin\nDisallow: /wallet\nDisallow: /orders\n', {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-Keynest-Region-Worker': 'vietnam-social-v4' },
+      });
+    }
+    // User-Agent grants only public metadata, never access to the application.
+    const previewBot = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Discordbot|TelegramBot|WhatsApp|Zalo/i.test(request.headers.get('User-Agent') || '');
+    if (read && previewBot && (url.pathname === '/' || /^\/products\/[a-z0-9-]{1,120}\/?$/.test(url.pathname))) {
+      url.pathname = url.pathname === '/' ? '/share-preview' : '/share-preview' + url.pathname.replace(/\/$/, '');
+      url.search = '';
+      const response = await fetch(new Request(url, { method: request.method, headers: { Accept: 'text/html' } }));
+      const preview = new Response(request.method === 'HEAD' ? null : response.body, response);
+      preview.headers.set('Cache-Control', 'private, no-store');
+      preview.headers.set('X-Keynest-Region-Worker', 'vietnam-social-v4');
+      return preview;
+    }
+    const publicImage = /^\/images\/(share|products)\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/.test(url.pathname)
+      || /^\/api\/media\/[a-zA-Z0-9_-]+\.webp$/.test(url.pathname);
+    if (read && publicImage) {
+      url.search = '';
+      return fetch(new Request(url, { method: request.method }));
+    }
     // Foreign visitors get self-contained public information, without application APIs.
-    // Same content for people and crawlers; no User-Agent bypass.
+    // Same policy content for people and crawlers.
     const page = url.pathname.replace(/\/$/, '') || '/';
     if (read && Object.hasOwn(PUBLIC_PAGES, page)) {
       return new Response(request.method === 'HEAD' ? null : PUBLIC_PAGES[page], {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
           'Cache-Control': 'private, no-store',
-          'X-Keynest-Region-Worker': 'strict-vietnam-v3',
+          'X-Keynest-Region-Worker': 'vietnam-social-v4',
           'X-Content-Type-Options': 'nosniff',
           'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
         },
       });
     }
     const headers = {
-      'X-Keynest-Region-Worker': 'strict-vietnam-v3',
+      'X-Keynest-Region-Worker': 'vietnam-social-v4',
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
       'X-Robots-Tag': 'noindex, nofollow',

@@ -7,6 +7,33 @@ function request(path = '/', country, method = 'GET') {
   if (country) Object.defineProperty(req, 'cf', { value: { country } });
   return req;
 }
+test('social previews expose only public metadata and images without credentials', async t => {
+  const origin = t.mock.method(globalThis, 'fetch', async req => {
+    assert.equal(req.headers.get('Cookie'), null);
+    assert.equal(req.headers.get('Authorization'), null);
+    assert.equal(new URL(req.url).search, '');
+    return new Response(req.url);
+  });
+  for (const bot of ['Discordbot', 'facebookexternalhit', 'Twitterbot', 'TelegramBot', 'WhatsApp', 'Zalo']) {
+    for (const path of ['/', '/products/steam/']) {
+      const req = request(path + '?private=value', 'US');
+      req.headers.set('User-Agent', bot);
+      req.headers.set('Cookie', 'session=secret');
+      req.headers.set('Authorization', 'Bearer secret');
+      const res = await worker.fetch(req);
+      assert.equal(res.status, 200);
+      assert.equal(await res.text(), 'https://keynest.store/share-preview' + (path === '/' ? '' : '/products/steam'));
+    }
+  }
+  for (const path of ['/api/media/image.webp', '/images/share/keynest-v2.jpg', '/images/products/game.png']) {
+    assert.equal((await worker.fetch(request(path, 'US'))).status, 200);
+    assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
+  }
+  assert.equal(origin.mock.callCount(), 15);
+  assert.equal((await worker.fetch(request('/products/steam', 'US'))).status, 403);
+  assert.equal((await worker.fetch(request('/api/media/private.json', 'US'))).status, 403);
+  assert.equal((await worker.fetch(request('/robots.txt', 'US'))).status, 200);
+});
 test('foreign and unknown countries receive standalone 403; spoofed country header is ignored', async () => {
   for (const country of ['US','SG','XX',undefined]) {
     const res = await worker.fetch(request('/account', country));
@@ -31,7 +58,7 @@ test('foreign public pages are standalone and all other reads and writes are blo
     assert.equal(await (await worker.fetch(request(path, 'US', 'HEAD'))).text(), '');
     assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
   }
-  const blocked = ['/api', '/api/config', '/api/products', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements', '/api/media/image.webp', '/api/me', '/api/auth/refresh', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/index.js', '/images/share/keynest-v2.jpg', '/products/steam', '/share-preview', '/robots.txt'];
+  const blocked = ['/api', '/api/config', '/api/products', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements', '/api/me', '/api/auth/refresh', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/index.js', '/share-preview'];
   for (const path of blocked) {
     for (const method of ['GET', 'HEAD', 'POST', 'OPTIONS']) {
       const req = request(path, 'US', method);
