@@ -108,7 +108,7 @@ export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
       const profile = await store.profile(session.user.id);
       if (!profile) return failure();
       setAuth(res, session);
-      return res.redirect(303, `${config.origin}/account`);
+      return res.redirect(303, `${config.origin}/account?welcome=${transaction.provider}`);
     } catch {
       // Never echo provider errors, codes or tokens into logs or redirect URLs.
       return failure();

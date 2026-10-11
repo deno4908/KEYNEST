@@ -144,7 +144,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   assert.equal(wrong.headers.get("location"), `${config.origin}/auth/error`);
   const good = await callback("?code=valid-code", flow.cookie);
   assert.equal(good.status, 303);
-  assert.equal(good.headers.get("location"), `${config.origin}/account`);
+  assert.equal(good.headers.get("location"), `${config.origin}/account?welcome=google`);
   assert.equal(good.headers.get('X-Access-Token'), 'private-access-token');
   assert.doesNotMatch(good.headers.get('set-cookie'), /kn_access=private-access-token/);
   assert.equal(good.headers.get("referrer-policy"), "no-referrer");

@@ -65,6 +65,7 @@ import { HeaderSearch, StoreNavigation } from "./Navigation";
 import { Catalog } from "./Catalog";
 import { rememberProduct } from "./discovery";
 import { AuthModal, OAuthErrorPage } from "./Auth";
+import { OAuthWelcome } from './OAuthWelcome';
 import { AccountPage } from "./Account";
 import { Avatar } from "./Avatar";
 import { OrdersPage, OrderDetailPage } from "./Orders";
@@ -623,6 +624,7 @@ export function App() {
           </div>
         </footer>
         {authOpen && <AuthModal close={() => setAuthOpen(false)} />}{" "}
+        <OAuthWelcome />
         {toast && (
           <div
             className={`toast ${toast.error ? "toast-error" : ""}`}
