@@ -189,13 +189,6 @@ export function AccountPage({ logout }: { logout: () => void }) {
               Trung tâm hỗ trợ
               <ChevronRight size={14} />
             </Link>
-            {user!.role === "admin" && (
-              <Link to="/admin" className="member-admin-link">
-                <LayoutDashboard size={18} />
-                Quản trị cửa hàng
-                <ChevronRight size={14} />
-              </Link>
-            )}
           </nav>
           <button className="member-logout" onClick={logout}>
             <LogOut size={17} />
@@ -222,10 +215,15 @@ export function AccountPage({ logout }: { logout: () => void }) {
               </p>
             </div>
             {section === "overview" && (
+              <div className="member-overview-actions">
+              {user!.role === 'admin' && <Link to="/admin" className="button button-outline member-admin-link">
+                <LayoutDashboard size={16} /> Quản trị cửa hàng <ArrowUpRight size={16} />
+              </Link>}
               <Link className="button button-outline" to="/catalog">
                 Tiếp tục khám phá
                 <ArrowUpRight size={16} />
               </Link>
+              </div>
             )}
           </header>
           {section === "overview" && (

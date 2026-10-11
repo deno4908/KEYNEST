@@ -13,7 +13,8 @@ test('mobile admin entry and support count remain accessible', async ({ page }) 
   await expect(entry).toBeVisible();
   for (const width of [320, 390, 760]) {
     await page.setViewportSize({ width, height: 844 });
-    await expect(page.getByRole('link', { name: 'Vào trang quản trị' })).toBeVisible();
+    await expect(page.locator('.header-actions a[href="/admin"]')).toHaveCount(0);
+    await expect(entry).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
