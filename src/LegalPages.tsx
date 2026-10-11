@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowUpRight, Facebook, ShieldCheck, FileText, List, ChevronDown, Headphones, CalendarDays } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Facebook, ShieldCheck, FileText, List, ChevronDown, Headphones } from "lucide-react";
 import { DiscordIcon } from "./AuthProviders";
 import "./legal.css";
 
@@ -87,17 +87,13 @@ export function LegalPage({
         Trang chủ
       </Link>
       <header className="legal-hero">
-        <span className="legal-hero-icon" aria-hidden="true">{isPrivacy ? <ShieldCheck size={30} /> : <FileText size={30} />}</span>
-        <div className="legal-hero-copy">
-        <span className="eyebrow">KEYNEST / THÔNG TIN DỊCH VỤ</span>
         <h1>{isPrivacy ? "Chính sách bảo mật" : "Điều khoản dịch vụ"}</h1>
         <p>
           {isPrivacy
             ? "Thông tin chúng tôi xử lý và cách bạn quản lý dữ liệu của mình."
             : "Những điều cần biết khi sử dụng tài khoản và mua sản phẩm tại KEYNEST."}
         </p>
-        <div className="legal-meta"><span><CalendarDays size={14} /> Cập nhật <time dateTime="2026-10-11">11/10/2026</time></span><span>KEYNEST / Việt Nam</span></div>
-        </div>
+        <p className="legal-meta">Cập nhật lần cuối: <time dateTime="2026-10-11">11/10/2026</time></p>
       </header>
       <nav className="legal-tabs" aria-label="Chính sách cửa hàng">
         <Link to="/terms" aria-current={!isPrivacy ? 'page' : undefined}><FileText size={17} />Điều khoản dịch vụ</Link>
