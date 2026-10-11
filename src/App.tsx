@@ -285,6 +285,7 @@ export function App() {
   const [products, setProducts] = useState<Product[]>([]),
     [user, setUser] = useState<User | null>(null),
     [ready, setReady] = useState(false),
+    [catalogReady, setCatalogReady] = useState(false),
     [mode, setMode] = useState(""),
     [authOpen, setAuthOpen] = useState(false),
     [toast, setToast] = useState<{ message: string; error: boolean } | null>(
@@ -319,22 +320,22 @@ export function App() {
     localStorage.setItem("kn-cart", JSON.stringify(items));
   };
   const refresh = async () => {
-    const [p, u, c] = await Promise.all([
-      api<Product[]>("/products"),
-      api<User>("/me").catch(() => null),
-      api<{ id: string; name: string }[]>('/categories'),
+    await Promise.all([
+      api<Product[]>("/products").then(setProducts),
+      api<User>("/me").catch(() => null).then(setUser),
+      api<{ id: string; name: string }[]>('/categories').then(updateCategories),
     ]);
-    updateCategories(c);
-    setProducts(p);
-    setUser(u);
   };
   useEffect(() => {
+    // Session restoration must not delay public storefront rendering.
+    api<User>("/me").then(setUser).catch(() => setUser(null)).finally(() => setReady(true));
     Promise.all([
-      refresh(),
+      api<Product[]>("/products").then(setProducts),
+      api<{ id: string; name: string }[]>('/categories').then(updateCategories),
       api<{ mode: string }>("/config").then((c) => setMode(c.mode)),
     ])
       .catch((e) => setLoadError(e.message))
-      .finally(() => setReady(true));
+      .finally(() => setCatalogReady(true));
   }, []);
   useEffect(() => {
     if (toast) {
@@ -418,6 +419,7 @@ export function App() {
               </Link>
               <button
                 className="account-button"
+                disabled={!ready}
                 aria-label={user ? `Tài khoản của ${user.name}` : "Đăng nhập"}
                 onClick={() =>
                   user ? navigate("/account") : setAuthOpen(true)
@@ -484,7 +486,7 @@ export function App() {
                 </button>
               </Empty>
             </div>
-          ) : !ready ? (
+          ) : !catalogReady ? (
             <Loading />
           ) : (
             <Routes>
@@ -652,7 +654,8 @@ function Protected({
   children: ReactNode;
   admin?: boolean;
 }) {
-  const { user, login } = useStore();
+  const { user, login, ready } = useStore();
+  if (!ready) return <Loading />;
   if (!user)
     return (
       <div className="container">
