@@ -215,15 +215,10 @@ export function AccountPage({ logout }: { logout: () => void }) {
               </p>
             </div>
             {section === "overview" && (
-              <div className="member-overview-actions">
-              {user!.role === 'admin' && <Link to="/admin" className="button button-outline member-admin-link">
-                <LayoutDashboard size={16} /> Quản trị cửa hàng <ArrowUpRight size={16} />
-              </Link>}
               <Link className="button button-outline" to="/catalog">
                 Tiếp tục khám phá
                 <ArrowUpRight size={16} />
               </Link>
-              </div>
             )}
           </header>
           {section === "overview" && (
@@ -386,6 +381,10 @@ export function AccountPage({ logout }: { logout: () => void }) {
                         </div>
                       )}
                     </section>
+                    <div className="member-help-column">
+                    {user!.role === 'admin' && <Link to="/admin" className="button button-outline member-admin-link">
+                      <LayoutDashboard size={17} /> Quản trị cửa hàng <ArrowUpRight size={16} />
+                    </Link>}
                     <section className="member-help">
                       <Headphones size={26} />
                       <h2>Cần hỗ trợ đơn hàng?</h2>
@@ -399,6 +398,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
                       </Link>
                       <span>Lịch sử trao đổi được lưu trong tài khoản.</span>
                     </section>
+                    </div>
                   </div>
                 </>
               )}
