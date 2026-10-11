@@ -190,7 +190,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
               <ChevronRight size={14} />
             </Link>
             {user!.role === "admin" && (
-              <Link to="/admin">
+              <Link to="/admin" className="member-admin-link">
                 <LayoutDashboard size={18} />
                 Quản trị cửa hàng
                 <ChevronRight size={14} />

@@ -198,6 +198,7 @@ export class SupabaseStore {
     let q = this.client
       .from("tickets")
       .select("*,messages:ticket_messages(*)")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
     if (!admin) q = q.eq("user_id", uid);
     if (id) q = q.eq("id", id);
@@ -210,6 +211,9 @@ export class SupabaseStore {
           a.id.localeCompare(b.id),
       ),
     }));
+  }
+  async deleteTicket(id) {
+    await this.query(this.client.from('tickets').update({ deleted_at: new Date().toISOString(), status: 'closed' }).eq('id', id));
   }
   async createTicket(uid, data) {
     return this.query(

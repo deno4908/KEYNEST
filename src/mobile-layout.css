@@ -85,3 +85,43 @@
   .category-directory > article > div { display: none; }
   .category-directory .directory-count { font-size: 11px; margin-top: 16px; }
 }
+
+/* Keep the admin entry reachable when the account menu becomes mobile tabs. */
+@media (max-width: 760px) {
+  .member-sidebar nav { flex-wrap: wrap; }
+  .member-sidebar nav > a.member-admin-link {
+    display: flex;
+    flex: 0 0 100%;
+    justify-content: center;
+    padding: 12px 14px;
+    color: #f3a078;
+    border: 1px solid #544032;
+    border-radius: 8px;
+  }
+}
+.catalog-toolbar .input-icon {
+  border: 1px solid #34363e;
+  border-radius: 8px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.catalog-toolbar .input-icon:focus-within {
+  border-color: #b88363;
+  box-shadow: 0 0 0 2px rgb(243 139 88 / 12%);
+}
+.catalog-toolbar .input-icon input:focus,
+.catalog-toolbar .input-icon input:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border-color: transparent;
+}
+.thread-avatar { overflow: hidden; font-size: 11px; }
+.thread-message.admin .thread-brand {
+  background: #29201c;
+  border-color: #614330;
+  color: #f38b58;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -3px;
+  padding-right: 3px;
+}
+.support-dialog-heading { flex-wrap: wrap; gap: 12px; }

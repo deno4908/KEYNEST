@@ -443,7 +443,7 @@ export class DemoStore {
   }
   tickets(uid, admin = false, id) {
     return this.db.tickets
-      .filter((t) => (admin || t.user_id === uid) && (!id || t.id === id))
+      .filter((t) => !t.deleted_at && (admin || t.user_id === uid) && (!id || t.id === id))
       .map((t) => ({
         ...t,
         messages:
@@ -459,6 +459,10 @@ export class DemoStore {
               ]
             : []),
       }));
+  }
+  deleteTicket(id) {
+    const ticket = this.db.tickets.find(t => t.id === id);
+    if (ticket) { ticket.deleted_at = new Date().toISOString(); ticket.status = 'closed'; this.save(); }
   }
   createTicket(uid, data) {
     const t = {

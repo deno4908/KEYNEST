@@ -57,6 +57,16 @@ test("admin operations: uploads, scoped coupons, support history and warranty re
       password: "Admin123!",
     })
   ).cookie;
+  await t.test('only admin can delete a support request; history is retained and replies are blocked', async () => {
+    const ticket = await store.createTicket(store.db.users.find(u => u.email === 'student@keynest.local').id, { subject: 'Delete test', message: 'Support deletion test' });
+    const remove = cookie => fetch(`${base}/admin/tickets/${ticket.id}`, { method: 'DELETE', headers: { Cookie: cookie, Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest' } });
+    assert.equal((await remove(customer)).status, 403);
+    assert.equal((await remove(admin)).status, 200);
+    assert.equal((await store.tickets(null, true, ticket.id)).length, 0);
+    assert.ok(store.db.tickets.find(t => t.id === ticket.id).deleted_at);
+    assert.equal((await req(`/tickets/${ticket.id}/messages`, { body: 'Reopen deleted request' }, customer)).status, 404);
+    assert.equal((await req(`/admin/tickets/${ticket.id}/reply`, { reply: 'Reply to deleted request' }, admin)).status, 404);
+  });
   const outsider = (
     await req("/auth/register", {
       email: "admin-ops@example.test",

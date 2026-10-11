@@ -11,17 +11,22 @@ import {
   UserRound,
 } from "lucide-react";
 import { Badge, Modal, useStore } from "./App";
-import { date, money, post } from "./api";
+import { api, date, money, post } from "./api";
+import { Avatar } from "./Avatar";
 import type { Overview, Ticket } from "./types";
 
 const priorities = { low: "Thấp", normal: "Bình thường", high: "Ưu tiên cao" };
 export function TicketHistory({
   ticket,
   name = "Khách hàng",
+  avatar,
 }: {
   ticket: Ticket;
   name?: string;
+  avatar?: string | null;
 }) {
+  const { user } = useStore();
+  const avatarUrl = avatar || (user?.id === ticket.user_id ? user.avatar_url : null);
   const messages =
     ticket.messages ||
     (ticket.reply
@@ -30,9 +35,7 @@ export function TicketHistory({
   return (
     <div className="ticket-thread">
       <article className="thread-message customer">
-        <div className="thread-avatar">
-          <UserRound size={17} />
-        </div>
+        <Avatar className="thread-avatar" name={name} url={avatarUrl} />
         <div className="thread-bubble">
           <header>
             <strong>{name}</strong>
@@ -43,13 +46,7 @@ export function TicketHistory({
       </article>
       {messages.map((m) => (
         <article className={`thread-message ${m.role}`} key={m.id}>
-          <div className="thread-avatar">
-            {m.role === "admin" ? (
-              <Headphones size={17} />
-            ) : (
-              <UserRound size={17} />
-            )}
-          </div>
+          {m.role === "admin" ? <span className="thread-avatar thread-brand" aria-label="KEYNEST">//</span> : <Avatar className="thread-avatar" name={name} url={avatarUrl} />}
           <div className="thread-bubble">
             <header>
               <strong>{m.role === "admin" ? "KEYNEST hỗ trợ" : name}</strong>
@@ -338,12 +335,24 @@ export function TicketDialog({
       <div className="support-dialog-heading">
         <h2>{ticket.subject}</h2>
         <Badge status={ticket.status} />
+        <button type="button" className="button button-outline button-small" disabled={busy} onClick={async () => {
+          if (!window.confirm('Xóa yêu cầu này khỏi danh sách hỗ trợ? Lịch sử vẫn được lưu để đối soát bảo hành.')) return;
+          setBusy(true);
+          try {
+            await api(`/admin/tickets/${ticket.id}`, { method: 'DELETE' });
+            await saved();
+            close();
+            notify('Đã xóa yêu cầu hỗ trợ.');
+          } catch (e) { setError((e as Error).message); }
+          finally { setBusy(false); }
+        }}>Xóa yêu cầu</button>
       </div>
       <div className="support-dialog-layout">
         <div className="support-conversation">
           <TicketHistory
             ticket={ticket}
             name={customer?.name || "Khách hàng"}
+            avatar={customer?.avatar_url}
           />
           <form className="support-reply-form" onSubmit={submit}>
             <div className="support-reply-title">

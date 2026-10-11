@@ -148,6 +148,7 @@ export function Admin() {
               >
                 <I size={18} />
                 {String(label)}
+                {id === "tickets" && <span aria-label="Yêu cầu chưa xử lý">{data?.tickets.filter(t => t.status !== 'closed').length || 0}</span>}
                 {id === "orders" && (
                   <span>
                     {data?.orders.filter((o) => o.status === "processing")

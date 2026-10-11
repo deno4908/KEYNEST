@@ -747,7 +747,9 @@ app.post(
       .object({ body: z.string().trim().min(3).max(3000) })
       .strict()
       .parse(req.body);
-    await store.addTicketMessage(req.user.id, uuid.parse(req.params.id), body);
+    const id = uuid.parse(req.params.id);
+    if (!(await store.tickets(req.user.id, false, id)).length) throw new AppError('Không tìm thấy yêu cầu.', 404);
+    await store.addTicketMessage(req.user.id, id, body);
     res.status(201).json({ ok: true });
   },
 );
@@ -1017,6 +1019,7 @@ app.post("/api/admin/coupons/:code/pin", async (req, res) => {
 });
 app.post("/api/admin/tickets/:id/reply", async (req, res) => {
   const id = uuid.parse(req.params.id);
+  if (!(await store.tickets(req.user.id, true, id)).length) throw new AppError('Không tìm thấy yêu cầu.', 404);
   const { reply, status, priority } = z
     .object({
       reply: z.string().trim().min(3).max(3000),
@@ -1027,6 +1030,13 @@ app.post("/api/admin/tickets/:id/reply", async (req, res) => {
     .parse(req.body);
   await store.replyTicket(id, reply, req.user.id, status, priority);
   await store.audit(req.user.id, "reply_ticket", id);
+  res.json({ ok: true });
+});
+app.delete('/api/admin/tickets/:id', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  if (!(await store.tickets(req.user.id, true, id)).length) throw new AppError('Không tìm thấy yêu cầu.', 404);
+  await store.deleteTicket(id);
+  await store.audit(req.user.id, 'delete_ticket', id);
   res.json({ ok: true });
 });
 app.use("/api", (req, res) =>
