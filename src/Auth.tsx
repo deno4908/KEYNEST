@@ -47,6 +47,15 @@ export function AuthModal({ close }: { close: () => void }) {
   const [confirmationVisible, setConfirmationVisible] = useState(false);
   const [confirmationTouched, setConfirmationTouched] = useState(false);
   const confirmationRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const clearPasswords = () => {
+    setPassword('');
+    setConfirmation('');
+    setVisible(false);
+    setConfirmationVisible(false);
+    setConfirmationTouched(false);
+    passwordRef.current?.focus();
+  };
   const stageRef = useRef<HTMLDivElement>(null);
   const [stageHeight, setStageHeight] = useState<number>();
   const [direction, setDirection] = useState("forward");
@@ -124,8 +133,8 @@ export function AuthModal({ close }: { close: () => void }) {
     event.preventDefault();
     if (busy || captchaBlocked) return;
     if (tab === "register" && password !== confirmation) {
-      setConfirmationTouched(true);
-      confirmationRef.current?.focus();
+      setError('Mật khẩu nhập lại chưa khớp. Vui lòng nhập lại mật khẩu.');
+      clearPasswords();
       return;
     }
     setBusy(true);
@@ -157,6 +166,7 @@ export function AuthModal({ close }: { close: () => void }) {
       }
     } catch (e) {
       setError((e as Error).message);
+      if (tab === 'login' || tab === 'register') clearPasswords();
     } finally {
       setBusy(false);
       resetCaptcha();
@@ -387,6 +397,7 @@ export function AuthModal({ close }: { close: () => void }) {
                         <div className="password-control">
                           <input
                             id="auth-password"
+                            ref={passwordRef}
                             type={visible ? "text" : "password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}

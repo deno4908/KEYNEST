@@ -45,9 +45,28 @@
 .oauth-welcome-progress span { display: block; height: 100%; background: #c89676; transform-origin: left; transition: transform 1s linear; }
 .oauth-welcome-hint { font-size: 10px; line-height: 1.6; color: #9095a1; }
 @media (max-width: 760px) {
-  .oauth-welcome-layout { display: flex; flex-direction: column; gap: 12px; }
-  .oauth-welcome-brand { padding: 14px 16px; gap: 0; }
+  .modal-backdrop > .modal.oauth-welcome { padding: max(12px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .oauth-welcome > .modal-title { flex: 0 0 auto; margin-bottom: 14px; padding-bottom: 0; border-bottom: 0; min-height: 44px; }
+  .oauth-welcome > .modal-title h2 { font-size: 12px; font-weight: 500; }
+  .oauth-welcome > .modal-title .icon-button { width: 44px; height: 44px; border: 0; background: transparent; }
+  .oauth-welcome > .modal-title .icon-button svg { width: 20px; height: 20px; }
+  .oauth-welcome-layout { display: flex; flex-direction: column; flex: 0 0 auto; gap: 0; width: 100%; max-width: 480px; margin: 0 auto; }
+  .oauth-welcome-brand { flex: 0 0 auto; height: clamp(140px, 24svh, 190px); padding: 18px; gap: 0; justify-content: flex-start; border: 0; border-radius: 12px; }
+  .oauth-welcome-brand::before { background: linear-gradient(180deg, #10111455, #10111400 35%, #191a20e6); }
+  .oauth-welcome-wordmark { font-size: 14px; text-shadow: 0 2px 8px #000a; }
   .oauth-welcome-brand > div, .oauth-welcome-brand > small { display: none; }
-  .oauth-welcome-body { padding: 12px 0 24px; }
+  .oauth-welcome-body { position: relative; flex: 0 0 auto; justify-content: flex-start; padding: 0 4px 16px; }
+  .oauth-welcome-connection { margin-top: -34px; padding: 0 0 20px; }
+  .oauth-welcome-provider, .oauth-welcome-avatar { box-shadow: 0 0 0 4px #191a20, 0 8px 24px #0004; }
+  .oauth-welcome-arrows { color: #d1d3d8; }
+  .oauth-welcome-copy h2 { font-size: 22px; line-height: 1.4; margin: 12px 0 8px; }
+  .oauth-welcome-copy p { margin-bottom: 20px; font-size: 12px; }
+  .oauth-welcome-confirmed { font-size: 11px; }
+  .oauth-welcome-account { padding: 12px 14px; margin-bottom: 20px; max-width: none; background: transparent; }
+  .oauth-welcome-account strong { display: block; font-size: 13px; }
+  .oauth-welcome-continue { width: 100%; min-height: 48px; justify-content: center; font-size: 13px; }
+  .oauth-welcome-progress { max-width: none; margin-top: 14px; }
+  .oauth-welcome-hint { max-width: 280px; }
 }
+.oauth-welcome-copy:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) { .modal-backdrop:has(.oauth-welcome), .modal.oauth-welcome, .oauth-welcome * { animation: none !important; transition: none !important; } }

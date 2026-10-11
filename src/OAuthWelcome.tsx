@@ -114,7 +114,7 @@ export function OAuthWelcome() {
       <ArrowLeftRight className="oauth-welcome-arrows" size={28} />
       <Avatar className="oauth-welcome-avatar" name={user.name} url={user.avatar_url} />
     </div>
-    <div className="oauth-welcome-copy" role="status">
+    <div className="oauth-welcome-copy" role="status" tabIndex={-1} data-initial-focus>
       <span className="oauth-welcome-confirmed"><CheckCircle2 size={17} /> Đăng nhập thành công</span>
       <h2>Xin chào, <strong>{user.name}</strong></h2>
       <p>Chào mừng bạn đến với KEYNEST.</p>

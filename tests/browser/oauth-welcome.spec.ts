@@ -13,7 +13,7 @@ test('social welcome requires a session, works on mobile and does not replay aft
   expect(login.ok()).toBe(true);
   await page.clock.install();
   for (const provider of ['google', 'discord']) {
-    await page.setViewportSize({ width: provider === 'google' ? 1440 : 390, height: 900 });
+    await page.setViewportSize({ width: provider === 'google' ? 1440 : 390, height: provider === 'google' ? 900 : 740 });
     await page.goto(`/account?welcome=${provider}`);
     const welcome = page.locator('.oauth-welcome');
     await expect(welcome).toBeVisible();
@@ -29,6 +29,12 @@ test('social welcome requires a session, works on mobile and does not replay aft
       await page.clock.fastForward(5000);
       await expect(welcome).toBeVisible();
       await expect(welcome.locator('.oauth-welcome-countdown')).toHaveText('5s');
+      for (const width of [320, 390]) {
+        await page.setViewportSize({ width, height: 740 });
+        await expect(welcome.getByRole('button', { name: /Tiếp tục vào cửa hàng/ })).toBeInViewport();
+        await expect.poll(() => welcome.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      }
+      await welcome.screenshot({ path: 'test-results/oauth-welcome-mobile.png', animations: 'disabled' });
       await page.clock.fastForward(5000);
     }
     await expect(welcome).toHaveCount(0);
