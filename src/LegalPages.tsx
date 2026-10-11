@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowLeft, Facebook } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Facebook, ShieldCheck, FileText, List, ChevronDown, Headphones, CalendarDays } from "lucide-react";
 import { DiscordIcon } from "./AuthProviders";
 import "./legal.css";
 
@@ -77,13 +77,18 @@ export function LegalPage({
   privacy?: boolean;
 }) {
   const sections = isPrivacy ? privacy : terms;
+  const contents = sections.map(([title], i) => (
+    <a key={title} href={`#policy-${i}`}><span>{String(i + 1).padStart(2, "0")}</span>{title}</a>
+  ));
   return (
     <main className="container legal-page">
       <Link className="legal-back" to="/">
         <ArrowLeft size={15} />
         Trang chủ
       </Link>
-      <header>
+      <header className="legal-hero">
+        <span className="legal-hero-icon" aria-hidden="true">{isPrivacy ? <ShieldCheck size={30} /> : <FileText size={30} />}</span>
+        <div className="legal-hero-copy">
         <span className="eyebrow">KEYNEST / THÔNG TIN DỊCH VỤ</span>
         <h1>{isPrivacy ? "Chính sách bảo mật" : "Điều khoản dịch vụ"}</h1>
         <p>
@@ -91,31 +96,27 @@ export function LegalPage({
             ? "Thông tin chúng tôi xử lý và cách bạn quản lý dữ liệu của mình."
             : "Những điều cần biết khi sử dụng tài khoản và mua sản phẩm tại KEYNEST."}
         </p>
-        <p>Cập nhật ngày <time dateTime="2026-10-11">11/10/2026</time> · Áp dụng tại keynest.store</p>
+        <div className="legal-meta"><span><CalendarDays size={14} /> Cập nhật <time dateTime="2026-10-11">11/10/2026</time></span><span>KEYNEST / Việt Nam</span></div>
+        </div>
       </header>
+      <nav className="legal-tabs" aria-label="Chính sách cửa hàng">
+        <Link to="/terms" aria-current={!isPrivacy ? 'page' : undefined}><FileText size={17} />Điều khoản dịch vụ</Link>
+        <Link to="/privacy" aria-current={isPrivacy ? 'page' : undefined}><ShieldCheck size={17} />Chính sách bảo mật</Link>
+      </nav>
       <div className="legal-layout">
-        <nav aria-label="Mục lục">
-          {sections.map(([title], i) => (
-            <a key={title} href={`#policy-${i}`}>
-              {String(i + 1).padStart(2, "0")} · {title}
-            </a>
-          ))}
-          <Link to={isPrivacy ? "/terms" : "/privacy"}>
-            {isPrivacy ? "Điều khoản dịch vụ" : "Chính sách bảo mật"} →
-          </Link>
-        </nav>
-        <article>
+        <aside className="legal-sidebar">
+          <nav className="legal-toc legal-toc-desktop" aria-label="Mục lục"><strong><List size={16} />Trong trang này</strong>{contents}</nav>
+          <details className="legal-toc-mobile"><summary><List size={17} />Mục lục · {sections.length} nội dung<ChevronDown size={16} /></summary><nav className="legal-toc" aria-label="Mục lục trên điện thoại">{contents}</nav></details>
+          <div className="legal-help"><Headphones size={22} /><strong>Bạn cần giải đáp?</strong><p>Gửi câu hỏi để được hỗ trợ về đơn hàng hoặc tài khoản.</p><Link to="/support">Liên hệ KEYNEST<ArrowUpRight size={15} /></Link></div>
+        </aside>
+        <article className="legal-document">
           {sections.map(([title, text], i) => (
-            <section id={`policy-${i}`} key={title}>
-              <h2>
-                {i + 1}. {title}
-              </h2>
-              <p>{text}</p>
+            <section className="legal-section" id={`policy-${i}`} key={title}>
+              <span className="legal-section-number" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              <div><h2>{title}</h2><p>{text}</p></div>
             </section>
           ))}
-          <Link className="button button-outline" to="/support">
-            Liên hệ hỗ trợ
-          </Link>
+          <div className="legal-document-end"><ShieldCheck size={17} /><span>Cảm ơn bạn đã dành thời gian tìm hiểu chính sách của KEYNEST.</span></div>
         </article>
       </div>
     </main>
