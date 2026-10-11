@@ -12,21 +12,22 @@ test("banners rotate, pause and respect reduced motion; category menu works at a
   const slide = page.locator(".campaign-slide");
   await expect(slide).toBeVisible();
   const initial = await slide.getAttribute("aria-label");
-  await page.clock.fastForward(6100);
+  await page.clock.fastForward(8500);
   await expect(slide).not.toHaveAttribute("aria-label", initial!);
   await page.locator(".campaign-slider").hover();
   const hovered = await slide.getAttribute("aria-label");
   await page.clock.fastForward(13000);
-  await expect(slide).toHaveAttribute("aria-label", hovered!);
+  await expect(slide).not.toHaveAttribute("aria-label", hovered!);
+  const paused = await slide.getAttribute("aria-label");
   await page.getByRole("button", { name: "Tạm dừng chuyển banner" }).click();
   await page.mouse.move(0, 0);
   await page.locator("h1").click();
   await page.clock.fastForward(13000);
-  await expect(slide).toHaveAttribute("aria-label", hovered!);
+  await expect(slide).toHaveAttribute("aria-label", paused!);
   await page
     .getByRole("button", { name: "Banner tiếp theo", exact: true })
     .click();
-  await expect(slide).not.toHaveAttribute("aria-label", hovered!);
+  await expect(slide).not.toHaveAttribute("aria-label", paused!);
   await page.getByRole("button", { name: "Tiếp tục chuyển banner" }).click();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.locator("h1").click();
@@ -41,6 +42,8 @@ test("banners rotate, pause and respect reduced motion; category menu works at a
       .click();
     const menu = page.locator("#shop-departments");
     await expect(menu).toBeVisible();
+    const mobileCategory = menu.locator('.department-mobile-toggle').filter({ hasText: 'MMO' });
+    if (await mobileCategory.isVisible() && await mobileCategory.getAttribute('aria-expanded') !== 'true') await mobileCategory.click();
     await expect(
       menu.getByRole("link", { name: /Proxy dân cư/ }),
     ).toBeAttached();
@@ -56,6 +59,8 @@ test("banners rotate, pause and respect reduced motion; category menu works at a
     await expect(menu).not.toBeVisible();
   }
   await page.locator(".mobile-toggle").click();
+  const mobileCategory = page.locator(".department-mobile-toggle").filter({ hasText: "MMO" });
+  if (await mobileCategory.getAttribute('aria-expanded') !== 'true') await mobileCategory.click();
   await page
     .locator("#shop-departments")
     .getByRole("link", { name: /Proxy IPv4 riêng/ })

@@ -681,7 +681,7 @@ app.get("/api/wallet", auth, async (req, res) =>
 );
 app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
   const { amount } = z
-    .object({ amount: z.number().int().min(10000).max(50000000) })
+    .object({ amount: z.number().int().min(10000).max(50000000).multipleOf(1000) })
     .strict()
     .parse(req.body);
   bankPayments.assertReady();

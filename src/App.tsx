@@ -1325,6 +1325,8 @@ export function PaymentModal({
     [remaining, setRemaining] = useState(
       Math.max(0, Math.ceil((Date.parse(payment.expires_at) - Date.now()) / 1000)) * 1000,
     );
+  const onPaidRef = useRef(onPaid);
+  onPaidRef.current = onPaid;
   useEffect(() => {
     const updateCountdown = () => {
       setRemaining(
@@ -1340,26 +1342,31 @@ export function PaymentModal({
     };
   }, [payment.id, payment.expires_at]);
   useEffect(() => {
-    const id = setInterval(() => {
-      api<{ payments: Payment[] }>("/wallet")
-        .then(async (w) => {
-          let p = w.payments.find((p) => p.id === payment.id);
-          if (payment.order_id) {
-            const orders = await api<Order[]>("/orders");
-            p = orders.find((o) => o.payment?.id === payment.id)?.payment;
-          }
-          if (p) {
-            setStatus(p.status);
-            if (p.status === "paid") {
-              clearInterval(id);
-              onPaid();
-            }
-          }
-        })
-        .catch(() => {});
-    }, 4000);
-    return () => clearInterval(id);
-  }, [payment.id]);
+    if (status !== 'pending') return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    const check = async () => {
+      let terminal = false;
+      try {
+        if (document.hidden) return;
+        const options = { signal: controller.signal };
+        const p = payment.order_id
+          ? (await api<Order>(`/orders/${payment.order_id}`, options)).payment
+          : (await api<{ payments: Payment[] }>('/wallet', options)).payments.find(p => p.id === payment.id);
+        if (controller.signal.aborted) return;
+        if (p) {
+          terminal = p.status !== 'pending';
+          setStatus(p.status);
+          if (p.status === 'paid') onPaidRef.current();
+        }
+      } catch { /* Retry transient failures without overlapping requests. */ }
+      finally {
+        if (!controller.signal.aborted && !terminal) timer = setTimeout(check, 4000);
+      }
+    };
+    timer = setTimeout(check, 4000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [payment.id, payment.order_id, status]);
   async function simulate() {
     setBusy(true);
     try {

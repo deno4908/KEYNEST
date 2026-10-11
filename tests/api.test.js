@@ -317,6 +317,7 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
     },
   );
   await t.test("wallet topup replay credits only once", async () => {
+    assert.equal((await request('/wallet/topup', { method: 'POST', cookie: customer, body: { amount: 10500 } })).status, 400);
     const p = (
       await request("/wallet/topup", {
         method: "POST",

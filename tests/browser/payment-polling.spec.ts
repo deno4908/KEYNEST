@@ -1,0 +1,68 @@
+import { test, expect } from '@playwright/test';
+
+test('wallet hides expired requests and removes pending requests as they expire', async ({ page }) => {
+  expect((await (await page.request.get('/api/health')).json()).mode).toBe('demo');
+  const login = await page.request.post('/api/auth/login', {
+    headers: { Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest' },
+    data: { email: 'admin@keynest.local', password: 'Admin123!' },
+  });
+  expect(login.ok()).toBe(true);
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  const base = { amount: 10000, created_at: new Date(now).toISOString(), expires_at: new Date(now - 60000).toISOString() };
+  await page.route('**/api/wallet', route => route.fulfill({ json: {
+    balance: 10000, ledger: [], payments: [
+      { ...base, id: 'expired', code: 'KN-EXPIRED', status: 'expired' },
+      { ...base, id: 'stale', code: 'KN-STALE', status: 'pending' },
+      { ...base, id: 'paid', code: 'KN-PAID', status: 'paid' },
+      { ...base, id: 'pending', code: 'KN-PENDING', status: 'pending', expires_at: new Date(now + 30000).toISOString() },
+    ],
+  } }));
+  await page.goto('/wallet');
+  const list = page.locator('.wallet-requests');
+  await expect(list.locator('tbody tr')).toHaveCount(2);
+  await expect(list).not.toContainText('KN-EXPIRED');
+  await expect(list).not.toContainText('KN-STALE');
+  await expect(list).toContainText('KN-PENDING');
+  await page.clock.fastForward(31000);
+  await expect(list.locator('tbody tr')).toHaveCount(1);
+  await expect(list).toContainText('KN-PAID');
+  await expect(list).not.toContainText('KN-PENDING');
+});
+
+test('payment polling waits for slow responses and stops after payment', async ({ page }) => {
+  expect((await (await page.request.get('/api/health')).json()).mode).toBe('demo');
+  const login = await page.request.post('/api/auth/login', {
+    headers: { Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest' },
+    data: { email: 'admin@keynest.local', password: 'Admin123!' },
+  });
+  expect(login.ok()).toBe(true);
+  await page.clock.install();
+  await page.goto('/wallet');
+  await page.getByRole('button', { name: 'Tạo mã nạp tiền' }).click();
+  await expect(page.locator('.payment-modal')).toBeVisible();
+  const wallet = await (await page.request.get('/api/wallet')).json();
+  const pending = wallet.payments.find((p: { status: string }) => p.status === 'pending');
+  expect(pending).toBeTruthy();
+  let requests = 0;
+  let release!: () => void;
+  const slowResponse = new Promise<void>(resolve => { release = resolve; });
+  await page.route('**/api/wallet', async route => {
+    requests++;
+    if (requests === 1) await slowResponse;
+    await route.fulfill({ json: {
+      ...wallet,
+      payments: wallet.payments.map((p: { id: string }) => p.id === pending.id ? { ...p, status: 'paid' } : p),
+    } });
+  });
+  await page.clock.fastForward(4500);
+  await expect.poll(() => requests).toBe(1);
+  await page.clock.fastForward(16000);
+  expect(requests).toBe(1);
+  release();
+  await expect(page.getByRole('heading', { name: 'Đã nhận thanh toán.' })).toBeVisible();
+  // The success callback refreshes the shared wallet exactly once.
+  await expect.poll(() => requests).toBe(2);
+  await page.clock.fastForward(16000);
+  expect(requests).toBe(2);
+});

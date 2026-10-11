@@ -1306,6 +1306,7 @@ try {
   );
   const requestWalletTopup = async (uid, amount) => (await db.query('select * from create_wallet_topup($1,$2)', [uid, amount])).rows[0];
   const firstTopup = await requestWalletTopup(user, 17000);
+  await fails('select create_wallet_topup($1,$2)', [user,10500]);
   const reusedTopup = await requestWalletTopup(user, 17000);
   assert.equal(reusedTopup.id, firstTopup.id);
   assert.equal(new Date(reusedTopup.expires_at).getTime(), new Date(firstTopup.expires_at).getTime());
