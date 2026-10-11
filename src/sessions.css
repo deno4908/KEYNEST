@@ -33,11 +33,14 @@
 .session-list:empty {
   display: none;
 }
+.session-list.is-expanded { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; }
+.session-expand { width: 100%; margin-top: 10px; padding: 10px; background: transparent; border: 1px solid #35373d; border-radius: 7px; color: #b9bdc8; font: inherit; font-size: 12px; cursor: pointer; }
+.session-expand:hover { border-color: #75665c; color: #f3ad88; }
 .session-device {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 12px;
   background: #191b1f;
 }
 .session-device + .session-device {

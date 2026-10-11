@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Monitor, ShieldCheck, Smartphone, LogOut } from "lucide-react";
 import "./sessions.css";
@@ -56,7 +56,15 @@ function deviceLabel(agent: string) {
   };
 }
 export function SessionManager() {
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
   const [sessions, setSessions] = useState<Session[]>([]);
+  const orderedSessions = [...sessions].sort((a, b) =>
+    Number(b.current) - Number(a.current) ||
+    Number(!!a.revoked_at) - Number(!!b.revoked_at) ||
+    b.created_at.localeCompare(a.created_at),
+  );
+  const visibleSessions = expanded ? orderedSessions : orderedSessions.slice(0, 3);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [version, setVersion] = useState(0);
@@ -105,10 +113,8 @@ export function SessionManager() {
           <button onClick={() => setVersion((v) => v + 1)}>Thử lại</button>
         </p>
       )}
-      <div className="session-list">
-        {[...sessions]
-          .sort((a, b) => Number(b.current) - Number(a.current))
-          .map((s) => (
+      <div id={listId} className={`session-list ${expanded ? 'is-expanded' : ''}`}>
+        {visibleSessions.map((s) => (
             <div
               className={`session-device ${s.current ? "is-current" : ""} ${s.revoked_at ? "is-revoked" : ""}`}
               key={s.id}
@@ -146,6 +152,10 @@ export function SessionManager() {
             </div>
           ))}
       </div>
+      {sessions.length > 3 && <button
+        type="button" className="session-expand" aria-expanded={expanded} aria-controls={listId}
+        onClick={() => setExpanded(value => !value)}
+      >{expanded ? 'Thu gọn danh sách' : `Xem thêm ${sessions.length - 3} phiên đăng nhập`}</button>}
       <p className="session-footnote">
         Phiên cũ có thể đã hết hạn. Tên thiết bị được nhận diện từ trình duyệt.
       </p>
