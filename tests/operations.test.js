@@ -80,6 +80,7 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
         200,
       );
       const inbox = await req("/notifications", buyer);
+      assert.equal((await req('/notifications?read=1', buyer)).data.items.length, 0);
       const matches = inbox.data.items.filter((n) => n.title === input.title);
       assert.equal(matches.length, 1);
       assert.equal(matches[0].body, input.body);
@@ -189,6 +190,10 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
         0,
       );
       const listing = await req("/admin/orders", admin);
+      const history = await req('/notifications?read=1&page_size=1', buyer);
+      assert.equal(history.data.items.length, 1);
+      assert.ok(history.data.items.every(n => n.read_at));
+      assert.equal((await req('/notifications?unread=1', buyer)).data.items.length, 0);
       assert.equal(listing.data.items[0].customer.id, uid);
       assert.equal(listing.data.items[0].items[0].keys, undefined);
       assert.equal(

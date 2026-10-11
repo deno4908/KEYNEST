@@ -105,14 +105,20 @@
   transition: border-color .15s, box-shadow .15s;
 }
 .catalog-toolbar .input-icon:focus-within {
-  border-color: #b88363;
-  box-shadow: 0 0 0 2px rgb(243 139 88 / 12%);
+  border-color: #79717e;
+  box-shadow: 0 0 0 2px rgb(183 168 189 / 7%);
 }
+.catalog-toolbar .input-icon input,
 .catalog-toolbar .input-icon input:focus,
 .catalog-toolbar .input-icon input:focus-visible {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   outline: none;
+  outline-offset: 0;
   box-shadow: none;
-  border-color: transparent;
+  min-width: 0;
+  caret-color: #e5e1e8;
 }
 .thread-avatar { overflow: hidden; font-size: 11px; }
 .thread-message.admin .thread-brand {

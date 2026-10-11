@@ -500,7 +500,7 @@ export function createOperations(store) {
         return {
           ...slice(
             all
-              .filter((n) => !f.unread || !n.read_at)
+              .filter((n) => (!f.unread || !n.read_at) && (!f.read || !!n.read_at))
               .sort(
                 (a, b) =>
                   b.created_at.localeCompare(a.created_at) ||
@@ -516,6 +516,7 @@ export function createOperations(store) {
         .select("id,title,body,href,created_at,read_at", { count: "exact" })
         .eq("user_id", uid);
       if (f.unread) q = q.is("read_at", null);
+      if (f.read) q = q.not("read_at", "is", null);
       const [result, unread] = await Promise.all([
         q
           .order("created_at", { ascending: false })
@@ -581,6 +582,7 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
         req.user.id,
         paging
           .extend({
+            read: z.enum(["0", "1"]).default("0").transform(v => v === "1"),
             unread: z
               .enum(["0", "1"])
               .default("0")

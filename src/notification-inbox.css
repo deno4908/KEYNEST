@@ -22,6 +22,14 @@
   display: grid;
   gap: 10px;
 }
+.notification-history { margin-top: 18px; border-top: 1px solid #30333b; }
+.notification-history-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 15px 0; background: none; border: 0; color: #adb3c0; font: inherit; font-size: 12px; cursor: pointer; }
+.notification-history-toggle:hover { color: #f1b389; }
+.notification-history-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.notification-history-collapse.is-open { grid-template-rows: 1fr; }
+.notification-history-collapse > div { min-height: 0; overflow: hidden; }
+.notification-history-list { padding-top: 5px; }
+@media (prefers-reduced-motion: reduce) { .notification-history-collapse { transition: none; } }
 .inbox-item {
   display: flex;
   align-items: flex-start;

@@ -153,7 +153,9 @@ export function SessionManager() {
   );
 }
 
-export function NotificationInbox() {
+export function NotificationInbox({ history = false }: { history?: boolean } = {}) {
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [data, setData] = useState<Inbox | null>(null);
   const [page, setPage] = useState(1);
   const [version, setVersion] = useState(0);
@@ -163,18 +165,19 @@ export function NotificationInbox() {
     const c = new AbortController();
     setError("");
     setData(null);
-    api<Inbox>(`/notifications?page=${page}&page_size=5`, { signal: c.signal })
+    api<Inbox>(`/notifications?page=${page}&page_size=5&${history ? 'read=1' : 'unread=1'}`, { signal: c.signal })
       .then(setData)
       .catch((e) => {
         if (!c.signal.aborted) setError(e.message);
       });
     return () => c.abort();
-  }, [page, version]);
+  }, [page, version, history]);
   async function read(id?: string) {
     setBusy(true);
     setError("");
     try {
       await post("/notifications/read", id ? { id } : { all: true });
+      setPage(1);
       setVersion((v) => v + 1);
     } catch (e) {
       setError((e as Error).message);
@@ -183,19 +186,19 @@ export function NotificationInbox() {
     }
   }
   return (
-    <section className="member-panel account-operations notification-inbox">
+    <section className={history ? "notification-history-list notification-inbox" : "member-panel account-operations notification-inbox"}>
       <div className="operations-heading">
         <h3>
-          <Bell size={18} /> Thông báo{" "}
-          {data && data.unread_count > 0 ? `(${data.unread_count})` : ""}
+          <Bell size={18} /> {history ? 'Đã đọc' : 'Thông báo mới'}{" "}
+          {!history && data && data.unread_count > 0 ? `(${data.unread_count})` : ""}
         </h3>
-        <button
+        {!history && <button
           className="button button-outline"
           disabled={busy || !data?.unread_count}
           onClick={() => read()}
         >
           Đánh dấu tất cả đã đọc
-        </button>
+        </button>}
       </div>
       {error && (
         <p className="form-error" role="alert">
@@ -205,7 +208,7 @@ export function NotificationInbox() {
       )}
       {!data && !error && <p className="muted">Đang tải thông báo…</p>}
       {data?.items.length === 0 && (
-        <p className="muted">Chưa có thông báo mới.</p>
+        <p className="muted">{history ? 'Chưa có thông báo đã đọc.' : 'Bạn đã xem hết thông báo mới.'}</p>
       )}
       <div className="inbox-list">
         {data?.items.map((n) => (
@@ -265,6 +268,14 @@ export function NotificationInbox() {
           </button>
         </div>
       )}
+      {!history && <div className="notification-history">
+        <button type="button" className="notification-history-toggle" aria-expanded={showHistory} aria-controls="notification-history-content" onClick={() => { setHistoryLoaded(true); setShowHistory(v => !v); }}>
+          {showHistory ? 'Thu gọn thông báo cũ' : 'Xem thông báo cũ'} <span aria-hidden="true">{showHistory ? '−' : '+'}</span>
+        </button>
+        <div id="notification-history-content" className={`notification-history-collapse ${showHistory ? 'is-open' : ''}`} inert={!showHistory} aria-hidden={!showHistory}>
+          <div>{historyLoaded && <NotificationInbox key={version} history />}</div>
+        </div>
+      </div>}
     </section>
   );
 }

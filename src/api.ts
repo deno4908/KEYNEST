@@ -27,7 +27,11 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  if (!initialized) await refreshAccess();
+  // Public storefront requests can start while the session is being restored.
+  // Private routes and every mutation still wait for authentication as before.
+  const publicRead = (options.method || 'GET').toUpperCase() === 'GET' &&
+    ['/config', '/products', '/categories', '/catalog', '/banners', '/promotions', '/announcements'].includes(path.split('?')[0]);
+  if (!initialized && !publicRead) await refreshAccess();
   const send = () => {
     const headers = new Headers(options.headers);
     if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');

@@ -670,15 +670,18 @@ app.post("/api/orders/:id/cancel", auth, async (req, res) => {
   await store.cancel(req.user.id, uuid.parse(req.params.id));
   res.json({ ok: true });
 });
-app.get("/api/wallet", auth, async (req, res) =>
+app.get("/api/wallet", auth, async (req, res) => {
+  const [profile, ledger, payments] = await Promise.all([
+    store.profile(req.user.id), store.ledger(req.user.id), store.payments(req.user.id),
+  ]);
   res.json({
-    balance: (await store.profile(req.user.id)).balance,
-    ledger: await store.ledger(req.user.id),
-    payments: (await store.payments(req.user.id))
+    balance: profile.balance,
+    ledger,
+    payments: payments
       .filter((p) => !p.order_id)
       .map(paymentInfo),
-  }),
-);
+  });
+});
 app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
   const { amount } = z
     .object({ amount: z.number().int().min(10000).max(50000000).multipleOf(1000) })

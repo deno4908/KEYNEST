@@ -12,6 +12,28 @@ const response = (body, status = 200, token) => new Response(JSON.stringify(body
   status, headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Access-Token': token } : {}) },
 });
 
+test('public storefront loads without waiting for a slow session refresh', async t => {
+  let release;
+  let privateRequests = 0;
+  const gate = new Promise(resolve => { release = resolve; });
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/refresh') { await gate; return response({ ok: true }, 200, 'session'); }
+    if (url === '/api/me') {
+      privateRequests++;
+      assert.equal(options.headers.get('Authorization'), 'Bearer session');
+    }
+    return response({ ok: true });
+  });
+  const { api } = await client();
+  const me = api('/me');
+  try {
+    await Promise.all(['/config', '/products', '/categories', '/catalog?q=test'].map(path => api(path)));
+    assert.equal(privateRequests, 0);
+  } finally { release(); }
+  await me;
+  assert.equal(privateRequests, 1);
+});
+
 test('frontend shares bootstrap refresh and attaches Bearer to parallel API requests', async t => {
   let refreshes = 0, calls = 0;
   t.mock.method(globalThis, 'fetch', async (url, options) => {
