@@ -286,6 +286,19 @@ try {
     1110000,
   );
   pass("webhook duplicate cannot double-credit wallet");
+  const ledgerBeforeReplay = await scalar('select count(*)::int from wallet_ledger where user_id=$1', [user]);
+  const noticesBeforeReplay = await scalar('select count(*)::int from notifications where user_id=$1', [user]);
+  for (let i=0; i<20; i++) {
+    assert.equal((await scalar('select settle_payment($1,$2,$3)', ['1001', topup.code, 200000])).duplicate, true);
+  }
+  assert.equal((await scalar('select settle_payment($1,$2,$3)', ['1001-alternate', topup.code, 200000])).review, true);
+  const anotherTopup = (await db.query('insert into payments(user_id,amount) values($1,200000) returning *', [user])).rows[0];
+  assert.equal((await scalar('select settle_payment($1,$2,$3)', ['1001', anotherTopup.code, 200000])).duplicate, true);
+  assert.equal(await scalar('select status from payments where id=$1', [anotherTopup.id]), 'pending');
+  assert.equal(Number(await scalar('select balance from profiles where id=$1', [user])), 1110000);
+  assert.equal(await scalar('select count(*)::int from wallet_ledger where user_id=$1', [user]), ledgerBeforeReplay);
+  assert.equal(await scalar('select count(*)::int from notifications where user_id=$1', [user]), noticesBeforeReplay);
+  pass('20 replays, alternate transaction IDs for paid code and reused transaction ID for another code cannot auto-credit or notify twice');
   const unpaid = await scalar("select create_order($1,$2,$3)", [
     user,
     JSON.stringify({ ...payload, method: "sepay", coupon: "" }),
@@ -1291,6 +1304,20 @@ try {
   pass(
     "deleting a campaign removes recipient copies and prevents resend on retry",
   );
+  const requestWalletTopup = async (uid, amount) => (await db.query('select * from create_wallet_topup($1,$2)', [uid, amount])).rows[0];
+  const firstTopup = await requestWalletTopup(user, 17000);
+  const reusedTopup = await requestWalletTopup(user, 17000);
+  assert.equal(reusedTopup.id, firstTopup.id);
+  assert.equal(new Date(reusedTopup.expires_at).getTime(), new Date(firstTopup.expires_at).getTime());
+  assert.notEqual((await requestWalletTopup(other, 17000)).id, firstTopup.id);
+  assert.notEqual((await requestWalletTopup(user, 18000)).id, firstTopup.id);
+  await db.query("update payments set expires_at=now()-interval '1 second' where id=$1", [firstTopup.id]);
+  const freshTopup = await requestWalletTopup(user, 17000);
+  assert.notEqual(freshTopup.id, firstTopup.id);
+  assert.equal(await scalar('select count(*)::int from payments where id=$1', [firstTopup.id]), 1);
+  await db.query("update payments set status='paid' where id=$1", [freshTopup.id]);
+  assert.notEqual((await requestWalletTopup(user, 17000)).id, freshTopup.id);
+  pass('wallet topups reuse only same-owner pending unexpired requests, preserve expiry and late-transfer records');
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

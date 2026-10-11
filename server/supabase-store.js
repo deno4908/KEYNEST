@@ -124,11 +124,7 @@ export class SupabaseStore {
   }
   async createTopup(uid, amount) {
     return this.query(
-      this.client
-        .from("payments")
-        .insert({ user_id: uid, amount })
-        .select()
-        .single(),
+      this.client.rpc('create_wallet_topup', { p_user: uid, p_amount: amount }).single(),
     );
   }
   async settle(transaction_id, code, amount) {

@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { Dispatch, SetStateAction, FormEvent, ReactNode } from "react";
 import {
   Link,
   Route,
@@ -83,7 +83,7 @@ type Context = {
   refresh: () => Promise<void>;
   notify: (message: string, error?: boolean) => void;
   login: () => void;
-  setUser: (u: User | null) => void;
+  setUser: Dispatch<SetStateAction<User | null>>;
 };
 const StoreContext = createContext<Context>(null!);
 export const useStore = () => useContext(StoreContext);
@@ -1560,7 +1560,13 @@ export function PaymentModal({
   );
 }
 function WalletPage() {
-  const { refresh, notify } = useStore();
+  const { user, setUser, notify } = useStore();
+  const walletLoadVersion = useRef(0);
+  const [walletNow, setWalletNow] = useState(Date.now);
+  useEffect(() => {
+    const timer = window.setInterval(() => setWalletNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
   const amountInput = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<{
       balance: number;
@@ -1577,13 +1583,38 @@ function WalletPage() {
         ? 'Nhập từ 10.000 đến 50.000.000 VND, theo bước 1.000 VND.' : '',
     );
   }, [amount, data]);
-  const load = () =>
-    api<typeof data>("/wallet")
-      .then(setData)
-      .catch((e) => setError(e.message));
+  const load = async () => {
+    const version = ++walletLoadVersion.current;
+    const owner = user?.id;
+    try {
+      const wallet = await api<NonNullable<typeof data>>("/wallet");
+      if (version !== walletLoadVersion.current) return;
+      setData(wallet);
+      setError('');
+      setUser(current => current && current.id === owner ? { ...current, balance: wallet.balance } : current);
+    } catch (e) {
+      if (version === walletLoadVersion.current) setError((e as Error).message);
+    }
+  };
+  const visiblePayments = data?.payments.filter(p => p.status !== 'expired' &&
+    !(p.status === 'pending' && new Date(p.expires_at).getTime() <= walletNow)) || [];
   useEffect(() => {
     load();
-  }, []);
+    const onFocus = () => { if (!document.hidden) void load(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      walletLoadVersion.current++;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [user?.id]);
+  const hasPendingTopup = visiblePayments.some(p => p.status === 'pending');
+  useEffect(() => {
+    if (!hasPendingTopup || payment) return;
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 15000);
+    return () => window.clearInterval(timer);
+  }, [hasPendingTopup, payment, user?.id]);
   async function topup(e: FormEvent) {
     e.preventDefault();
     if (busy) return;
@@ -1628,7 +1659,7 @@ function WalletPage() {
                 <span>KEYNEST WALLET</span>
               </div>
               <span>Số dư khả dụng</span>
-              <strong>{money(data.balance)}</strong>
+              <strong>{money(user?.balance ?? data.balance)}</strong>
               <p>
                 Dùng để thanh toán game key, gift card và dịch vụ tại KEYNEST.
               </p>
@@ -1747,7 +1778,7 @@ function WalletPage() {
           </section>
           <section className="panel wallet-requests">
             <h2>Yêu cầu nạp tiền</h2>
-            {data.payments.length ? (
+            {visiblePayments.length ? (
               <div className="table-scroll">
                 <table>
                   <thead>
@@ -1760,7 +1791,7 @@ function WalletPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.payments.map((p) => (
+                    {visiblePayments.map((p) => (
                       <tr key={p.id}>
                         <td className="mono">{p.code}</td>
                         <td>{date(p.created_at)}</td>
@@ -1795,7 +1826,6 @@ function WalletPage() {
           onClose={() => setPayment(null)}
           onPaid={() => {
             load();
-            refresh();
           }}
         />
       )}

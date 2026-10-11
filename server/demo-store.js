@@ -338,6 +338,8 @@ export class DemoStore {
   }
   createTopup(uid, amount) {
     this.expire();
+    const existing = this.db.payments.find(p => p.user_id === uid && !p.order_id && p.amount === amount && p.status === 'pending' && new Date(p.expires_at).getTime() > Date.now());
+    if (existing) return existing;
     const p = this.payment(uid, amount);
     this.save();
     return p;

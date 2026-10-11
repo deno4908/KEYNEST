@@ -155,7 +155,7 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
           { ...tx(21, payment.code), transferType: "OUT" },
         ],
       };
-      const results = await Promise.all([send(body), send(body)]);
+      const results = await Promise.all(Array.from({ length: 20 }, () => send(body)));
       for (const r of results) {
         assert.equal(r.status, 200);
         assert.deepEqual(r.body, { success: true });
@@ -178,6 +178,10 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
       });
       assert.equal(result.duplicate, true);
       assert.equal(restored.profile(uid).balance, before + 20000);
+      // A different provider ID for an already-paid code must not auto-credit.
+      assert.equal((await send({ transactions: [tx(22, payment.code)] })).status, 200);
+      assert.equal(store.profile(uid).balance, before + 20000);
+      assert.equal(store.db.events.find(e => e.transaction_id.endsWith(':22')).outcome, 'needs_review');
     },
   );
   await t.test(
@@ -231,14 +235,14 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
     "returns failure on DB error and retries a partially processed batch without double credit",
     async () => {
       const a = store.createTopup(uid, 20000),
-        b = store.createTopup(uid, 20000);
+        b = store.createTopup(uid, 30000);
       const beforeBatch = store.profile(uid).balance;
       const originalSettle = store.settle;
       store.settle = function (id, code, amount) {
         if (id.endsWith(":41")) throw new Error(`sensitive ${token}`);
         return originalSettle.call(this, id, code, amount);
       };
-      const body = { transactions: [tx(40, a.code), tx(41, b.code)] };
+      const body = { transactions: [tx(40, a.code), tx(41, b.code, 30000)] };
       try {
         const failed = await send(body);
         assert.equal(failed.status, 503);
@@ -249,7 +253,7 @@ test("Pay2S HTTP integration: authentication, batch validation, retry and financ
       }
       assert.equal(store.profile(uid).balance, beforeBatch + 20000);
       assert.equal((await send(body)).status, 200);
-      assert.equal(store.profile(uid).balance, beforeBatch + 40000);
+      assert.equal(store.profile(uid).balance, beforeBatch + 50000);
     },
   );
 });
