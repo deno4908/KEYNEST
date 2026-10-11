@@ -49,10 +49,20 @@ Chọn **Route**, không thay bản ghi web thành Custom Domain Worker, vì Wor
 
 Worker độc lập với GitHub Actions hiện tại. Push code chỉ cập nhật web trên VPS; lần đầu và khi sửa Worker phải dán/deploy lại trên Cloudflare. Sau sửa HTML hoặc handler, chạy `node scripts/build-country-worker.js` để tạo lại file Worker rồi dán file mới.
 
+## Chế độ chặn chặt — strict-vietnam-v3
+
+Worker hiện chỉ cho IP ngoài Việt Nam (hoặc không xác định quốc gia) đọc `GET/HEAD /`, `/privacy`, `/terms`, gồm dấu `/` cuối đường dẫn chính sách. Ba trang này là HTML tự chứa, dùng chung nội dung giới thiệu/chính sách của website, không tải JavaScript, ảnh hoặc gọi API. Không có ngoại lệ theo User-Agent.
+
+Mọi đường dẫn khác trả 403, bao gồm API công khai, API tài khoản, ảnh `/api/media`, tài nguyên `/assets`, trang sản phẩm, preview và robots.txt. Ngoại lệ duy nhất ngoài ba trang là **POST chính xác** `/api/webhooks/pay2s` và `/api/webhooks/sepay`; backend vẫn phải xác thực webhook. Bot Facebook/Discord ngoài VN không còn lấy được ảnh chia sẻ sản phẩm trong chế độ này.
+
+Khi sửa chính sách, chạy `node scripts/build-country-worker.js` và dán lại toàn bộ file Worker đã tạo → Deploy để cập nhật bản HTML công khai. Git push không cập nhật Worker. Header nhận diện: `X-Keynest-Region-Worker: strict-vietnam-v3`.
+
+Giới hạn này chỉ áp dụng request đi qua Worker. Cần khóa truy cập trực tiếp cổng web của VPS để tránh bỏ qua Cloudflare; không coi việc triển khai Worker là đã khóa origin.
+
 ## Kiểm tra sau bật
 
 - Mạng Việt Nam: trang chủ, đăng nhập, account, mua hàng hoạt động.
-- VPN IP Singapore/Mỹ: trang chủ trả 403 và hiện trang thông báo; `/api/config` trả 403. Với Worker, API trả code REGION_RESTRICTED.
+- VPN IP Singapore/Mỹ: trang chủ hiện giới thiệu tĩnh; `/privacy`, `/terms` đọc được. `/account` trả trang chặn 403; `/api/config` và các API khác trả 403 với code REGION_RESTRICTED, trừ POST webhook nêu trên.
 - Tắt VPN và bấm “Thử truy cập lại”: trở lại cửa hàng.
 - Chỉ thêm header `CF-IPCountry: VN` trên request IP nước ngoài không được mở quyền.
 - Callback Pay2S hợp lệ vẫn phải được backend nhận và xác nhận thanh toán. Không gửi thanh toán thật chỉ để thử; kiểm tra staging hoặc công cụ thử webhook của nhà cung cấp.

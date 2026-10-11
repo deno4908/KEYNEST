@@ -1,5 +1,7 @@
 # Ảnh khi chia sẻ link
 
+> **Cấu hình hiện tại: strict-vietnam-v3.** Theo yêu cầu chặn chặt ngoài Việt Nam, Worker đã bỏ ngoại lệ bot và ảnh công khai. Facebook/Discord ngoài VN không lấy được ảnh hoặc preview sản phẩm. Hướng dẫn mở preview bên dưới thuộc cấu hình cũ `social-preview-v2`, không áp dụng khi giữ chế độ chặn chặt. Push Git không tự thay đổi Worker trên Cloudflare.
+
 ## Facebook báo 403 và tiêu đề “Khu vực chưa được hỗ trợ”
 
 Facebook đang nhận trang chặn khu vực. Đây không chỉ là vấn đề cache ảnh. Cần cập nhật Worker đang gắn với domain:

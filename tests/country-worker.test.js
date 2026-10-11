@@ -1,18 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import worker from '../deploy/cloudflare-vietnam-worker.js';
-test('robots.txt remains available to foreign crawlers before preview lookup', async () => {
-  const response = await worker.fetch(new Request('https://keynest.store/robots.txt'));
-  assert.equal(response.status, 200);
-  assert.match(await response.text(), /Allow: \/\n/);
-  assert.equal(response.headers.get('X-Keynest-Region-Worker'), 'social-preview-v2');
-});
-test('foreign social agents get metadata only and never customer APIs', async t => {
-  t.mock.method(globalThis, 'fetch', async req => new Response(req.url));
-  const req = new Request('https://keynest.store/products/steam', { headers: { 'User-Agent': 'facebookexternalhit/1.1', Cookie: 'private=value' } });
-  assert.equal(await (await worker.fetch(req)).text(), 'https://keynest.store/share-preview/products/steam');
-  assert.equal((await worker.fetch(new Request('https://keynest.store/api/me', { headers: { 'User-Agent': 'facebookexternalhit/1.1' } }))).status, 403);
-});
+import { publicInformation } from '../server/public-information.js';
 function request(path = '/', country, method = 'GET') {
   const req = new Request('https://keynest.store' + path, { method, headers: { 'CF-IPCountry': 'VN' } });
   if (country) Object.defineProperty(req, 'cf', { value: { country } });
@@ -30,16 +19,27 @@ test('foreign and unknown countries receive standalone 403; spoofed country head
   assert.equal(await (await worker.fetch(request('/account', 'US', 'HEAD'))).text(), '');
 });
 
-test('public information and its assets are accessible worldwide, private and write routes are not', async t => {
-  t.mock.method(globalThis, 'fetch', async () => new Response('public origin'));
-  for (const path of ['/', '/privacy', '/terms/', '/assets/index-abc.js', '/api/products', '/api/categories']) {
-    assert.equal(await (await worker.fetch(request(path, 'US'))).text(), 'public origin');
+test('foreign public pages are standalone and all other reads and writes are blocked', async t => {
+  const origin = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected origin request'); });
+  for (const path of ['/', '/privacy', '/privacy/', '/terms', '/terms/']) {
+    const res = await worker.fetch(request(path, 'US'));
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /KEYNEST/);
+    assert.ok(html.includes(publicInformation(path)), 'Generated public copy must match current policies');
+    assert.doesNotMatch(html, /<script|<link|<img/i);
+    assert.equal(await (await worker.fetch(request(path, 'US', 'HEAD'))).text(), '');
+    assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
   }
-  for (const path of ['/api/me', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/secret.json']) {
-    assert.equal((await worker.fetch(request(path, 'US'))).status, 403);
+  const blocked = ['/api', '/api/config', '/api/products', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements', '/api/media/image.webp', '/api/me', '/api/auth/refresh', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/index.js', '/images/share/keynest-v2.jpg', '/products/steam', '/share-preview', '/robots.txt'];
+  for (const path of blocked) {
+    for (const method of ['GET', 'HEAD', 'POST', 'OPTIONS']) {
+      const req = request(path, 'US', method);
+      req.headers.set('User-Agent', 'facebookexternalhit Googlebot');
+      assert.equal((await worker.fetch(req)).status, 403, method + ' ' + path);
+    }
   }
-  assert.equal((await worker.fetch(request('/api/products', 'US', 'POST'))).status, 403);
-  assert.equal((await worker.fetch(request('/privacy', 'US', 'POST'))).status, 403);
+  assert.equal(origin.mock.callCount(), 0);
 });
 test('Vietnam requests and exact payment POST webhooks reach origin, no broad path exemption', async t => {
   let calls = 0;

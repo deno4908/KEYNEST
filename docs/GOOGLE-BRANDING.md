@@ -15,7 +15,7 @@ Sau khi GitHub Actions deploy thành công:
 
 1. Cloudflare → Workers & Pages → Worker đang gắn keynest.store → Edit code.
 2. Thay toàn bộ code bằng `deploy/cloudflare-vietnam-worker.js` mới và chọn Deploy. Git push không tự cập nhật Worker này.
-3. Code mới cho mọi người đọc trang chủ, /privacy, /terms và tài nguyên công khai cần thiết. Tài khoản, admin, API riêng tư và giao dịch vẫn bị giới hạn khu vực như trước.
+3. Worker strict-vietnam-v3 cho người ngoài VN đọc trang giới thiệu tại `/`, `/privacy`, `/terms` bằng HTML tự chứa. Nội dung lấy từ cùng nguồn với website; không gọi API hoặc tải tài nguyên bên ngoài. Các API đều bị chặn ngoài VN, chỉ giữ POST webhook Pay2S/SePay. Không có ngoại lệ riêng cho Googlebot. Cần tạo lại và Deploy Worker mỗi khi sửa nội dung chính sách.
 4. Nếu có WAF rule riêng chặn mọi IP ngoài VN, tắt rule trùng đó để Worker kiểm soát quốc gia. Không tắt các rule bảo vệ khác. WAF chặn trước Worker sẽ khiến ngoại lệ trong Worker không có tác dụng.
 5. Dùng cửa sổ ẩn danh và kết nối ngoài Việt Nam thử cả ba trang. Phải xem được nội dung thật, không phải màn hình đăng nhập, xác minh Cloudflare hoặc thông báo 403. Thử View Source của /privacy để thấy nội dung chính sách trong HTML.
 
