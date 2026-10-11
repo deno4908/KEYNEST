@@ -16,6 +16,7 @@ import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
+import { createSteamArt } from './steam-art.js';
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
 import { createOperations, operationsRouter } from "./operations.js";
 import { createBankPayments } from "./bank-payments.js";
@@ -410,6 +411,8 @@ function orderInfo(o) {
   };
 }
 app.get("/api/health", (req, res) => res.json({ ok: true, mode: config.mode }));
+const steamArt = createSteamArt();
+app.get('/api/steam-art', async (req, res) => res.json({ items: await steamArt() }));
 app.get("/api/config", (req, res) =>
   res.json({
     mode: config.mode,

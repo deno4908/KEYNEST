@@ -8,11 +8,7 @@ import './oauth-welcome.css';
 
 const storageKey = 'kn-oauth-welcome';
 const fallbackArt = { name: 'ELDEN RING', src: '/images/products/elden-ring-welcome.jpg' };
-const steamArt = [
-  { name: 'ELDEN RING', app: '1245620' },
-  { name: 'BLACK MYTH: WUKONG', app: '2358720' },
-  { name: 'CYBERPUNK 2077', app: '1091500' },
-].map(game => ({ name: game.name, src: `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.app}/library_hero.jpg` }));
+type GameArt = typeof fallbackArt;
 // Cosmetic marker only. The authenticated /me response controls the greeting.
 function pendingWelcome(): 'google' | 'discord' | null {
   const provider = new URLSearchParams(window.location.search).get('welcome');
@@ -38,7 +34,37 @@ export function OAuthWelcome() {
   const [remaining, setRemaining] = useState(10);
   const [closing, setClosing] = useState(false);
   // Pick once; countdown updates must not replace the background mid-animation.
-  const [art, setArt] = useState(() => steamArt[Math.floor(Math.random() * steamArt.length)]);
+  const [art, setArt] = useState(fallbackArt);
+  useEffect(() => {
+    if (!provider) return;
+    const controller = new AbortController();
+    let cancelled = false;
+    let preload: HTMLImageElement | undefined;
+    void fetch('/api/steam-art', { signal: controller.signal, credentials: 'omit' })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        const candidates: GameArt[] = Array.isArray(data?.items) ? data.items.filter((item: GameArt) =>
+          typeof item?.name === 'string' && typeof item?.src === 'string' &&
+          /^https:\/\/shared\.fastly\.steamstatic\.com\/store_item_assets\/steam\/apps\/\d+\/library_hero\.jpg$/.test(item.src)) : [];
+        // Some Steam games have no hero art. Try up to three random candidates.
+        let attempts = 0;
+        const load = () => {
+          if (cancelled || !candidates.length || attempts++ >= 3) return;
+          const [chosen] = candidates.splice(Math.floor(Math.random() * candidates.length), 1);
+          preload = new Image();
+          preload.referrerPolicy = 'no-referrer';
+          preload.onload = () => { if (!cancelled) setArt(chosen); };
+          preload.onerror = load;
+          preload.src = chosen.src;
+        };
+        load();
+      }).catch(() => { /* Local art keeps login usable if Steam is unavailable. */ });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (preload) { preload.onload = null; preload.onerror = null; }
+    };
+  }, [provider]);
   const location = useLocation();
   const navigate = useNavigate();
   const visible = !!user && !!provider && !['/two-factor', '/admin-verification', '/auth/error'].includes(location.pathname);
