@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Monitor, ShieldCheck, Smartphone, LogOut } from "lucide-react";
+import { Bell, Monitor, ShieldCheck, Smartphone, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 import "./sessions.css";
 import "./notification-inbox.css";
 import { api, date, post } from "./api";
@@ -263,23 +263,23 @@ export function NotificationInbox({ history = false }: { history?: boolean } = {
         ))}
       </div>
       {data && data.pages > 1 && (
-        <div className="operations-heading">
+        <nav className="inbox-pagination" aria-label={history ? 'Phân trang thông báo cũ' : 'Phân trang thông báo mới'}>
           <button
+            type="button" aria-label="Trang trước"
             disabled={page <= 1 || busy}
             onClick={() => setPage(page - 1)}
           >
-            Trước
+            <ChevronLeft size={15} aria-hidden="true" /> Trước
           </button>
-          <small>
-            {page} / {data.pages}
-          </small>
+          <span className="inbox-page-number" aria-live="polite">Trang <strong>{page}</strong><span>/ {data.pages}</span></span>
           <button
+            type="button" aria-label="Trang sau"
             disabled={page >= data.pages || busy}
             onClick={() => setPage(page + 1)}
           >
-            Sau
+            Sau <ChevronRight size={15} aria-hidden="true" />
           </button>
-        </div>
+        </nav>
       )}
       {!history && <div className="notification-history">
         <button type="button" className="notification-history-toggle" aria-expanded={showHistory} aria-controls="notification-history-content" onClick={() => { setHistoryLoaded(true); setShowHistory(v => !v); }}>

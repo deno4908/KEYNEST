@@ -22,6 +22,36 @@
   display: grid;
   gap: 10px;
 }
+.inbox-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #2e3037;
+}
+.inbox-pagination button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #393c45;
+  border-radius: 7px;
+  background: #202228;
+  color: #d9dce3;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.inbox-pagination button:hover:not(:disabled) { background: #2b2a2e; border-color: #9c7963; }
+.inbox-pagination button:focus-visible { outline: 2px solid #dfac86; outline-offset: 3px; }
+.inbox-pagination button:disabled { color: #737984; background: #181a1f; border-color: #2b2e35; cursor: default; }
+.inbox-page-number { display: inline-flex; align-items: baseline; gap: 5px; color: #939aa8; font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inbox-page-number strong { color: #f0d0b9; font-size: 13px; font-weight: 600; }
 .notification-history { margin-top: 18px; border-top: 1px solid #30333b; }
 .notification-history-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 15px 0; background: none; border: 0; color: #adb3c0; font: inherit; font-size: 12px; cursor: pointer; }
 .notification-history-toggle:hover { color: #f1b389; }
