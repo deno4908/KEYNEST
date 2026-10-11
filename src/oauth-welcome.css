@@ -1,5 +1,9 @@
 .modal-backdrop:has(.oauth-welcome) { backdrop-filter: blur(9px); background: rgb(8 9 12 / 72%); }
-.modal.oauth-welcome { width: min(440px, calc(100vw - 32px)); padding: 24px; text-align: center; border: 1px solid #3b3c43; background: #191a20; border-radius: 16px; }
+.modal.oauth-welcome { width: min(960px, 100%); max-width: 960px; min-height: min(630px, calc(100dvh - 48px)); display: flex; flex-direction: column; padding: 24px; text-align: center; border: 1px solid #3b3c43; background: #191a20; border-radius: 12px; }
+.oauth-welcome-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 0 48px; }
+.oauth-welcome-copy { max-width: 600px; }
+.oauth-welcome-continue { gap: 14px; max-width: 100%; }
+.oauth-welcome-countdown { font-variant-numeric: tabular-nums; min-width: 30px; border-left: 1px solid currentColor; padding-left: 12px; }
 .oauth-welcome .modal-title h2 { font-size: 13px; color: #9da3b0; }
 .oauth-welcome-connection { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 30px 0 24px; }
 .oauth-welcome-provider, .oauth-welcome-avatar { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 50%; display: grid; place-items: center; }
@@ -15,5 +19,5 @@
 @keyframes welcome-provider { from { transform: translateX(61px) scale(.85); opacity: 0; } 35% { opacity: 1; transform: translateX(61px) scale(1.12); } to { transform: translateX(0) scale(1); opacity: 1; } }
 @keyframes welcome-avatar { from { transform: translateX(-12px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes welcome-reveal { from { transform: translateY(7px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (max-width: 600px) { .modal.oauth-welcome { height: auto; min-height: 0; max-height: calc(100dvh - 32px); margin: auto; padding: 20px; border-radius: 16px; } .oauth-welcome-connection { gap: 16px; } }
+@media (max-width: 760px) { .modal-backdrop > .modal.oauth-welcome { width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); border-radius: 0; border: 0; } .oauth-welcome-connection { gap: 16px; } .oauth-welcome-body { padding: 20px 0; } }
 @media (prefers-reduced-motion: reduce) { .oauth-welcome * { animation: none !important; } }

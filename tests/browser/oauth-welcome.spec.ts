@@ -21,9 +21,12 @@ test('social welcome requires a session, works on mobile and does not replay aft
     await expect(page).toHaveURL(/\/account$/);
     await expect.poll(() => welcome.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     if (provider === 'google') {
-      await welcome.getByRole('button', { name: 'Tiếp tục vào cửa hàng' }).click();
+      await welcome.getByRole('button', { name: /Tiếp tục vào cửa hàng/ }).click();
     } else {
-      await page.clock.fastForward(3500);
+      await page.clock.fastForward(5000);
+      await expect(welcome).toBeVisible();
+      await expect(welcome.locator('.oauth-welcome-countdown')).toHaveText('5s');
+      await page.clock.fastForward(5000);
     }
     await expect(welcome).toHaveCount(0);
     await page.reload();

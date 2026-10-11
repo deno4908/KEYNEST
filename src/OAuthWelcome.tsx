@@ -29,6 +29,7 @@ function pendingWelcome(): 'google' | 'discord' | null {
 export function OAuthWelcome() {
   const { user } = useStore();
   const [provider, setProvider] = useState(pendingWelcome);
+  const [remaining, setRemaining] = useState(10);
   const location = useLocation();
   const navigate = useNavigate();
   const visible = !!user && !!provider && !['/two-factor', '/admin-verification', '/auth/error'].includes(location.pathname);
@@ -44,11 +45,20 @@ export function OAuthWelcome() {
   }, [visible, location.pathname, location.search, location.hash, navigate]);
   useEffect(() => {
     if (!visible) return;
-    const timer = window.setTimeout(() => setProvider(null), 3200);
-    return () => window.clearTimeout(timer);
+    const deadline = Date.now() + 10000;
+    setRemaining(10);
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setRemaining(seconds);
+      if (!seconds) setProvider(null);
+    };
+    const timer = window.setInterval(tick, 250);
+    document.addEventListener('visibilitychange', tick);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
   }, [visible]);
   if (!visible || !user) return null;
   return <Modal title="Đăng nhập thành công" className="oauth-welcome" close={() => setProvider(null)}>
+    <div className="oauth-welcome-body">
     <div className="oauth-welcome-connection" aria-hidden="true">
       <span className={`oauth-welcome-provider ${provider}`}>{provider === 'google' ? <GoogleIcon /> : <DiscordIcon />}</span>
       <ArrowLeftRight className="oauth-welcome-arrows" size={28} />
@@ -59,6 +69,7 @@ export function OAuthWelcome() {
       <h2>Xin chào, <strong>{user.name}</strong></h2>
       <p>Chào mừng bạn đến với KEYNEST.</p>
     </div>
-    <button className="button full" onClick={() => setProvider(null)}>Tiếp tục vào cửa hàng</button>
+    <button className="button oauth-welcome-continue" onClick={() => setProvider(null)}>Tiếp tục vào cửa hàng <span className="oauth-welcome-countdown">{remaining}s</span></button>
+    </div>
   </Modal>;
 }
