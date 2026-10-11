@@ -1,6 +1,6 @@
 # Ảnh khi chia sẻ link
 
-> **C?u h?nh hi?n t?i: vietnam-social-v4.** ?? m? l?i GET/HEAD robots.txt, ?nh c?ng khai v? metadata chia s? cho Discord/Facebook c?ng c?c bot preview ???c li?t k? trong handler. Bot ngo?i VN ch? nh?n HTML metadata t? /share-preview, kh?ng ???c v?o ?ng d?ng ho?c API t?i kho?n. C?n copy to?n b? deploy/cloudflare-vietnam-worker.js l?n Cloudflare v? Deploy; Git push kh?ng t? c?p nh?t Worker.
+> **Cấu hình hiện tại: vietnam-social-v4.** Đã mở lại robots.txt, ảnh công khai và metadata chia sẻ. Bot ngoài VN chỉ nhận metadata, không được vào ứng dụng hay API tài khoản. Copy toàn bộ deploy/cloudflare-vietnam-worker.js lên Cloudflare và Deploy; Git push không tự cập nhật Worker.
 
 ## Facebook báo 403 và tiêu đề “Khu vực chưa được hỗ trợ”
 

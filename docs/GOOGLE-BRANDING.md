@@ -1,5 +1,7 @@
 # Xử lý lỗi xác minh thương hiệu Google
 
+Worker hiện là `vietnam-social-v4`: vẫn giữ ba trang thông tin tĩnh ngoài VN, bổ sung ngoại lệ ảnh công khai, robots.txt và metadata cho bot chia sẻ. API nghiệp vụ vẫn bị chặn. Luôn dùng file Worker mới nhất và Deploy lại trên Cloudflare.
+
 ## 1. Xác minh keynest.store
 
 1. Đăng nhập Google Search Console (https://search.google.com/search-console) bằng tài khoản quản lý dự án OAuth trên Google Cloud.

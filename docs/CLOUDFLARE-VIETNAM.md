@@ -49,7 +49,11 @@ Chọn **Route**, không thay bản ghi web thành Custom Domain Worker, vì Wor
 
 Worker độc lập với GitHub Actions hiện tại. Push code chỉ cập nhật web trên VPS; lần đầu và khi sửa Worker phải dán/deploy lại trên Cloudflare. Sau sửa HTML hoặc handler, chạy `node scripts/build-country-worker.js` để tạo lại file Worker rồi dán file mới.
 
-## Chế độ chặn chặt — strict-vietnam-v3
+## Cập nhật hiện tại — vietnam-social-v4
+
+Đã mở lại GET/HEAD robots.txt, ảnh công khai `/images/share/`, `/images/products/` và `/api/media/<id>.webp` theo định dạng cho phép trong handler. Bot chia sẻ Discord/Facebook và các bot được liệt kê chỉ nhận metadata trang chủ hoặc sản phẩm, không được vào ứng dụng/API nghiệp vụ. Cookie, Authorization và query được bỏ khi lấy preview/ảnh. Cần Deploy lại Worker. Chế độ v3 bên dưới là cấu hình cũ, trước khi khôi phục ảnh chia sẻ.
+
+## Chế độ chặn chặt cũ — strict-vietnam-v3
 
 Worker hiện chỉ cho IP ngoài Việt Nam (hoặc không xác định quốc gia) đọc `GET/HEAD /`, `/privacy`, `/terms`, gồm dấu `/` cuối đường dẫn chính sách. Ba trang này là HTML tự chứa, dùng chung nội dung giới thiệu/chính sách của website, không tải JavaScript, ảnh hoặc gọi API. Không có ngoại lệ theo User-Agent.
 
