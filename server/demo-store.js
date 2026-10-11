@@ -721,6 +721,68 @@ export class DemoStore {
     this.save();
     return p;
   }
+  deleteProduct(id, actor) {
+    const product = this.db.products.find((p) => p.id === id);
+    if (!product) throw new AppError("Không tìm thấy sản phẩm.", 404);
+    const user = this.db.users.find((u) => u.id === actor);
+    if (!user || !["admin", "seller"].includes(user.role))
+      throw new AppError("Cần quyền quản lý sản phẩm.", 403);
+    if (user.role === "seller" && product.seller_id !== actor)
+      throw new AppError("Không có quyền xóa sản phẩm này.", 403);
+    const variantIds = new Set(product.variants.map((v) => v.id));
+    const hasOrder = this.db.orders.some((order) =>
+      order.items.some(
+        (item) => item.product_id === id || variantIds.has(item.variant_id),
+      ),
+    );
+    const hasAssignedInventory = this.db.inventory.some(
+      (item) =>
+        variantIds.has(item.variant_id) && (item.order_id || item.item_id),
+    );
+    const hasFeedback =
+      this.db.reviews.some((review) => review.product_id === id) ||
+      this.db.product_comments.some((comment) => comment.product_id === id);
+    if (hasOrder || hasAssignedInventory || hasFeedback)
+      throw new AppError(
+        'Sản phẩm đã có lịch sử đơn hàng hoặc đánh giá; hãy tắt “Đang bán” thay vì xóa.',
+        409,
+      );
+    this.db.inventory = this.db.inventory.filter(
+      (item) => !variantIds.has(item.variant_id),
+    );
+    this.db.products = this.db.products.filter((p) => p.id !== id);
+    this.audit(actor, "delete_product", id);
+    this.save();
+  }
+  deleteVariant(id, actor) {
+    const product = this.db.products.find((p) =>
+      p.variants.some((variant) => variant.id === id),
+    );
+    if (!product) throw new AppError("Không tìm thấy gói sản phẩm.", 404);
+    const user = this.db.users.find((u) => u.id === actor);
+    if (!user || !["admin", "seller"].includes(user.role))
+      throw new AppError("Cần quyền quản lý gói.", 403);
+    if (user.role === "seller" && product.seller_id !== actor)
+      throw new AppError("Không có quyền xóa gói này.", 403);
+    const hasOrder = this.db.orders.some((order) =>
+      order.items.some((item) => item.variant_id === id),
+    );
+    const hasAssignedInventory = this.db.inventory.some(
+      (item) =>
+        item.variant_id === id && (item.order_id || item.item_id),
+    );
+    if (hasOrder || hasAssignedInventory)
+      throw new AppError(
+        "Gói đã có lịch sử đơn hàng; hãy tắt sản phẩm thay vì xóa gói.",
+        409,
+      );
+    product.variants = product.variants.filter((variant) => variant.id !== id);
+    this.db.inventory = this.db.inventory.filter(
+      (item) => item.variant_id !== id,
+    );
+    this.audit(actor, "delete_variant", id);
+    this.save();
+  }
   inventory(variant_id, filters) {
     const variant = this.db.products
       .flatMap((p) => p.variants)

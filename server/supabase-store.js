@@ -353,6 +353,22 @@ export class SupabaseStore {
       this.client.rpc("save_variant", { p_product: product_id, p_data: data }),
     );
   }
+  async deleteProduct(id, actor) {
+    return this.query(
+      this.client.rpc("delete_catalog_product", {
+        p_actor: actor,
+        p_product: id,
+      }),
+    );
+  }
+  async deleteVariant(id, actor) {
+    return this.query(
+      this.client.rpc("delete_catalog_variant", {
+        p_actor: actor,
+        p_variant: id,
+      }),
+    );
+  }
   encrypted(secrets) {
     return secrets.map((secret) => ({
       secret: encrypt(secret, this.key),

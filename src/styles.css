@@ -2370,6 +2370,27 @@ td small {
 .variant-form h3 {
   margin-bottom: 0;
 }
+.product-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.product-delete-button,
+.variant-delete-button {
+  color: #ff9b9b !important;
+  border-color: #713d43 !important;
+}
+.product-delete-button:hover,
+.variant-delete-button:hover {
+  background: #49272c !important;
+  border-color: #a8555d !important;
+}
+.variant-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .admin-content .table-scroll.panel {
   padding: 10px;
 }

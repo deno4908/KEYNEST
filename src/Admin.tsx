@@ -14,6 +14,7 @@ import {
   Plus,
   ShieldCheck,
   Ticket as TicketIcon,
+  Trash2,
   Upload,
   Users,
   Wallet,
@@ -485,6 +486,7 @@ export function Admin() {
         <ProductEditor
           value={editing}
           close={() => setEditing(null)}
+          changed={afterSave}
           saved={async () => {
             setEditing(null);
             await afterSave();
@@ -578,12 +580,14 @@ export function ProductEditor({
   scope = "admin",
   value,
   close,
+  changed,
   saved,
   importKeys,
 }: {
   scope?: "admin" | "seller";
   value: Partial<Product>;
   close: () => void;
+  changed: () => Promise<void>;
   saved: () => Promise<void>;
   importKeys: (v: Variant) => void;
 }) {
@@ -613,6 +617,7 @@ export function ProductEditor({
       });
       setProduct({ ...p, variants: product.variants || [] });
       notify("Đã lưu sản phẩm.");
+      await changed();
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -634,10 +639,56 @@ export function ProductEditor({
         region: f.get("region"),
         warranty_days: Number(f.get("warranty_days")),
       });
-      const data = await api<Overview>(`/${scope}/overview`);
-      setProduct(data.products.find((p) => p.id === product.id)!);
+      const data = await api<{ products: Product[] }>(`/${scope}/overview`);
+      const updated = data.products.find((p) => p.id === product.id);
+      if (!updated) throw new Error("Không tìm thấy sản phẩm vừa cập nhật.");
+      setProduct(updated);
       setVariant(null);
       notify("Đã lưu gói sản phẩm.");
+      await changed();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteProduct() {
+    if (!product.id) return;
+    if (
+      !window.confirm(
+        `Xóa vĩnh viễn “${product.name}” cùng các gói và mã tồn kho chưa bán? Nếu đã có đơn hàng, đánh giá hoặc bình luận thì sản phẩm sẽ được giữ lại.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await api(`/${scope}/products/${product.id}`, { method: "DELETE" });
+      notify("Đã xóa sản phẩm.");
+      close();
+      await changed();
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteVariant(v: Variant) {
+    if (
+      !window.confirm(
+        `Xóa gói “${v.name}” và toàn bộ mã tồn kho chưa bán? Gói đã có lịch sử mua sẽ không thể xóa.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      await api(`/${scope}/variants/${v.id}`, { method: "DELETE" });
+      setProduct((current) => ({
+        ...current,
+        variants: current.variants?.filter((item) => item.id !== v.id),
+      }));
+      setVariant(null);
+      notify("Đã xóa gói sản phẩm.");
+      await changed();
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -649,6 +700,7 @@ export function ProductEditor({
       title={product.id ? "Quản lý sản phẩm" : "Thêm sản phẩm"}
       close={close}
       wide
+      className="product-editor"
     >
       <form className="form" onSubmit={saveProduct}>
         <div className="form-grid">
@@ -783,9 +835,18 @@ export function ProductEditor({
               <button
                 className="icon-button"
                 aria-label="Sửa gói"
+                disabled={busy}
                 onClick={() => setVariant(v)}
               >
                 <Pencil size={16} />
+              </button>
+              <button
+                className="icon-button variant-delete-button"
+                aria-label={`Xóa gói ${v.name}`}
+                disabled={busy}
+                onClick={() => void deleteVariant(v)}
+              >
+                <Trash2 size={16} />
               </button>
               {v.delivery === "key" && (
                 <button
@@ -905,13 +966,27 @@ export function ProductEditor({
         <p className="muted">Lưu sản phẩm trước khi thêm gói và nhập mã.</p>
       )}
       <hr />
-      <button
-        className="button button-dark full"
-        disabled={busy}
-        onClick={saved}
-      >
-        Hoàn tất quản lý
-      </button>
+      <div className="product-editor-actions">
+        {product.id && (
+          <button
+            type="button"
+            className="button button-outline button-small product-delete-button"
+            disabled={busy}
+            onClick={() => void deleteProduct()}
+          >
+            <Trash2 size={15} />
+            Xóa sản phẩm
+          </button>
+        )}
+        <button
+          type="button"
+          className="button button-dark"
+          disabled={busy}
+          onClick={saved}
+        >
+          Hoàn tất quản lý
+        </button>
+      </div>
     </Modal>
   );
 }

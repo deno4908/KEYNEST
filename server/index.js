@@ -932,6 +932,11 @@ app.post("/api/admin/products", async (req, res) => {
   await store.audit(req.user.id, "save_product", result.id);
   res.json(result);
 });
+app.delete("/api/admin/products/:id", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  await store.deleteProduct(id, req.user.id);
+  res.json({ ok: true });
+});
 app.get("/api/admin/banners", async (req, res) =>
   res.json(await store.banners(true)),
 );
@@ -971,6 +976,11 @@ app.post("/api/admin/products/:id/variants", async (req, res) => {
   const result = await store.saveVariant(id, variantSchema.parse(req.body));
   await store.audit(req.user.id, "save_variant", id);
   res.json(result);
+});
+app.delete("/api/admin/variants/:id", async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  await store.deleteVariant(id, req.user.id);
+  res.json({ ok: true });
 });
 app.post("/api/admin/inventory/:id", async (req, res) => {
   const id = uuid.parse(req.params.id);

@@ -558,11 +558,12 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         <ProductEditor
           scope="seller"
           value={editing}
-          close={() => {
+          close={() => setEditing(null)}
+          changed={saved}
+          saved={async () => {
             setEditing(null);
-            void saved();
+            await saved();
           }}
-          saved={saved}
           importKeys={(v) =>
             setAction({
               endpoint: `/seller/inventory/${v.id}`,

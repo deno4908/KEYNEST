@@ -326,6 +326,10 @@ export function sellersRouter({
     await categoryStore.require(input.category);
     res.json(await sellers.command(req.user.id, "product", input));
   });
+  router.delete("/seller/products/:id", async (req, res) => {
+    await store.deleteProduct(uuid.parse(req.params.id), req.user.id);
+    res.json({ ok: true });
+  });
   router.post("/seller/products/:id/variants", async (req, res) =>
     res.json(
       await sellers.command(req.user.id, "variant", {
@@ -334,6 +338,10 @@ export function sellersRouter({
       }),
     ),
   );
+  router.delete("/seller/variants/:id", async (req, res) => {
+    await store.deleteVariant(uuid.parse(req.params.id), req.user.id);
+    res.json({ ok: true });
+  });
   router.post("/seller/inventory/:id", async (req, res) =>
     res.json(
       await sellers.command(req.user.id, "keys", {
