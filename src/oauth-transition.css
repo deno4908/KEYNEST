@@ -1,3 +1,9 @@
+.auth-dialog, .oauth-welcome {
+  --oauth-surface: #191a20;
+  --oauth-icon-surface: #24262d;
+  --oauth-icon-border: #454852;
+  --oauth-easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
 .auth-dialog .auth-layout {
   transition:
     filter 280ms ease,
@@ -24,8 +30,8 @@
   margin: -34px 0 0 -34px;
   display: grid;
   place-items: center;
-  background: #24262d;
-  border: 1px solid #454852;
+  background: var(--oauth-icon-surface);
+  border: 1px solid var(--oauth-icon-border);
   border-radius: 18px;
   box-shadow: 0 12px 32px #0003;
   animation: oauth-flight 600ms cubic-bezier(0.22, 1, 0.36, 1) both;

@@ -1,4 +1,7 @@
-.modal-backdrop:has(.oauth-welcome) { backdrop-filter: blur(9px); background: rgb(8 9 12 / 72%); }
+.modal-backdrop:has(.oauth-welcome) { backdrop-filter: blur(6px); background: rgb(8 9 12 / 72%); animation: welcome-backdrop-in 360ms ease both; }
+.modal-backdrop:has(.oauth-welcome.is-leaving) { animation: welcome-backdrop-out 360ms ease both; pointer-events: none; }
+.modal.oauth-welcome { background: var(--oauth-surface); box-shadow: 0 32px 100px #0009; animation: welcome-panel-in 500ms var(--oauth-easing) both; }
+.modal.oauth-welcome.is-leaving { animation: welcome-panel-out 360ms var(--oauth-easing) both; }
 .modal.oauth-welcome { width: min(960px, 100%); max-width: 960px; min-height: min(630px, calc(100dvh - 48px)); display: flex; flex-direction: column; padding: 24px; text-align: center; border: 1px solid #3b3c43; background: #191a20; border-radius: 12px; }
 .oauth-welcome-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 0 48px; }
 .oauth-welcome-copy { max-width: 600px; }
@@ -6,18 +9,22 @@
 .oauth-welcome-countdown { font-variant-numeric: tabular-nums; min-width: 30px; border-left: 1px solid currentColor; padding-left: 12px; }
 .oauth-welcome .modal-title h2 { font-size: 13px; color: #9da3b0; }
 .oauth-welcome-connection { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 30px 0 24px; }
-.oauth-welcome-provider, .oauth-welcome-avatar { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 50%; display: grid; place-items: center; }
-.oauth-welcome-provider { background: #f6f6f8; animation: welcome-provider .65s cubic-bezier(.2,.7,.2,1) both; }
-.oauth-welcome-provider svg { width: 36px; height: 36px; }
-.oauth-welcome-provider.discord { background: #5865f2; color: white; }
-.oauth-welcome-avatar { border: 2px solid #789886; background: #2b3330; color: #d6e9dd; font-size: 22px; overflow: hidden; animation: welcome-avatar .55s .5s ease both; }
+.oauth-welcome-provider, .oauth-welcome-avatar { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 18px; display: grid; place-items: center; }
+.oauth-welcome-provider { background: var(--oauth-icon-surface); border: 1px solid var(--oauth-icon-border); box-shadow: 0 12px 32px #0003; animation: welcome-provider 900ms var(--oauth-easing) both; }
+.oauth-welcome-provider svg { width: 34px; height: 34px; }
+.oauth-welcome-avatar { border: 1px solid var(--oauth-icon-border); background: var(--oauth-icon-surface); color: #e5e1e8; font-size: 22px; overflow: hidden; animation: welcome-avatar .6s .5s var(--oauth-easing) both; }
 .oauth-welcome-arrows { color: #a5acae; animation: welcome-reveal .4s .25s ease both; }
 .oauth-welcome-copy { animation: welcome-reveal .45s .75s ease both; }
 .oauth-welcome-confirmed { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: #a5d3b4; }
 .oauth-welcome-copy h2 { margin: 16px 0 10px; font-size: 23px; line-height: 1.5; overflow-wrap: anywhere; }
 .oauth-welcome-copy p { font-size: 13px; color: #989fac; margin: 0 0 28px; }
-@keyframes welcome-provider { from { transform: translateX(61px) scale(.85); opacity: 0; } 35% { opacity: 1; transform: translateX(61px) scale(1.12); } to { transform: translateX(0) scale(1); opacity: 1; } }
+@keyframes welcome-provider { from { transform: translateX(var(--welcome-offset, 70px)); opacity: 0; } 30% { opacity: 1; transform: translateX(var(--welcome-offset, 70px)); } to { transform: translateX(0); opacity: 1; } }
 @keyframes welcome-avatar { from { transform: translateX(-12px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes welcome-reveal { from { transform: translateY(7px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 760px) { .modal-backdrop > .modal.oauth-welcome { width: 100%; max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; padding: max(20px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom)); border-radius: 0; border: 0; } .oauth-welcome-connection { gap: 16px; } .oauth-welcome-body { padding: 20px 0; } }
-@media (prefers-reduced-motion: reduce) { .oauth-welcome * { animation: none !important; } }
+@keyframes welcome-panel-in { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes welcome-panel-out { to { opacity: 0; transform: translateY(-6px) scale(.985); } }
+@keyframes welcome-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes welcome-backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+@media (max-width: 760px) { .oauth-welcome { --welcome-offset: 64px; } }
+@media (prefers-reduced-motion: reduce) { .modal-backdrop:has(.oauth-welcome), .modal.oauth-welcome, .oauth-welcome * { animation: none !important; } }
