@@ -45,7 +45,7 @@ export function BannerSlider() {
       return;
     const timer = window.setInterval(
       () => setIndex((i) => (i + 1) % banners.length),
-      4000,
+      8000,
     );
     return () => clearInterval(timer);
   }, [banners.length, paused, focused, hidden, index]);

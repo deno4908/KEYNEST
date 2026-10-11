@@ -16,7 +16,7 @@ Bản Worker mới trả `X-Keynest-Region-Worker: social-preview-v2` trên robo
 Nếu vẫn bị 403 sau khi cập nhật đúng Worker, xem Cloudflare Security Events để kiểm tra rule WAF chặn trước Worker. Chỉ bỏ rule chặn quốc gia trùng với Worker, không tắt toàn bộ bảo vệ website.
 
 Backend trả Open Graph và Twitter Card ngay trong HTML, không cần bot chạy React:
-- Trang chủ: `/images/share/keynest.jpg`.
+- Trang chủ: `/images/share/keynest-v2.jpg`.
 - `/products/slug`: tên, mô tả và ảnh của sản phẩm đang công khai.
 - Ảnh SVG có sẵn dùng bản PNG tương ứng trong `public/images/share`.
 

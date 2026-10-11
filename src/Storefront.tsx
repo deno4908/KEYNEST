@@ -27,6 +27,18 @@ export function Home() {
   const { products, notify } = useStore();
   const [category, setCategory] = useState<Category>("all");
   const [promotions, setPromotions] = useState<Coupon[]>([]);
+  const [offerIndex, setOfferIndex] = useState(0);
+  const [offerPaused, setOfferPaused] = useState(false);
+  const [offerHidden, setOfferHidden] = useState(document.hidden);
+  const [reduceMotion, setReduceMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const motion = () => setReduceMotion(media.matches);
+    const visibility = () => setOfferHidden(document.hidden);
+    media.addEventListener('change', motion);
+    document.addEventListener('visibilitychange', visibility);
+    return () => { media.removeEventListener('change', motion); document.removeEventListener('visibilitychange', visibility); };
+  }, []);
   useEffect(() => {
     api<Coupon[]>("/promotions")
       .then(setPromotions)
@@ -42,10 +54,14 @@ export function Home() {
     .map((slug) => products.find((p) => p.slug === slug))
     .filter((p) => p !== undefined)
     .slice(0, 6);
-  const promotion =
-    promotions.find((c) => c.pinned) ||
-    promotions.find((c) => c.code === "WELCOME10") ||
-    promotions[0];
+  const pinnedOffers = promotions.filter((c) => c.pinned);
+  const offers = pinnedOffers.length ? pinnedOffers : promotions.slice(0, 1);
+  const promotion = offers[offerIndex % (offers.length || 1)];
+  useEffect(() => {
+    if (offers.length < 2 || offerPaused || offerHidden || reduceMotion) return;
+    const timer = window.setTimeout(() => setOfferIndex(i => (i + 1) % offers.length), 8000);
+    return () => window.clearTimeout(timer);
+  }, [offers.length, offerIndex, offerPaused, offerHidden, reduceMotion]);
   const icons: Record<string, typeof Package> = { game: Gamepad2, gift: Gift, topup: Smartphone, mmo: Server };
   const groups = Object.keys(categories).filter((c) => c !== 'all').map((category) => ({ category, icon: icons[category] || Package }));
   return (
@@ -177,9 +193,12 @@ export function Home() {
         </div>
       </section>
       {promotion && (
-        <div className="offer-strip">
+        <div className="offer-strip" role="region" aria-label="Mã giảm giá được ghim"
+          onMouseEnter={() => setOfferPaused(true)} onMouseLeave={() => setOfferPaused(false)}
+          onFocusCapture={() => setOfferPaused(true)}
+          onBlurCapture={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOfferPaused(false); }}>
           <TicketPercent size={25} />
-          <div>
+          <div className="offer-slide" key={promotion.code}>
             <strong>Thêm một ưu đãi cho đơn hàng của bạn</strong>
             <p>
               Giảm{" "}
@@ -204,6 +223,11 @@ export function Home() {
             Tất cả ưu đãi
             <ArrowRight size={15} />
           </Link>
+          {offers.length > 1 && <div className="offer-pagination" aria-label="Chọn mã giảm giá">
+            {offers.map((offer, i) => <button key={offer.code} type="button"
+              aria-label={`Xem mã ${offer.code}`} aria-pressed={offerIndex % offers.length === i}
+              onClick={() => setOfferIndex(i)}><span /></button>)}
+          </div>}
         </div>
       )}
       <section className="home-section">

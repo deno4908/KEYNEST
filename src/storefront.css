@@ -1674,3 +1674,12 @@
 .product-usage-notes { margin: 24px 0; padding: 20px; border: 1px solid #393b42; border-left: 3px solid #e5946b; border-radius: 8px; background: #191a1e; }
 .product-usage-notes h3 { margin: 0 0 12px; font-size: 15px; color: #eceef2; }
 .product-usage-notes p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.offer-strip { position: relative; }
+.offer-strip:has(.offer-pagination) { padding-bottom: 38px; }
+.offer-slide { animation: offer-appear .35s ease-out; }
+.offer-strip > .offer-pagination { position: absolute; bottom: 7px; left: 0; right: 0; display: flex; justify-content: center; gap: 2px; }
+.offer-strip .offer-pagination button { display: grid; place-items: center; width: 32px; height: 24px; padding: 0; border: 0; background: transparent; }
+.offer-pagination button span { width: 6px; height: 6px; border-radius: 10px; background: #77716b; }
+.offer-pagination button[aria-pressed=true] span { width: 20px; background: #f3a078; }
+@keyframes offer-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .offer-slide { animation: none; } }

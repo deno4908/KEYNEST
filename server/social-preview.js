@@ -3,7 +3,7 @@ export async function socialMetadata(path, origin, store) {
   const base = new URL(origin).origin;
   let title = 'KEYNEST — Game key, gift card & MMO';
   let description = 'Khám phá game key, gift card, nạp game và dịch vụ MMO tại KEYNEST.';
-  let image = '/images/share/keynest.jpg';
+  let image = '/images/share/keynest-v2.jpg';
   let canonical = '/';
   const match = /^\/products\/([a-z0-9-]{1,120})\/?$/.exec(path);
   if (match) {
@@ -19,7 +19,7 @@ export async function socialMetadata(path, origin, store) {
     }
   }
   return { title, description, image: new URL(image, base).href, url: base + canonical,
-    ...(image === '/images/share/keynest.jpg' ? { imageWidth: 1200, imageHeight: 630 } : {}) };
+    ...(image === '/images/share/keynest-v2.jpg' ? { imageWidth: 1200, imageHeight: 630 } : {}) };
 }
 export function metadataHead(meta) {
   const tag = (key, value, kind = 'property') => `<meta ${kind}="${key}" content="${escape(value)}">`;

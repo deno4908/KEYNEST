@@ -4,7 +4,7 @@ import { socialMetadata, injectMetadata } from '../server/social-preview.js';
 test('sharing uses absolute homepage and individual public product metadata', async () => {
   const store = { product: async () => ({ name: 'Steam <Gift>', slug: 'steam', active: true, image: '/images/products/steam-wallet.png', description: 'Steam wallet' }) };
   const home = await socialMetadata('/', 'https://keynest.store', store);
-  assert.equal(home.image, 'https://keynest.store/images/share/keynest.jpg');
+  assert.equal(home.image, 'https://keynest.store/images/share/keynest-v2.jpg');
   assert.equal(home.imageWidth, 1200);
   assert.equal(home.imageHeight, 630);
   assert.match(injectMetadata('<head></head>', home), /og:image:width" content="1200"/);
