@@ -165,7 +165,7 @@ export function NotificationInbox({ history = false }: { history?: boolean } = {
     const c = new AbortController();
     setError("");
     setData(null);
-    api<Inbox>(`/notifications?page=${page}&page_size=5&${history ? 'read=1' : 'unread=1'}`, { signal: c.signal })
+    api<Inbox>(`/notifications?page=${page}&page_size=3&${history ? 'read=1' : 'unread=1'}`, { signal: c.signal })
       .then(setData)
       .catch((e) => {
         if (!c.signal.aborted) setError(e.message);
@@ -232,7 +232,10 @@ export function NotificationInbox({ history = false }: { history?: boolean } = {
                   <span className="inbox-unread-label">Chưa đọc</span>
                 )}
               </div>
-              {n.body && <p className="inbox-message">{n.body}</p>}
+              {n.body && (n.body.length > 160 ? <details className="inbox-message-details">
+                <summary>{n.body.slice(0, 160)}… <span>Đọc tiếp</span></summary>
+                <p className="inbox-message">{n.body}</p>
+              </details> : <p className="inbox-message">{n.body}</p>)}
               <div className="inbox-item-footer">
                 <time dateTime={n.created_at}>{date(n.created_at)}</time>
                 {!n.read_at && (

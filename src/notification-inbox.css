@@ -135,3 +135,13 @@
     flex-basis: 30px;
   }
 }
+
+.notification-history-list .inbox-list { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; }
+.notification-inbox .inbox-item { padding: 12px; gap: 10px; }
+.notification-inbox .inbox-item-heading h4 { font-size: 12px; line-height: 1.5; }
+.notification-inbox .inbox-item-footer { margin-top: 8px; }
+.inbox-message-details { margin-top: 8px; font-size: 12px; color: #adb3c0; overflow-wrap: anywhere; }
+.inbox-message-details summary { cursor: pointer; line-height: 1.7; }
+.inbox-message-details summary span { color: #e4a478; white-space: nowrap; }
+.inbox-message-details[open] summary { font-size: 0; }
+.inbox-message-details[open] summary span { font-size: 12px; }

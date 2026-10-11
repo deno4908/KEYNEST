@@ -44,7 +44,7 @@ export function StoreNavigation({
   open: boolean;
   onOpenChange: (value: boolean) => void;
 }) {
-  const { products } = useStore();
+  const { products, user } = useStore();
   const location = useLocation();
   const root = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -249,6 +249,7 @@ export function StoreNavigation({
             )}
           </div>
           <div className="department-footer">
+            {user?.role === 'admin' && <Link to="/admin">Quản trị cửa hàng <ArrowRight size={15} /></Link>}
             <Link to="/catalog">
               Toàn bộ cửa hàng
               <ArrowRight size={15} />

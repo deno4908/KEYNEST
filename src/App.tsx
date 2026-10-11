@@ -415,6 +415,7 @@ export function App() {
                   <strong>{user ? money(user.balance) : "Ví KEYNEST"}</strong>
                 </span>
               </Link>
+              {user?.role === 'admin' && <Link to="/admin" className="mobile-admin-entry" aria-label="Vào trang quản trị"><ShieldCheck size={17} /><span>Admin</span></Link>}
               <button
                 className="account-button"
                 aria-label={user ? `Tài khoản của ${user.name}` : "Đăng nhập"}
