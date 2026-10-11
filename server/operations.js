@@ -160,7 +160,7 @@ export function createOperations(store) {
       const users = rows("users").filter((u) =>
         input.email
           ? u.email.toLowerCase() === input.email.toLowerCase()
-          : u.role === "customer",
+          : ["customer", "seller"].includes(u.role),
       );
       if (input.email && !users.length)
         throw new AppError("Không tìm thấy tài khoản.", 404);
@@ -303,7 +303,7 @@ export function createOperations(store) {
     async access(actor, uid, input) {
       const user = await store.profile(uid);
       if (!user) throw new AppError("Không tìm thấy khách hàng.", 404);
-      if (user.role !== "customer")
+      if (!["customer", "seller"].includes(user.role))
         throw new AppError("Chỉ thay đổi quyền truy cập của khách hàng.", 409);
       if (demo) {
         let control = rows("account_controls").find((c) => c.user_id === uid);
@@ -343,7 +343,7 @@ export function createOperations(store) {
         if (f.q) q = q.ilike(c.search, `%${f.q.replace(/[\\%_]/g, "\\$&")}%`);
         for (const key of ["status", "user_id", "kind", "priority"])
           if (f[key]) q = q.eq(key, f[key]);
-        if (kind === "customers") q = q.eq("role", "customer");
+        if (kind === "customers") q = q.in("role", ["customer", "seller"]);
         if (f.from) q = q.gte("created_at", f.from);
         if (f.to) q = q.lte("created_at", f.to);
         q = q.order(c.sort, { ascending: false });
@@ -357,7 +357,7 @@ export function createOperations(store) {
         return shape(result.data, result.count, f);
       }
       let data = rows(kind === "customers" ? "users" : kind).filter(
-        (r) => kind !== "customers" || r.role === "customer",
+        (r) => kind !== "customers" || ["customer", "seller"].includes(r.role),
       );
       data = data.filter(
         (r) =>

@@ -7,6 +7,7 @@ import { calculateCoupon, couponStats } from "./coupons.js";
 import { defaultBanners, subcategories } from "../shared/storefront.js";
 import { writeDemoSnapshot } from "./demo-persistence.js";
 import { searchCatalog } from "./catalog.js";
+import { sellerPublic, snapshotSeller, settleSellerRevenue } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, hashPassword } from "./security.js";
 export class DemoStore {
   constructor(key, path = ".data/demo.json") {
@@ -121,6 +122,7 @@ export class DemoStore {
         const reviews = this.db.reviews.filter((r) => r.product_id === p.id);
         return {
           ...p,
+          seller: sellerPublic(this.db.users.find(user => user.id === p.seller_id)),
           image: p.image || productImages[p.slug] || "",
           review_count: reviews.length,
           rating_average: reviews.length
@@ -268,6 +270,7 @@ export class DemoStore {
         product_image: p.image || productImages[p.slug] || "",
         product_slug: p.slug,
         category: p.category,
+        ...snapshotSeller(this, p, uid),
       });
       subtotal += v.price * line.quantity;
     }
@@ -333,6 +336,7 @@ export class DemoStore {
       });
     } else this.payment(uid, total, o.id);
     this.db.orders.unshift(o);
+    settleSellerRevenue(this, o);
     this.save();
     return o;
   }
@@ -383,6 +387,7 @@ export class DemoStore {
         : "completed";
       o.paid_at = new Date().toISOString();
       this.stampDelivery(o);
+      settleSellerRevenue(this, o);
     } else {
       this.db.users.find((u) => u.id === p.user_id).balance += amount;
       this.db.ledger.unshift({
@@ -779,7 +784,7 @@ export class DemoStore {
     if (o?.status !== "processing")
       throw new AppError("Đơn không chờ xử lý.", 409);
     const manual = o.items
-      .filter((i) => i.delivery === "manual")
+      .filter((i) => i.delivery === "manual" && !i.delivered_at)
       .sort((a, b) => a.id.localeCompare(b.id));
     if (secrets.length !== manual.reduce((n, i) => n + i.quantity, 0))
       throw new AppError("Cần một kết quả cho mỗi đơn vị dịch vụ.");
@@ -830,6 +835,7 @@ export class DemoStore {
         created_at: new Date().toISOString(),
       });
     }
+    settleSellerRevenue(this, o, true);
     o.status = "refunded";
     Object.assign(o, {
       refunded_at: new Date().toISOString(),

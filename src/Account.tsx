@@ -147,7 +147,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
             <h2>{user!.name}</h2>
             <p title={user!.email}>{user!.email}</p>
             <span className="member-role">
-              {user!.role === "admin" ? "Quản trị viên" : "Thành viên KEYNEST"}
+              {user!.role === "admin" ? "Quản trị viên" : user!.role === 'seller' ? 'Người bán KEYNEST' : "Thành viên KEYNEST"}
             </span>
           </div>
           <nav aria-label="Quản lý tài khoản">
@@ -189,6 +189,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
               Trung tâm hỗ trợ
               <ChevronRight size={14} />
             </Link>
+            {user!.role === 'seller' && <Link to="/seller"><LayoutDashboard size={18}/>Kênh người bán<ChevronRight size={14}/></Link>}
             {user!.role === 'admin' && <Link to="/admin" className="member-admin-desktop">
               <LayoutDashboard size={18} /> Quản trị cửa hàng <ChevronRight size={14} />
             </Link>}
@@ -385,6 +386,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
                       )}
                     </section>
                     <div className="member-help-column">
+                    {user!.role === 'seller' && <Link to="/seller" className="button button-outline"><LayoutDashboard size={17}/>Kênh người bán<ArrowUpRight size={16}/></Link>}
                     {user!.role === 'admin' && <Link to="/admin" className="button button-outline member-admin-link">
                       <LayoutDashboard size={17} /> Quản trị cửa hàng <ArrowUpRight size={16} />
                     </Link>}

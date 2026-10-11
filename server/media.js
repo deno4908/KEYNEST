@@ -1,6 +1,7 @@
 import express from "express";
 import sharp from "sharp";
 import { randomUUID } from "node:crypto";
+import { requireSeller } from './seller-accounting.js';
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { AppError } from "./security.js";
@@ -57,10 +58,10 @@ export function mediaRouter({ store, mode, auth, admin, limiter }) {
     limit: "8mb",
   });
   router.post(
-    ["/admin/media", "/me/avatar"],
+    ["/admin/media", "/seller/media", "/me/avatar"],
     auth,
     (req, res, next) =>
-      req.path === "/me/avatar" ? next() : admin(req, res, next),
+      req.path === "/me/avatar" ? next() : req.path === '/seller/media' ? (() => { requireSeller(req.user); next(); })() : admin(req, res, next),
     (req, res, next) =>
       (req.path === "/me/avatar" ? avatarLimit : adminLimit)(req, res, next),
     (req, res, next) =>

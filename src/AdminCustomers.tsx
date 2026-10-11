@@ -5,6 +5,7 @@ import { Modal } from "./App";
 import { UsersRound } from "lucide-react";
 import "./admin-customers.css";
 type Customer = {
+  role: 'customer' | 'seller';
   id: string;
   name: string;
   email: string;
@@ -111,6 +112,12 @@ export function AdminCustomers() {
                       {u.access?.reason && <small>{u.access.reason}</small>}
                     </td>
                     <td>
+                      <button className="button button-outline" disabled={busy} onClick={async()=>{
+                        setBusy(true);
+                        try { await post('/admin/sellers/role',{user_id:u.id,role:u.role==='seller'?'customer':'seller'}); setVersion(v=>v+1); }
+                        catch(e) { setError((e as Error).message); }
+                        finally { setBusy(false); }
+                      }}>{u.role==='seller'?'Thu hồi seller':'Cấp quyền seller'}</button>
                       <button
                         className="button button-outline"
                         onClick={() => {

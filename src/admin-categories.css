@@ -52,9 +52,25 @@
   padding: 0;
   min-width: 0;
 }
+.category-editor .field-title {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 0;
+  line-height: 1.6;
+}
 .category-editor input {
   width: 100%;
   min-width: 0;
+}
+.category-editor input:focus {
+  border-color: #d58b68;
+  box-shadow: 0 0 0 2px #d58b681a;
+  outline: none;
+}
+.category-editor input:focus-visible {
+  outline: 2px solid #e99d78;
+  outline-offset: -2px;
+  box-shadow: none;
 }
 .category-editor input:disabled {
   opacity: 0.6;

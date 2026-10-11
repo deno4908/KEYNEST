@@ -3,11 +3,13 @@ import { ImagePlus, Upload, X } from "lucide-react";
 import { api } from './api';
 
 export function ImageUpload({
+  endpoint = "/admin/media",
   initial = "",
   label,
   required = false,
   onBusy,
 }: {
+  endpoint?: string;
   initial?: string;
   label: string;
   required?: boolean;
@@ -40,7 +42,7 @@ export function ImageUpload({
     const request = new AbortController();
     controller.current = request;
     try {
-      const data = await api<{ url: string }>("/admin/media", {
+      const data = await api<{ url: string }>(endpoint, {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": file.type, "X-App-Request": "keynest" },

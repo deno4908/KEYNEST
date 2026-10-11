@@ -28,6 +28,7 @@ import { AdminOrderList, AdminOrderDialog } from "./AdminOrders";
 import { SupportManager, TicketDialog } from "./AdminSupport";
 import { BankPaymentStatus } from "./BankPaymentStatus";
 import { AdminCustomers } from "./AdminCustomers";
+import { AdminSellers } from './Seller';
 import { AdminNotifications } from "./AdminNotifications";
 import { AdminCategories } from './AdminCategories';
 import { Bell } from "lucide-react";
@@ -133,6 +134,7 @@ export function Admin() {
             ["orders", "Đơn hàng", ClipboardList],
             ["tickets", "Hỗ trợ khách hàng", Headphones],
             ["users", "Khách hàng", Users],
+            ["sellers", "Người bán & rút tiền", Wallet],
             ["notifications", "Thông báo", Bell],
             ["payments", "Thanh toán", CreditCard],
             ["coupons", "Mã giảm giá", TicketIcon],
@@ -171,6 +173,7 @@ export function Admin() {
           ) : (
             <>
               {tab === "banners" && <BannerManager />}
+              {tab === 'sellers' && <AdminSellers />}
               {tab === 'categories' && <AdminCategories products={data.products} onEditProduct={setEditing} />}
               {tab === "overview" && (
                 <>
@@ -571,12 +574,14 @@ export function Admin() {
     </div>
   );
 }
-function ProductEditor({
+export function ProductEditor({
+  scope = "admin",
   value,
   close,
   saved,
   importKeys,
 }: {
+  scope?: "admin" | "seller";
   value: Partial<Product>;
   close: () => void;
   saved: () => Promise<void>;
@@ -592,7 +597,7 @@ function ProductEditor({
     setBusy(true);
     const f = new FormData(e.currentTarget);
     try {
-      const p = await post<Product>("/admin/products", {
+      const p = await post<Product>(`/${scope}/products`, {
         ...(product.id ? { id: product.id } : {}),
         slug: f.get("slug"),
         name: f.get("name"),
@@ -619,7 +624,7 @@ function ProductEditor({
     setBusy(true);
     const f = new FormData(e.currentTarget);
     try {
-      await post(`/admin/products/${product.id}/variants`, {
+      await post(`/${scope}/products/${product.id}/variants`, {
         ...(variant!.id ? { id: variant!.id } : {}),
         name: f.get("name"),
         price: Number(f.get("price")),
@@ -629,7 +634,7 @@ function ProductEditor({
         region: f.get("region"),
         warranty_days: Number(f.get("warranty_days")),
       });
-      const data = await api<Overview>("/admin/overview");
+      const data = await api<Overview>(`/${scope}/overview`);
       setProduct(data.products.find((p) => p.id === product.id)!);
       setVariant(null);
       notify("Đã lưu gói sản phẩm.");
@@ -706,6 +711,7 @@ function ProductEditor({
           />
         </label>
         <ImageUpload
+          endpoint={`/${scope}/media`}
           initial={product.image}
           label="Ảnh sản phẩm"
           onBusy={setUploading}
@@ -737,6 +743,7 @@ function ProductEditor({
           <label className="checkbox">
             <input
               type="checkbox"
+              disabled={scope === "seller"}
               name="featured"
               defaultChecked={product.featured}
             />

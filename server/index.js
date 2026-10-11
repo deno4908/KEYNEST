@@ -11,6 +11,7 @@ import { config } from "./config.js";
 import { createOAuthRouter } from "./oauth.js";
 import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
+import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
 import { registerSupabase } from "./registration.js";
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
@@ -375,6 +376,7 @@ const variantSchema = z
     warranty_days: z.number().int().min(0).max(3650).optional(),
   })
   .strict();
+app.use('/api', sellersRouter({ store, auth, admin, limiter, categoryStore, productSchema, variantSchema, secretsSchema }));
 function paymentInfo(p) {
   if (!p) return null;
   const query = new URLSearchParams({

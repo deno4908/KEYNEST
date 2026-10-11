@@ -132,7 +132,7 @@ export function AdminOrderDialog({
     [refundOpen, setRefundOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const manual = order.items.filter((i) => i.delivery === "manual"),
+  const manual = order.items.filter((i) => i.delivery === "manual" && !i.delivered_at),
     count = manual.reduce((n, i) => n + i.quantity, 0);
   async function fulfill(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

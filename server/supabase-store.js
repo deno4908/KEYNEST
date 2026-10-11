@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { config } from "./config.js";
 import { productImages } from "../shared/product-images.js";
+import { sellerPublic } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, digest } from "./security.js";
 export const makeAuthClient = () =>
   createClient(config.url, config.anon, {
@@ -48,7 +49,8 @@ export class SupabaseStore {
       this.query(this.client.from("product_review_stats").select("*")),
     ]);
     const byProduct = new Map(stats.map((s) => [s.product_id, s]));
-    return products.map((p) => {
+    const withSellers = await this.attachSellers(products);
+    return withSellers.map((p) => {
       const s = byProduct.get(p.id);
       return {
         ...p,
@@ -63,11 +65,17 @@ export class SupabaseStore {
     const result = await this.query(
       this.client.rpc("catalog_search", { p_filters: filters }),
     );
-    result.items = result.items.map((p) => ({
+    result.items = (await this.attachSellers(result.items)).map((p) => ({
       ...p,
       image: p.image || productImages[p.slug] || "",
     }));
     return result;
+  }
+  async attachSellers(products) {
+    const ids = [...new Set(products.map(p => p.seller_id).filter(Boolean))];
+    if (!ids.length) return products;
+    const sellers = await this.query(this.client.from('profiles').select('id,name,seller_name,seller_social_links').in('id', ids));
+    return products.map(p => ({ ...p, seller: sellerPublic(sellers.find(s => s.id === p.seller_id)) }));
   }
   async product(identifier) {
     return (await this.products(false, identifier))[0] || null;

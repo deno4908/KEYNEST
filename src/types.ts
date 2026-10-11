@@ -10,6 +10,8 @@ export type Variant = {
   warranty_days: number;
 };
 export type Product = {
+  seller_id?: string;
+  seller?: { id: string; name: string; social_links: string[] } | null;
   id: string;
   slug: string;
   name: string;
@@ -28,11 +30,16 @@ export type Product = {
   rating_counts: number[];
 };
 export type User = {
+  seller_name?: string;
+  seller_social_links?: string[];
+  seller_terms_version?: string;
+  seller_terms_accepted_at?: string;
+  seller_debt?: number;
   avatar_url?: string | null;
   id: string;
   email: string;
   name: string;
-  role: "admin" | "customer";
+  role: "admin" | "customer" | "seller";
   balance: number;
 };
 export type Payment = {
@@ -106,7 +113,7 @@ export type Ticket = {
   messages?: {
     id: string;
     author_id?: string;
-    role: "admin" | "customer";
+    role: "admin" | "customer" | "seller";
     body: string;
     created_at: string | null;
   }[];

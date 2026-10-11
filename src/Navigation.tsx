@@ -249,6 +249,7 @@ export function StoreNavigation({
             )}
           </div>
           <div className="department-footer">
+            {user?.role === 'seller' && <Link to="/seller">Kênh người bán <ArrowRight size={15}/></Link>}
             {user?.role === 'admin' && <Link to="/admin">Quản trị cửa hàng <ArrowRight size={15} /></Link>}
             <Link to="/catalog">
               Toàn bộ cửa hàng

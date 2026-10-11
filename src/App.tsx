@@ -60,6 +60,8 @@ import type {
   Variant,
 } from "./types";
 import { Admin } from "./Admin";
+import { Seller, SellerContact } from './Seller';
+import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
 import { Home, PromotionsPage, GuidePage } from "./Storefront";
 import { HeaderSearch, StoreNavigation } from "./Navigation";
 import { Catalog } from "./Catalog";
@@ -477,6 +479,8 @@ export function App() {
         <main>
           {['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
             <LegalPage privacy={location.pathname.startsWith('/privacy')} />
+          ) : user?.role === 'seller' && (user.seller_terms_version !== SELLER_TERMS_VERSION || !user.seller_social_links?.length) ? (
+            <Seller onboarding />
           ) : loadError ? (
             <div className="container">
               <Empty title="Chưa kết nối được cửa hàng" description={loadError}>
@@ -492,6 +496,7 @@ export function App() {
             <Loading />
           ) : (
             <Routes>
+              <Route path="/seller" element={<Protected><Seller /></Protected>} />
               <Route
                 path="/"
                 element={
@@ -714,6 +719,7 @@ export function ProductCard({ product }: { product: Product }) {
         {product.name}
       </Link>
       <RatingLine product={product} />
+      {product.seller && <p className="seller-card-name">Người bán: {product.seller.name}</p>}
       <div className="card-bottom">
         <div>
           {v ? (
@@ -799,6 +805,7 @@ function ProductPage() {
             {p.platform} / {categories[p.category]}
           </span>
           <h1>{p.name}</h1>
+          {p.seller && <section className="seller-notice"><SellerContact seller={p.seller}/><p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy liên hệ người bán qua các trang trên hoặc gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p></section>}
           <button
             className="detail-rating-button"
             onClick={() => {
