@@ -171,7 +171,7 @@ export function Admin() {
           ) : (
             <>
               {tab === "banners" && <BannerManager />}
-              {tab === 'categories' && <AdminCategories />}
+              {tab === 'categories' && <AdminCategories products={data.products} onEditProduct={setEditing} />}
               {tab === "overview" && (
                 <>
                   <div className="stat-grid">
