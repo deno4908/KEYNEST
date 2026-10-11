@@ -90,6 +90,10 @@
 .member-help-column { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .member-help-column .member-admin-link { flex-shrink: 0; margin: 0; }
 .member-help-column .member-help { flex: 1; }
+@media (min-width: 761px) {
+  .member-help-column { display: contents; }
+  .member-help-column .member-admin-link { display: none; }
+}
 .browse-results .catalog-toolbar .input-icon {
   height: 44px;
   background: #1d1e23;

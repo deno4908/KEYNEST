@@ -189,6 +189,9 @@ export function AccountPage({ logout }: { logout: () => void }) {
               Trung tâm hỗ trợ
               <ChevronRight size={14} />
             </Link>
+            {user!.role === 'admin' && <Link to="/admin" className="member-admin-desktop">
+              <LayoutDashboard size={18} /> Quản trị cửa hàng <ChevronRight size={14} />
+            </Link>}
           </nav>
           <button className="member-logout" onClick={logout}>
             <LogOut size={17} />
