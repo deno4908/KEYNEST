@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Package, Plus, Wallet, Store, ExternalLink } from "lucide-react";
+import {
+  Package,
+  Plus,
+  Wallet,
+  Store,
+  ExternalLink,
+  ShieldCheck,
+  ArrowRight,
+} from "lucide-react";
 import { api, post, money, date } from "./api";
 import { Loading, Modal, useStore } from "./App";
 import { ProductEditor } from "./Admin";
@@ -59,13 +67,6 @@ export function SellerContact({
       <div>
         <small>Người bán</small>
         <strong>{seller.name}</strong>
-        <div className="seller-links">
-          {seller.social_links.map((url) => (
-            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
-              {new URL(url).hostname} <ExternalLink size={12} />
-            </a>
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -80,6 +81,7 @@ function ProfileForm({
   saved: () => Promise<void>;
 }) {
   const { setUser } = useStore();
+  const [shopName, setShopName] = useState(profile.seller_name || profile.name);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -90,10 +92,6 @@ function ProfileForm({
     try {
       const user = await post<User>("/seller/profile", {
         name: f.get("name"),
-        social_links: String(f.get("links"))
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
         accepted: f.get("accepted") === "on",
         terms_version: SELLER_TERMS_VERSION,
         fee_bps: fee,
@@ -108,64 +106,109 @@ function ProfileForm({
   }
   return (
     <form className="form panel seller-profile" onSubmit={submit}>
-      <div>
-        <span className="eyebrow orange">HỒ SƠ NGƯỜI BÁN</span>
-        <h2>Thiết lập gian hàng của bạn</h2>
-        <p className="muted">
-          Tên và liên hệ bên dưới sẽ xuất hiện trên sản phẩm để khách hàng có
-          thể liên hệ hỗ trợ.
-        </p>
+      <div className="seller-profile-heading">
+        <span className="seller-profile-icon">
+          <Store size={27} />
+        </span>
+        <div>
+          <span className="eyebrow orange">HỒ SƠ NGƯỜI BÁN</span>
+          <h2>Thiết lập gian hàng của bạn</h2>
+          <p className="muted">
+            Hoàn thiện thông tin và xem điều khoản trước khi bắt đầu bán hàng
+            trên KEYNEST.
+          </p>
+        </div>
       </div>
-      <label>
-        Tên người bán / gian hàng
-        <input
-          name="name"
-          required
-          minLength={2}
-          maxLength={80}
-          defaultValue={profile.seller_name || profile.name}
-        />
-      </label>
-      <label>
-        Trang mạng xã hội liên hệ
-        <textarea
-          name="links"
-          required
-          rows={3}
-          defaultValue={profile.seller_social_links?.join("\n")}
-          placeholder="https://www.facebook.com/ten-cua-ban"
-        />
-      </label>
-      <small className="muted">
-        Ít nhất 1, tối đa 5 liên kết HTTPS; mỗi dòng một trang Facebook, Zalo,
-        Telegram, Discord, Instagram hoặc mạng xã hội được hỗ trợ.
-      </small>
-      <div className="seller-terms">
-        <h3>Điều khoản người bán</h3>
-        <p>
-          Phí hiện tại: <strong>{fee / 100}%</strong> trên giá trị sản phẩm sau
-          giảm giá. Ví dụ bán 100.000đ, phí {money(fee * 10)}, nhận{" "}
-          {money(100000 - fee * 10)}.
-        </p>
-        {sellerTerms.map(([title, body]) => (
-          <section key={title}>
-            <h4>{title}</h4>
-            <p>{body}</p>
+      <div className="seller-setup-layout">
+        <div className="seller-setup-main">
+          <section className="seller-setup-section">
+            <h3>
+              <span>01</span> Thông tin gian hàng
+            </h3>
+            <label>
+              Tên người bán / gian hàng
+              <input
+                name="name"
+                required
+                minLength={2}
+                maxLength={80}
+                value={shopName}
+                onChange={(e) => setShopName(e.target.value)}
+              />
+            </label>
+            <small>Tên này xuất hiện trên các sản phẩm bạn đăng bán.</small>
           </section>
-        ))}
+          <section className="seller-setup-section">
+            <h3>
+              <span>02</span> Quyền lợi & trách nhiệm
+            </h3>
+            <div className="seller-terms">
+              <h3>Điều khoản người bán</h3>
+              <p>
+                Phí hiện tại: <strong>{fee / 100}%</strong> trên giá trị sản
+                phẩm sau giảm giá. Ví dụ bán 100.000đ, phí {money(fee * 10)},
+                nhận {money(100000 - fee * 10)}.
+              </p>
+              {sellerTerms.map(([title, body]) => (
+                <section key={title}>
+                  <h4>{title}</h4>
+                  <p>{body}</p>
+                </section>
+              ))}
+            </div>
+          </section>
+        </div>
+        <aside className="seller-setup-aside">
+          <span className="eyebrow orange">HỒ SƠ HIỂN THỊ</span>
+          <div className="seller-shop-preview">
+            <Store size={28} />
+            <strong>{shopName.trim() || "Tên gian hàng của bạn"}</strong>
+            <span>Người bán trên KEYNEST</span>
+          </div>
+          <div className="seller-fee-preview">
+            <span>Phí nền tảng</span>
+            <strong>
+              {fee / 100}
+              <small>%</small>
+            </strong>
+            <p>Áp dụng trên giá trị sản phẩm sau giảm giá.</p>
+            <dl>
+              <div>
+                <dt>Ví dụ bán</dt>
+                <dd>{money(100000)}</dd>
+              </div>
+              <div>
+                <dt>Phí website</dt>
+                <dd>−{money(fee * 10)}</dd>
+              </div>
+              <div>
+                <dt>Bạn nhận</dt>
+                <dd>{money(100000 - fee * 10)}</dd>
+              </div>
+            </dl>
+          </div>
+          <p className="seller-setup-tip">
+            <ShieldCheck size={18} />
+            Bạn chịu trách nhiệm về chất lượng, giao hàng và bảo hành sản phẩm
+            của mình.
+          </p>
+        </aside>
       </div>
-      <label className="checkbox">
-        <input type="checkbox" name="accepted" required />
-        Tôi đã đọc, đồng ý điều khoản và công khai thông tin liên hệ trên.
-      </label>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <button className="button" disabled={busy}>
-        {busy ? "Đang lưu…" : "Đồng ý và lưu hồ sơ"}
-      </button>
+      <div className="seller-setup-footer">
+        <label className="checkbox">
+          <input type="checkbox" name="accepted" required />
+          Tôi đã đọc và đồng ý với điều khoản người bán.
+        </label>
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        <button className="button" disabled={busy}>
+          {busy ? "Đang lưu…" : "Đồng ý và lưu hồ sơ"}
+          <ArrowRight size={16} />
+        </button>
+      </div>
     </form>
   );
 }
@@ -680,7 +723,6 @@ export function AdminSellers() {
               <thead>
                 <tr>
                   <th>Người bán</th>
-                  <th>Liên hệ</th>
                   <th>Ví / cần bù trừ</th>
                   <th>Điều khoản</th>
                 </tr>
@@ -692,19 +734,7 @@ export function AdminSellers() {
                       {s.seller_name || s.name}
                       <p>{s.email}</p>
                     </td>
-                    <td>
-                      {s.seller_social_links?.map((link) => (
-                        <p key={link}>
-                          <a
-                            href={link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            {link}
-                          </a>
-                        </p>
-                      ))}
-                    </td>
+
                     <td>
                       {money(s.balance)}
                       <p>{money(s.seller_debt || 0)}</p>

@@ -41,6 +41,18 @@ try {
       ),
     );
   pass("migration compiles with pgcrypto and all functions");
+  const missingProfile = randomUUID(), existingProfile = randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'existing-profile@example.test')", [existingProfile]);
+  await db.query("update profiles set role='seller',balance=12345 where id=$1", [existingProfile]);
+  await db.exec('drop trigger new_auth_user on auth.users');
+  await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,'missing-profile@example.test','{\"name\":\"Email Customer\",\"role\":\"admin\"}')", [missingProfile]);
+  await db.exec(await readFile(new URL('../supabase/migrations/023_restore_customer_profiles.sql', import.meta.url), 'utf8'));
+  assert.equal(await scalar('select role from profiles where id=$1', [missingProfile]), 'customer');
+  assert.equal(await scalar('select name from profiles where id=$1', [missingProfile]), 'Email Customer');
+  assert.equal(await scalar('select balance::int from profiles where id=$1', [existingProfile]), 12345);
+  assert.equal(await scalar('select role from profiles where id=$1', [existingProfile]), 'seller');
+  await db.query('delete from auth.users where id in ($1,$2)', [missingProfile, existingProfile]);
+  pass('missing email customer profiles restored without changing existing roles or balances');
   await db.exec('begin');
   const registrationId = randomUUID();
   await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,'Duplicate@example.test',$2)",
@@ -1326,7 +1338,7 @@ try {
   await fails('select seller_command($1,$2,$3)',[user,'role',JSON.stringify({user_id:sid,role:'seller'})]);
   await sellerCommand(other,'role',{user_id:sid,role:'seller'});
   await fails('select require_seller($1)',[sid]);
-  await sellerCommand(sid,'profile',{name:'Seller DB',social_links:['https://facebook.com/seller-db'],terms_version:'2026-10-11-v1',fee_bps:700,accepted:true});
+  await sellerCommand(sid,'profile',{name:'Seller DB',terms_version:'2026-10-11-v1',fee_bps:700,accepted:true});
   const sellerProduct=await sellerCommand(sid,'product',{slug:'seller-db',name:'Seller DB product',category:'game',platform:'PC',subcategory:'',subtitle:'',description:'',image:'',active:true});
   const sellerVariant=randomUUID();
   await db.query("insert into variants(id,product_id,name,price,original_price,delivery,stock,region) values($1,$2,'Manual',100000,100000,'manual',20,'Global')",[sellerVariant,sellerProduct.id]);

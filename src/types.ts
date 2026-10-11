@@ -11,7 +11,7 @@ export type Variant = {
 };
 export type Product = {
   seller_id?: string;
-  seller?: { id: string; name: string; social_links: string[] } | null;
+  seller?: { id: string; name: string } | null;
   id: string;
   slug: string;
   name: string;
@@ -31,7 +31,6 @@ export type Product = {
 };
 export type User = {
   seller_name?: string;
-  seller_social_links?: string[];
   seller_terms_version?: string;
   seller_terms_accepted_at?: string;
   seller_debt?: number;

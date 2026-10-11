@@ -58,9 +58,22 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
   await expect(
     page.getByRole("heading", { name: "Thiết lập gian hàng của bạn" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Trang mạng xã hội liên hệ")
-    .fill("https://facebook.com/seller-ui");
+  await expect(page.getByLabel("Trang mạng xã hội liên hệ")).toHaveCount(0);
+  await page.screenshot({
+    path: "test-results/seller-setup-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "test-results/seller-setup-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("checkbox", { name: /Tôi đã đọc/ }).check();
   await page.getByRole("button", { name: "Đồng ý và lưu hồ sơ" }).click();
   await expect(

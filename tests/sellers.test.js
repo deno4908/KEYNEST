@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { createSellers, socialLink } from "../server/sellers.js";
+import { createSellers } from "../server/sellers.js";
 import { settleSellerRevenue } from "../server/seller-accounting.js";
 import { SELLER_TERMS_VERSION } from "../shared/seller-terms.js";
 process.env.NODE_ENV = "test";
@@ -88,21 +88,10 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   );
   const profile = {
     name: "Seller Test",
-    social_links: ["https://facebook.com/seller-test"],
     accepted: true,
     terms_version: SELLER_TERMS_VERSION,
     fee_bps: 700,
   };
-  assert.equal(
-    (
-      await req(
-        "/seller/profile",
-        { ...profile, social_links: [] },
-        login.cookie,
-      )
-    ).status,
-    400,
-  );
   assert.equal(
     (
       await req(
@@ -117,14 +106,6 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
     (await req("/seller/profile", profile, login.cookie)).status,
     200,
   );
-  for (const url of [
-    "javascript:alert(1)",
-    "https://facebook.com.evil.test/seller",
-    "https://facebook.com@evil.test/seller",
-    "http://facebook.com/seller",
-    "https://facebook.com/",
-  ])
-    assert.equal(socialLink.safeParse(url).success, false);
   const payload = {
     slug: "seller-test",
     name: "Seller Test Product",

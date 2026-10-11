@@ -50,9 +50,219 @@
   color: #f4a47f;
 }
 .seller-profile {
-  max-width: 850px;
+  max-width: 1060px;
   width: 100%;
   margin: auto;
+}
+.seller-profile.form {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.seller-profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 32px;
+  border-bottom: 1px solid #34363e;
+  background: #1c1d22;
+}
+.seller-profile-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 58px;
+  height: 58px;
+  border-radius: 15px;
+  background: #e99d7812;
+  border: 1px solid #e99d7833;
+  color: #e99d78;
+}
+.seller-profile-heading h2 {
+  font-size: 25px;
+  margin: 10px 0;
+}
+.seller-profile-heading p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.seller-setup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr);
+}
+.seller-setup-main {
+  padding: 30px;
+  min-width: 0;
+}
+.seller-setup-section + .seller-setup-section {
+  margin-top: 30px;
+}
+.seller-setup-section > h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  margin: 0 0 22px;
+}
+.seller-setup-section > h3 > span {
+  font-size: 11px;
+  color: #e99d78;
+  border: 1px solid #544033;
+  padding: 6px;
+  border-radius: 5px;
+}
+.seller-profile .seller-setup-section label {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+.seller-setup-section > small {
+  display: block;
+  margin-top: 10px;
+  line-height: 1.7;
+  font-size: 11px;
+}
+.seller-profile input:focus {
+  border-color: #e99d78;
+  outline: 2px solid #e99d78;
+  outline-offset: -2px;
+}
+.seller-profile .seller-terms {
+  max-height: 370px;
+  padding: 20px;
+}
+.seller-setup-aside {
+  min-width: 0;
+  padding: 30px;
+  background: #15171b;
+  border-left: 1px solid #34363e;
+}
+.seller-shop-preview {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 26px 12px;
+  margin-top: 16px;
+  border: 1px dashed #454047;
+  border-radius: 9px;
+  text-align: center;
+}
+.seller-shop-preview svg {
+  color: #e99d78;
+}
+.seller-shop-preview strong {
+  overflow-wrap: anywhere;
+  max-width: 100%;
+  font-size: 17px;
+}
+.seller-shop-preview > span {
+  font-size: 11px;
+  color: #929aa8;
+}
+.seller-fee-preview {
+  margin-top: 30px;
+}
+.seller-fee-preview > span {
+  font-size: 12px;
+  color: #b5bac4;
+}
+.seller-fee-preview > strong {
+  display: block;
+  color: #efad8c;
+  font-size: 42px;
+  margin: 8px 0;
+}
+.seller-fee-preview > strong small {
+  color: inherit;
+  font-size: 22px;
+}
+.seller-fee-preview p,
+.seller-setup-tip {
+  font-size: 11px;
+  line-height: 1.8;
+  color: #929aa8;
+}
+.seller-fee-preview dl {
+  margin: 22px 0;
+}
+.seller-fee-preview dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 12px;
+}
+.seller-fee-preview dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.seller-fee-preview dl > div:last-child {
+  border-top: 1px solid #34363e;
+  color: #aad0b7;
+  font-weight: 600;
+}
+.seller-setup-tip {
+  display: flex;
+  gap: 9px;
+}
+.seller-setup-tip svg {
+  flex-shrink: 0;
+  color: #e99d78;
+}
+.seller-setup-footer {
+  padding: 24px 30px;
+  border-top: 1px solid #34363e;
+  display: grid;
+  gap: 18px;
+}
+.seller-profile .seller-setup-footer .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.seller-setup-footer .checkbox input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  accent-color: #e99d78;
+  margin: 0;
+}
+.seller-setup-footer > .button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  justify-self: end;
+}
+@media (max-width: 700px) {
+  .seller-profile-heading {
+    padding: 22px;
+    align-items: start;
+  }
+  .seller-profile-heading h2 {
+    font-size: 21px;
+  }
+  .seller-profile-icon {
+    display: none;
+  }
+  .seller-setup-layout {
+    grid-template-columns: 1fr;
+  }
+  .seller-setup-main,
+  .seller-setup-aside,
+  .seller-setup-footer {
+    padding: 22px;
+  }
+  .seller-setup-aside {
+    border-left: 0;
+    border-top: 1px solid #34363e;
+  }
+  .seller-setup-footer > .button {
+    width: 100%;
+  }
 }
 .seller-terms {
   max-height: 360px;
@@ -137,19 +347,6 @@
   height: 46px;
   border-radius: 12px;
   background: #ef966f18;
-  color: #f4a47f;
-}
-.seller-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 12px;
-}
-.seller-links a {
-  display: flex;
-  align-items: center;
-  gap: 4px;
   color: #f4a47f;
 }
 .seller-notice {

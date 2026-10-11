@@ -2,15 +2,15 @@
 
 ## Triển khai
 
-Chạy các migration còn thiếu theo thứ tự, bao gồm `supabase/migrations/022_sellers.sql`, trong Supabase SQL Editor trước khi đưa bản server/frontend mới vào hoạt động. Không chạy lại migration đã áp dụng. Bản thay đổi này không tự cập nhật cơ sở dữ liệu hoặc chuyển tiền ngân hàng.
+Chạy các migration còn thiếu theo thứ tự đến `024_seller_without_social.sql` trong Supabase SQL Editor trước khi đưa bản server/frontend mới vào hoạt động. Không chạy lại migration đã áp dụng. Migration 023 khôi phục hồ sơ bị thiếu cho tài khoản Auth; migration 024 xóa liên kết mạng xã hội đã lưu và bỏ yêu cầu này. Bản thay đổi này không tự cập nhật cơ sở dữ liệu hoặc chuyển tiền ngân hàng.
 
 Không cần thay Cloudflare Worker cho tính năng seller. Các trang và API seller vẫn tuân theo giới hạn truy cập Việt Nam hiện có.
 
 ## Sử dụng
 
 1. Admin mở **Khách hàng**, tìm tài khoản và chọn **Cấp quyền seller**.
-2. Lần truy cập tiếp theo, seller phải nhập tên gian hàng, ít nhất một liên kết mạng xã hội HTTPS và tích đồng ý điều khoản. Việc chấp nhận được lưu trên máy chủ theo phiên bản điều khoản.
-3. Seller mở **Tài khoản → Kênh người bán** (`/seller`), tạo sản phẩm, thêm gói bán, nhập kho mã hoặc giao kết quả thủ công. Seller chỉ quản lý sản phẩm/kho/đơn bán của mình. Tên và liên hệ xuất hiện trên trang sản phẩm; danh sách sản phẩm hiển thị tên người bán.
+2. Lần truy cập tiếp theo, seller nhập tên gian hàng và tích đồng ý điều khoản. Không yêu cầu mạng xã hội. Việc chấp nhận được lưu trên máy chủ theo phiên bản điều khoản.
+3. Seller mở **Tài khoản → Kênh người bán** (`/seller`), tạo sản phẩm, thêm gói bán, nhập kho mã hoặc giao kết quả thủ công. Seller chỉ quản lý sản phẩm/kho/đơn bán của mình. Tên người bán xuất hiện trên trang và danh sách sản phẩm; khách hàng gửi vấn đề tại Trung tâm hỗ trợ KEYNEST.
 4. Admin quản lý phí và yêu cầu rút tại **Người bán & rút tiền**. Thu hồi quyền seller sẽ ẩn sản phẩm của tài khoản đó.
 
 ## Tiền và đối soát

@@ -46,6 +46,15 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
   const admin = (await login("admin@keynest.local", "Admin123!")).cookie;
   let buyer = (await login()).cookie;
   const uid = (await req("/me", buyer)).data.id;
+  await t.test('email registration appears in customer list and role filters apply before pagination', async () => {
+    const registration = await req('/auth/register', '', { email: 'listed@example.test', password: 'Registered123!', name: 'Listed Customer' });
+    assert.equal(registration.status, 200);
+    const listed = await req('/admin/customers?q=listed%40example.test&role=customer', admin);
+    assert.equal(listed.data.total, 1);
+    assert.equal(listed.data.items[0].email, 'listed@example.test');
+    assert.equal((await req('/admin/customers?q=listed%40example.test&role=seller', admin)).data.total, 0);
+    assert.equal((await req('/admin/customers?role=admin', admin)).status, 400);
+  });
   await t.test("homepage announcements are public only while published and admin-owned", async () => {
     const a = { id: randomUUID(), title: "Lịch bảo trì", body: "Thông tin công khai", active: true };
     assert.equal((await req("/admin/announcements", buyer, a)).status, 403);

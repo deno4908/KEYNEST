@@ -343,7 +343,7 @@ export function createOperations(store) {
         if (f.q) q = q.ilike(c.search, `%${f.q.replace(/[\\%_]/g, "\\$&")}%`);
         for (const key of ["status", "user_id", "kind", "priority"])
           if (f[key]) q = q.eq(key, f[key]);
-        if (kind === "customers") q = q.in("role", ["customer", "seller"]);
+        if (kind === "customers") q = f.role ? q.eq("role", f.role) : q.in("role", ["customer", "seller"]);
         if (f.from) q = q.gte("created_at", f.from);
         if (f.to) q = q.lte("created_at", f.to);
         q = q.order(c.sort, { ascending: false });
@@ -357,7 +357,7 @@ export function createOperations(store) {
         return shape(result.data, result.count, f);
       }
       let data = rows(kind === "customers" ? "users" : kind).filter(
-        (r) => kind !== "customers" || ["customer", "seller"].includes(r.role),
+        (r) => kind !== "customers" || (["customer", "seller"].includes(r.role) && (!f.role || r.role === f.role)),
       );
       data = data.filter(
         (r) =>
@@ -656,6 +656,7 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
   for (const kind of Object.keys(listConfig))
     router.get(`/admin/${kind}`, async (req, res) => {
       let schema = paging.extend({ q: z.string().trim().max(100).default("") });
+      if (kind === "customers") schema = schema.extend({ role: z.enum(["customer", "seller"]).optional() });
       if (kind !== "customers")
         schema = schema.extend({
           user_id: z.uuid().optional(),

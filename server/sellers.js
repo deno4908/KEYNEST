@@ -5,41 +5,6 @@ import { AppError, encrypt } from "./security.js";
 import { requireSeller } from "./seller-accounting.js";
 import { SELLER_TERMS_VERSION, sellerTerms } from "../shared/seller-terms.js";
 
-const socialHosts = [
-  "facebook.com",
-  "www.facebook.com",
-  "m.facebook.com",
-  "instagram.com",
-  "www.instagram.com",
-  "tiktok.com",
-  "www.tiktok.com",
-  "x.com",
-  "twitter.com",
-  "t.me",
-  "zalo.me",
-  "discord.com",
-  "discord.gg",
-  "youtube.com",
-  "www.youtube.com",
-  "linkedin.com",
-  "www.linkedin.com",
-];
-export const socialLink = z
-  .string()
-  .trim()
-  .max(400)
-  .url()
-  .refine((value) => {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      !url.username &&
-      !url.password &&
-      !url.port &&
-      socialHosts.includes(url.hostname) &&
-      url.pathname.length > 1
-    );
-  }, "Nhập liên kết HTTPS tới trang mạng xã hội của bạn (Facebook, Zalo, Telegram, Discord…).");
 export function createSellers(store) {
   const demo = Boolean(store.db);
   if (demo) store.db.seller_withdrawals ||= [];
@@ -89,7 +54,7 @@ export function createSellers(store) {
         );
       Object.assign(user, {
         seller_name: data.name,
-        seller_social_links: data.social_links,
+        seller_social_links: [],
         seller_terms_version: data.terms_version,
         seller_terms_accepted_at:
           user.seller_terms_accepted_at || new Date().toISOString(),
@@ -275,7 +240,6 @@ export function createSellers(store) {
                 name,
                 email,
                 seller_name,
-                seller_social_links,
                 seller_debt,
                 seller_terms_accepted_at,
                 balance,
@@ -284,7 +248,6 @@ export function createSellers(store) {
                 name,
                 email,
                 seller_name,
-                seller_social_links,
                 seller_debt,
                 seller_terms_accepted_at,
                 balance,
@@ -294,7 +257,7 @@ export function createSellers(store) {
             store.client
               .from("profiles")
               .select(
-                "id,name,email,seller_name,seller_social_links,seller_debt,seller_terms_accepted_at,balance",
+                "id,name,email,seller_name,seller_debt,seller_terms_accepted_at,balance",
               )
               .eq("role", "seller"),
           );
@@ -340,7 +303,7 @@ export function sellersRouter({
     const input = z
       .object({
         name: z.string().trim().min(2).max(80),
-        social_links: z.array(socialLink).min(1).max(5),
+        social_links: z.array(z.string().max(400)).max(5).optional(),
         terms_version: z.literal(SELLER_TERMS_VERSION),
         accepted: z.literal(true),
         fee_bps: z.number().int().min(0).max(10000),

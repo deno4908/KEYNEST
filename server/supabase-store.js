@@ -74,7 +74,7 @@ export class SupabaseStore {
   async attachSellers(products) {
     const ids = [...new Set(products.map(p => p.seller_id).filter(Boolean))];
     if (!ids.length) return products;
-    const sellers = await this.query(this.client.from('profiles').select('id,name,seller_name,seller_social_links').in('id', ids));
+    const sellers = await this.query(this.client.from('profiles').select('id,name,seller_name').in('id', ids));
     return products.map(p => ({ ...p, seller: sellerPublic(sellers.find(s => s.id === p.seller_id)) }));
   }
   async product(identifier) {

@@ -4,10 +4,7 @@ import { SELLER_TERMS_VERSION } from "../shared/seller-terms.js";
 
 export function requireSeller(user) {
   if (user?.role !== "seller") throw new AppError("Cần quyền người bán.", 403);
-  if (
-    user.seller_terms_version !== SELLER_TERMS_VERSION ||
-    !user.seller_social_links?.length
-  )
+  if (user.seller_terms_version !== SELLER_TERMS_VERSION)
     throw new AppError(
       "Hoàn tất hồ sơ và chấp nhận điều khoản người bán trước khi bán hàng.",
       403,
@@ -18,7 +15,6 @@ export const sellerPublic = (user) =>
     ? {
         id: user.id,
         name: user.seller_name || user.name,
-        social_links: user.seller_social_links || [],
       }
     : null;
 export function snapshotSeller(store, product, buyer) {

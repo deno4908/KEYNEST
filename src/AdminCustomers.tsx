@@ -2,10 +2,19 @@
 import type { FormEvent } from "react";
 import { api, money, post } from "./api";
 import { Modal } from "./App";
-import { UsersRound } from "lucide-react";
+import {
+  UsersRound,
+  Store,
+  ShieldCheck,
+  LockKeyhole,
+  UnlockKeyhole,
+  RefreshCw,
+  Wallet,
+  Search,
+} from "lucide-react";
 import "./admin-customers.css";
 type Customer = {
-  role: 'customer' | 'seller';
+  role: "customer" | "seller";
   id: string;
   name: string;
   email: string;
@@ -16,6 +25,8 @@ type Result = { items: Customer[]; total: number; pages: number };
 export function AdminCustomers() {
   const [data, setData] = useState<Result | null>(null);
   const [q, setQ] = useState("");
+  const [role, setRole] = useState("");
+  const [notice, setNotice] = useState("");
   const [page, setPage] = useState(1);
   const [version, setVersion] = useState(0);
   const [selected, setSelected] = useState<Customer | null>(null);
@@ -30,7 +41,7 @@ export function AdminCustomers() {
     const timer = setTimeout(
       () =>
         api<Result>(
-          `/admin/customers?page=${page}&q=${encodeURIComponent(q)}`,
+          `/admin/customers?page=${page}&q=${encodeURIComponent(q)}${role ? `&role=${role}` : ""}`,
           { signal: c.signal },
         )
           .then(setData)
@@ -43,7 +54,7 @@ export function AdminCustomers() {
       clearTimeout(timer);
       c.abort();
     };
-  }, [q, page, version]);
+  }, [q, role, page, version]);
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!selected) return;
@@ -55,6 +66,7 @@ export function AdminCustomers() {
         reason,
       });
       setSelected(null);
+      setNotice("Đã cập nhật quyền truy cập tài khoản.");
       setVersion((v) => v + 1);
     } catch (e) {
       setActionError((e as Error).message);
@@ -65,21 +77,67 @@ export function AdminCustomers() {
   return (
     <div className="admin-customers">
       <header className="customers-heading">
-        <h2>Khách hàng</h2>
-        <p>Tra cứu số dư và quản lý quyền truy cập tài khoản.</p>
+        <div>
+          <span className="customers-eyebrow">QUẢN LÝ TÀI KHOẢN</span>
+          <h2>Khách hàng</h2>
+          <p>
+            Tra cứu tài khoản, quản lý người bán và kiểm soát quyền truy cập.
+          </p>
+        </div>
+        <button
+          className="button button-outline"
+          disabled={busy}
+          onClick={() => setVersion((v) => v + 1)}
+        >
+          <RefreshCw size={15} /> Làm mới
+        </button>
       </header>
-      <label className="field-title">
-        Tìm theo email
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => {
-            setQ(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Email khách hàng…"
-        />
-      </label>
+      <div className="customers-toolbar">
+        <div className="customers-filters" aria-label="Lọc theo vai trò">
+          {[
+            ["", "Tất cả"],
+            ["customer", "Khách mua hàng"],
+            ["seller", "Người bán"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={role === value}
+              onClick={() => {
+                setRole(value);
+                setPage(1);
+              }}
+            >
+              {value === "seller" ? (
+                <Store size={16} />
+              ) : (
+                <UsersRound size={16} />
+              )}
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="field-title">
+          <span>
+            <Search size={14} /> Tìm theo email
+          </span>
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Email khách hàng…"
+          />
+        </label>
+      </div>
+      {notice && (
+        <p className="customers-notice" role="status">
+          <ShieldCheck size={16} />
+          {notice}
+        </p>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}{" "}
@@ -90,10 +148,23 @@ export function AdminCustomers() {
       {data && (
         <>
           <div className="panel table-scroll customers-table">
+            <div className="customers-list-heading">
+              <strong>
+                Danh sách tài khoản <span>{data.total}</span>
+              </strong>
+              <small>
+                {role === "seller"
+                  ? "Người bán trên KEYNEST"
+                  : role === "customer"
+                    ? "Tài khoản mua hàng"
+                    : "Khách mua hàng & người bán"}
+              </small>
+            </div>
             <table>
               <thead>
                 <tr>
                   <th>Khách hàng</th>
+                  <th>Vai trò</th>
                   <th>Số dư ví</th>
                   <th>Truy cập</th>
                   <th>Thao tác</th>
@@ -103,33 +174,105 @@ export function AdminCustomers() {
                 {data.items.map((u) => (
                   <tr key={u.id}>
                     <td>
-                      {u.name}
-                      <small>{u.email}</small>
+                      <div className="customer-identity">
+                        <span
+                          className={`customer-avatar ${u.role === "seller" ? "is-seller" : ""}`}
+                          aria-hidden="true"
+                        >
+                          {(u.name || u.email)
+                            .trim()
+                            .split(/\s+/)
+                            .slice(-2)
+                            .map((part) => part[0])
+                            .join("")
+                            .toUpperCase()}
+                        </span>
+                        <div>
+                          <strong>{u.name || "Chưa đặt tên"}</strong>
+                          <small>{u.email}</small>
+                        </div>
+                      </div>
                     </td>
-                    <td>{money(u.balance)}</td>
-                    <td>
-                      {u.access?.suspended ? "Đã khóa" : "Hoạt động"}
-                      {u.access?.reason && <small>{u.access.reason}</small>}
-                    </td>
-                    <td>
-                      <button className="button button-outline" disabled={busy} onClick={async()=>{
-                        setBusy(true);
-                        try { await post('/admin/sellers/role',{user_id:u.id,role:u.role==='seller'?'customer':'seller'}); setVersion(v=>v+1); }
-                        catch(e) { setError((e as Error).message); }
-                        finally { setBusy(false); }
-                      }}>{u.role==='seller'?'Thu hồi seller':'Cấp quyền seller'}</button>
-                      <button
-                        className="button button-outline"
-                        onClick={() => {
-                          setSelected(u);
-                          setReason("");
-                          setActionError("");
-                        }}
+                    <td data-label="Vai trò">
+                      <span
+                        className={`customer-role ${u.role === "seller" ? "is-seller" : ""}`}
                       >
-                        {u.access?.suspended
-                          ? "Mở tài khoản"
-                          : "Khóa tài khoản"}
-                      </button>
+                        {u.role === "seller" ? (
+                          <Store size={13} />
+                        ) : (
+                          <UsersRound size={13} />
+                        )}
+                        {u.role === "seller" ? "Người bán" : "Khách hàng"}
+                      </span>
+                    </td>
+                    <td data-label="Số dư ví">
+                      <span className="customer-balance">
+                        <Wallet size={14} />
+                        {money(u.balance)}
+                      </span>
+                    </td>
+                    <td data-label="Truy cập">
+                      <span
+                        className={`customer-status ${u.access?.suspended ? "is-locked" : ""}`}
+                      >
+                        <i />
+                        {u.access?.suspended ? "Đã khóa" : "Hoạt động"}
+                      </span>
+                      {u.access?.reason && (
+                        <small className="customer-reason">
+                          {u.access?.suspended
+                            ? "Lý do khóa: "
+                            : "Ghi chú gần nhất: "}
+                          {u.access.reason}
+                        </small>
+                      )}
+                    </td>
+                    <td>
+                      <div className="customer-actions">
+                        <button
+                          className="button button-outline"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            setError("");
+                            try {
+                              await post("/admin/sellers/role", {
+                                user_id: u.id,
+                                role:
+                                  u.role === "seller" ? "customer" : "seller",
+                              });
+                              setVersion((v) => v + 1);
+                            } catch (e) {
+                              setError((e as Error).message);
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          <Store size={14} />
+                          {u.role === "seller"
+                            ? "Thu hồi seller"
+                            : "Cấp quyền seller"}
+                        </button>
+                        <button
+                          className={`button button-outline ${u.access?.suspended ? "" : "customer-lock"}`}
+                          disabled={busy}
+                          onClick={() => {
+                            setSelected(u);
+                            setReason("");
+                            setActionError("");
+                          }}
+                        >
+                          {u.access?.suspended ? (
+                            <UnlockKeyhole size={14} />
+                          ) : (
+                            <LockKeyhole size={14} />
+                          )}
+                          {u.access?.suspended
+                            ? "Mở tài khoản"
+                            : "Khóa tài khoản"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -139,22 +282,25 @@ export function AdminCustomers() {
               <div className="customers-empty">
                 <UsersRound size={30} strokeWidth={1.5} />
                 <strong>
-                  {q ? "Không tìm thấy khách hàng" : "Chưa có khách hàng"}
+                  {q || role
+                    ? "Không có tài khoản phù hợp"
+                    : "Chưa có khách hàng"}
                 </strong>
                 <p>
                   {q
                     ? "Thử tìm với một địa chỉ email khác."
                     : "Các tài khoản khách hàng sẽ xuất hiện tại đây."}
                 </p>
-                {q && (
+                {(q || role) && (
                   <button
                     className="button button-outline"
                     onClick={() => {
                       setQ("");
+                      setRole("");
                       setPage(1);
                     }}
                   >
-                    Xóa tìm kiếm
+                    Xóa bộ lọc
                   </button>
                 )}
               </div>

@@ -5,8 +5,8 @@ export const sellerTerms = [
     "Người bán chịu trách nhiệm về nguồn gốc, quyền phân phối, tính chính xác của mô tả, chất lượng, giao hàng và bảo hành sản phẩm do mình đăng. Không đăng sản phẩm trái phép, mã đã sử dụng hoặc thông tin gây hiểu nhầm.",
   ],
   [
-    "Thông tin liên hệ công khai",
-    "Cung cấp tên người bán và ít nhất một trang mạng xã hội đang hoạt động do bạn quản lý. Tên và các liên kết này được hiển thị với sản phẩm để khách hàng và quản trị viên liên hệ. Bạn phải cập nhật khi thông tin thay đổi và phản hồi các vấn đề liên quan đến sản phẩm.",
+    "Thông tin gian hàng",
+    "Cung cấp tên người bán rõ ràng, không mạo danh cá nhân hoặc đơn vị khác. Tên này được hiển thị trên sản phẩm. Người bán có trách nhiệm phối hợp với KEYNEST để xử lý các vấn đề liên quan đến sản phẩm.",
   ],
   [
     "Doanh thu và phí nền tảng",

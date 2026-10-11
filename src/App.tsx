@@ -479,7 +479,7 @@ export function App() {
         <main>
           {['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
             <LegalPage privacy={location.pathname.startsWith('/privacy')} />
-          ) : user?.role === 'seller' && (user.seller_terms_version !== SELLER_TERMS_VERSION || !user.seller_social_links?.length) ? (
+          ) : user?.role === 'seller' && (user.seller_terms_version !== SELLER_TERMS_VERSION) ? (
             <Seller onboarding />
           ) : loadError ? (
             <div className="container">
@@ -805,7 +805,7 @@ function ProductPage() {
             {p.platform} / {categories[p.category]}
           </span>
           <h1>{p.name}</h1>
-          {p.seller && <section className="seller-notice"><SellerContact seller={p.seller}/><p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy liên hệ người bán qua các trang trên hoặc gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p></section>}
+          {p.seller && <section className="seller-notice"><SellerContact seller={p.seller}/><p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p></section>}
           <button
             className="detail-rating-button"
             onClick={() => {
