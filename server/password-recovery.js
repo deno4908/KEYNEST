@@ -1,8 +1,11 @@
 import { AppError } from "./security.js";
 
+const MAX_RECOVERY_AGE_MS = 10 * 60 * 1000;
+
 export function createPasswordRecovery({
   config,
   makeAuthClient,
+  clock = () => Date.now(),
   logger = console,
 }) {
   return {
@@ -37,6 +40,15 @@ export function createPasswordRecovery({
         type: "recovery",
       });
       if (error || !data?.user || !data?.session)
+        throw new AppError("Liên kết đã hết hạn hoặc không hợp lệ.", 401);
+
+      const recoverySentAt = Date.parse(data.user.recovery_sent_at || "");
+      const age = clock() - recoverySentAt;
+      if (
+        !Number.isFinite(recoverySentAt) ||
+        age < 0 ||
+        age > MAX_RECOVERY_AGE_MS
+      )
         throw new AppError("Liên kết đã hết hạn hoặc không hợp lệ.", 401);
 
       const updated = await client.auth.updateUser({

@@ -38,11 +38,13 @@ test("recovery request uses the KEYNEST reset page and reports mail errors", asy
 });
 
 test("recovery verifies the one-time hash on submit and rejects replay", async () => {
+  const now = Date.now();
   const calls = [];
   let tokenUsed = false;
   const session = { access_token: "access", refresh_token: "refresh" };
   const service = createPasswordRecovery({
     config: { origin: "https://keynest.store" },
+    clock: () => now,
     makeAuthClient: () => ({
       auth: {
         verifyOtp: async (input) => {
@@ -52,7 +54,7 @@ test("recovery verifies the one-time hash on submit and rejects replay", async (
           tokenUsed = true;
           return {
             data: {
-              user: {},
+              user: { recovery_sent_at: new Date(now - 1000).toISOString() },
               session,
             },
             error: null,
@@ -81,6 +83,43 @@ test("recovery verifies the one-time hash on submit and rejects replay", async (
     ["updateUser", { password: "NewPassword123!" }],
     ["verifyOtp", { token_hash: "a".repeat(64), type: "recovery" }],
   ]);
+});
+
+test("recovery rejects a link older than ten minutes", async () => {
+  const now = Date.now();
+  let passwordUpdated = false;
+  const service = createPasswordRecovery({
+    config: { origin: "https://keynest.store" },
+    clock: () => now,
+    makeAuthClient: () => ({
+      auth: {
+        verifyOtp: async () => ({
+          data: {
+            user: {
+              recovery_sent_at: new Date(
+                now - 10 * 60 * 1000 - 1,
+              ).toISOString(),
+            },
+            session: { access_token: "access", refresh_token: "refresh" },
+          },
+          error: null,
+        }),
+        updateUser: async () => {
+          passwordUpdated = true;
+          return { error: null };
+        },
+      },
+    }),
+  });
+
+  await assert.rejects(
+    service.complete({
+      token_hash: "a".repeat(64),
+      password: "NewPassword123!",
+    }),
+    (error) => error instanceof AppError && error.status === 401,
+  );
+  assert.equal(passwordUpdated, false);
 });
 
 test("recovery rejects expired or already-invalid hashes", async () => {
