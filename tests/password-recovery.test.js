@@ -37,20 +37,22 @@ test("recovery request uses the KEYNEST reset page and reports mail errors", asy
   assert.doesNotMatch(JSON.stringify(logs), /user@example\.com/);
 });
 
-test("recovery verifies the one-time hash only when the new password is submitted", async () => {
-  const now = Date.now();
+test("recovery verifies the one-time hash on submit and rejects replay", async () => {
   const calls = [];
+  let tokenUsed = false;
   const session = { access_token: "access", refresh_token: "refresh" };
   const service = createPasswordRecovery({
     config: { origin: "https://keynest.store" },
-    clock: () => now,
     makeAuthClient: () => ({
       auth: {
         verifyOtp: async (input) => {
           calls.push(["verifyOtp", input]);
+          if (tokenUsed)
+            return { data: {}, error: new Error("token already used") };
+          tokenUsed = true;
           return {
             data: {
-              user: { recovery_sent_at: new Date(now - 1000).toISOString() },
+              user: {},
               session,
             },
             error: null,
@@ -64,22 +66,26 @@ test("recovery verifies the one-time hash only when the new password is submitte
     }),
   });
 
-  const result = await service.complete({
+  const input = {
     token_hash: "a".repeat(64),
     password: "NewPassword123!",
-  });
+  };
+  const result = await service.complete(input);
   assert.equal(result, session);
+  await assert.rejects(
+    service.complete(input),
+    (error) => error instanceof AppError && error.status === 401,
+  );
   assert.deepEqual(calls, [
     ["verifyOtp", { token_hash: "a".repeat(64), type: "recovery" }],
     ["updateUser", { password: "NewPassword123!" }],
+    ["verifyOtp", { token_hash: "a".repeat(64), type: "recovery" }],
   ]);
 });
 
 test("recovery rejects expired or already-invalid hashes", async () => {
-  const now = Date.now();
   const service = createPasswordRecovery({
     config: { origin: "https://keynest.store" },
-    clock: () => now,
     makeAuthClient: () => ({
       auth: {
         verifyOtp: async () => ({

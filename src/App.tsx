@@ -2000,19 +2000,14 @@ function ResetPassword() {
   const { notify } = useStore();
   const navigate = useNavigate();
   const [tokens] = useState(() => {
-    const p = new URLSearchParams(window.location.hash.slice(1));
     const q = new URLSearchParams(window.location.search);
     return {
       token_hash: q.get("token_hash"),
-      access_token: p.get("access_token"),
-      refresh_token: p.get("refresh_token"),
-      type: q.get("type") || p.get("type"),
+      type: q.get("type"),
     };
   });
   const validRecoveryLink =
-    tokens.type === "recovery" &&
-    (Boolean(tokens.token_hash) ||
-      Boolean(tokens.access_token && tokens.refresh_token));
+    tokens.type === "recovery" && Boolean(tokens.token_hash);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     window.history.replaceState(null, "", window.location.pathname);
@@ -2024,17 +2019,11 @@ function ResetPassword() {
       const newPassword = new FormData(e.currentTarget).get("password");
       await post(
         "/auth/reset",
-        tokens.token_hash
-          ? {
-              token_hash: tokens.token_hash,
-              type: "recovery",
-              password: newPassword,
-            }
-          : {
-              access_token: tokens.access_token,
-              refresh_token: tokens.refresh_token,
-              password: newPassword,
-            },
+        {
+          token_hash: tokens.token_hash,
+          type: "recovery",
+          password: newPassword,
+        },
       );
       notify("Mật khẩu đã cập nhật.");
       navigate("/account");

@@ -557,22 +557,12 @@ app.post("/api/auth/reset", async (req, res) => {
   if (config.mode === "demo")
     throw new AppError("Chức năng này cần Supabase Auth.");
   const input = z
-    .union([
-      z
-        .object({
-          token_hash: z.string().min(20).max(1024),
-          type: z.literal("recovery"),
-          password,
-        })
-        .strict(),
-      z
-        .object({
-          access_token: z.string().min(20).max(8000),
-          refresh_token: z.string().min(10).max(1000),
-          password,
-        })
-        .strict(),
-    ])
+    .object({
+      token_hash: z.string().min(20).max(1024),
+      type: z.literal("recovery"),
+      password,
+    })
+    .strict()
     .parse(req.body);
   const session = await passwordRecovery.complete(input);
   setAuth(res, session);
