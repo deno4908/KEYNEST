@@ -46,9 +46,16 @@ test('foreign and unknown countries receive standalone 403; spoofed country head
   assert.equal(await (await worker.fetch(request('/account', 'US', 'HEAD'))).text(), '');
 });
 
-test('foreign public pages are standalone and all other reads and writes are blocked', async t => {
+test('foreign visitors see the region UI at home; legal pages remain public', async t => {
   const origin = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected origin request'); });
-  for (const path of ['/', '/privacy', '/privacy/', '/terms', '/terms/']) {
+  const home = await worker.fetch(request('/', 'US'));
+  assert.equal(home.status, 403);
+  assert.match(await home.text(), /Khu vực chưa được hỗ trợ/);
+  assert.match(home.headers.get('X-Robots-Tag'), /noindex, nofollow/);
+  const head = await worker.fetch(request('/', 'US', 'HEAD'));
+  assert.equal(head.status, 403);
+  assert.equal(await head.text(), '');
+  for (const path of ['/privacy', '/privacy/', '/terms', '/terms/']) {
     const res = await worker.fetch(request(path, 'US'));
     assert.equal(res.status, 200);
     const html = await res.text();

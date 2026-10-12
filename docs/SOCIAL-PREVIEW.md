@@ -1,6 +1,6 @@
 # Ảnh khi chia sẻ link
 
-> **Cấu hình hiện tại: vietnam-social-v4.** Đã mở lại robots.txt, ảnh công khai và metadata chia sẻ. Bot ngoài VN chỉ nhận metadata, không được vào ứng dụng hay API tài khoản. Copy toàn bộ deploy/cloudflare-vietnam-worker.js lên Cloudflare và Deploy; Git push không tự cập nhật Worker.
+> **Cấu hình hiện tại: vietnam-region-v5.** Khách thông thường ngoài VN thấy giao diện giới hạn khu vực tại trang chủ. Bot ngoài VN chỉ nhận metadata/ảnh chia sẻ, không được vào ứng dụng hay API tài khoản. Copy toàn bộ deploy/cloudflare-vietnam-worker.js lên Cloudflare và Deploy; Git push không tự cập nhật Worker.
 
 ## Facebook báo 403 và tiêu đề “Khu vực chưa được hỗ trợ”
 
@@ -13,7 +13,7 @@ Facebook đang nhận trang chặn khu vực. Đây không chỉ là vấn đề
 5. Mở `https://keynest.store/robots.txt`: phải trả văn bản bắt đầu `User-agent: *`, không phải trang chặn khu vực.
 6. Quay lại Facebook Sharing Debugger, bấm Scrape Again. Kết quả cần là HTTP 200 và tiêu đề KEYNEST, không còn “Khu vực chưa được hỗ trợ”.
 
-Bản Worker mới trả `X-Keynest-Region-Worker: vietnam-social-v4` trên robots.txt, preview dành cho bot nước ngoài và trang chặn. Có thể kiểm tra `curl -I https://keynest.store/robots.txt`. Nếu không thấy header này, kiểm tra lại code Deploy và route. Push code lên GitHub chỉ cập nhật VPS theo workflow hiện tại, không tự dán code lên Worker.
+Bản Worker mới trả `X-Keynest-Region-Worker: vietnam-region-v5` trên robots.txt, preview dành cho bot nước ngoài và trang chặn. Có thể kiểm tra `curl -I https://keynest.store/robots.txt`. Nếu không thấy header này, kiểm tra lại code Deploy và route. Push code lên GitHub chỉ cập nhật VPS theo workflow hiện tại, không tự dán code lên Worker.
 
 Nếu vẫn bị 403 sau khi cập nhật đúng Worker, xem Cloudflare Security Events để kiểm tra rule WAF chặn trước Worker. Chỉ bỏ rule chặn quốc gia trùng với Worker, không tắt toàn bộ bảo vệ website.
 

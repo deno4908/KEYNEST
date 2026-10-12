@@ -49,9 +49,9 @@ Chọn **Route**, không thay bản ghi web thành Custom Domain Worker, vì Wor
 
 Worker độc lập với GitHub Actions hiện tại. Push code chỉ cập nhật web trên VPS; lần đầu và khi sửa Worker phải dán/deploy lại trên Cloudflare. Sau sửa HTML hoặc handler, chạy `node scripts/build-country-worker.js` để tạo lại file Worker rồi dán file mới.
 
-## Cập nhật hiện tại — vietnam-social-v4
+## Cập nhật hiện tại — vietnam-region-v5
 
-Đã mở lại GET/HEAD robots.txt, ảnh công khai `/images/share/`, `/images/products/` và `/api/media/<id>.webp` theo định dạng cho phép trong handler. Bot chia sẻ Discord/Facebook và các bot được liệt kê chỉ nhận metadata trang chủ hoặc sản phẩm, không được vào ứng dụng/API nghiệp vụ. Cookie, Authorization và query được bỏ khi lấy preview/ảnh. Cần Deploy lại Worker. Chế độ v3 bên dưới là cấu hình cũ, trước khi khôi phục ảnh chia sẻ.
+Đã mở lại GET/HEAD robots.txt, ảnh công khai `/images/share/`, `/images/products/` và `/api/media/<id>.webp` theo định dạng cho phép trong handler. Khách truy cập thông thường ngoài VN vào `/` nhận giao diện giới hạn khu vực; `/privacy` và `/terms` vẫn là trang tĩnh công khai. Bot chia sẻ Discord/Facebook và các bot được liệt kê chỉ nhận metadata trang chủ hoặc sản phẩm, không được vào ứng dụng/API nghiệp vụ. Cookie, Authorization và query được bỏ khi lấy preview/ảnh. Cần Deploy lại Worker. Chế độ v3 bên dưới là cấu hình cũ.
 
 ## Chế độ chặn chặt cũ — strict-vietnam-v3
 
@@ -66,7 +66,7 @@ Giới hạn này chỉ áp dụng request đi qua Worker. Cần khóa truy cậ
 ## Kiểm tra sau bật
 
 - Mạng Việt Nam: trang chủ, đăng nhập, account, mua hàng hoạt động.
-- VPN IP Singapore/Mỹ: trang chủ hiện giới thiệu tĩnh; `/privacy`, `/terms` đọc được. `/account` trả trang chặn 403; `/api/config` và các API khác trả 403 với code REGION_RESTRICTED, trừ POST webhook nêu trên.
+- VPN IP Singapore/Mỹ: trang chủ hiện giao diện giới hạn khu vực; `/privacy` và `/terms` đọc được. `/account` trả trang chặn 403; `/api/config` và các API khác trả 403 với code REGION_RESTRICTED, trừ POST webhook nêu trên.
 - Tắt VPN và bấm “Thử truy cập lại”: trở lại cửa hàng.
 - Chỉ thêm header `CF-IPCountry: VN` trên request IP nước ngoài không được mở quyền.
 - Callback Pay2S hợp lệ vẫn phải được backend nhận và xác nhận thanh toán. Không gửi thanh toán thật chỉ để thử; kiểm tra staging hoặc công cụ thử webhook của nhà cung cấp.
