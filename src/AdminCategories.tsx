@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { Check, FolderOpen, Package, Pencil, Plus, Search } from "lucide-react";
+import { Check, FolderOpen, Package, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, post } from "./api";
 import { useStore } from "./App";
 import type { Product } from "./types";
@@ -100,6 +100,20 @@ export function AdminCategories({
     setError("");
     setMessage("");
     nameInput.current?.focus();
+  }
+  async function remove(row: CategoryRow) {
+    if (!window.confirm(`Xóa danh mục “${row.name}”? Thao tác này không thể hoàn tác.`)) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      await api(`/admin/categories/${encodeURIComponent(row.id)}`, { method: "DELETE" });
+      const updated = rows.filter(r => r.id !== row.id);
+      setRows(updated);
+      if (value.id === row.id) { setEditing(false); setManualId(false); setValue(blank(updated)); }
+      if (expanded === row.id) setExpanded(null);
+      setMessage(`Đã xóa danh mục “${row.name}”.`);
+      await refresh();
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
   return (
     <div className="category-manager">
@@ -238,6 +252,9 @@ export function AdminCategories({
                       >
                         <Pencil size={15} />
                         <span>Sửa</span>
+                      </button>
+                      <button className="category-edit admin-delete-button" aria-label={`Xóa ${row.name}`} disabled={busy} onClick={() => void remove(row)}>
+                        <Trash2 size={15} /><span>Xóa</span>
                       </button>
                     </div>
                     <div className="category-item-footer">

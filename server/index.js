@@ -20,6 +20,7 @@ import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
 import { createSteamArt } from './steam-art.js';
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
+import { deleteAdminRecord } from './admin-deletion.js';
 import { createOperations, operationsRouter } from "./operations.js";
 import { createBankPayments } from "./bank-payments.js";
 import { createPay2SRouter } from "./pay2s.js";
@@ -815,6 +816,16 @@ app.post("/api/reviews", auth, limiter(12, 15 * 60000), async (req, res) =>
   ),
 );
 app.use("/api/admin", auth, admin);
+for (const [path, kind, schema] of [
+  ['categories', 'category', categoryId],
+  ['coupons', 'coupon', z.string().min(3).max(32).regex(/^[A-Z0-9_-]+$/)],
+  ['banners', 'banner', uuid],
+]) {
+  app.delete(`/api/admin/${path}/:id`, limiter(30, 60000, `delete-${kind}`), async (req, res) => {
+    await deleteAdminRecord(store, req.user.id, kind, schema.parse(req.params.id));
+    res.json({ ok: true });
+  });
+}
 app.get("/api/admin/bank-payments/status", (req, res) =>
   res.json({
     ...bankPayments.status(),

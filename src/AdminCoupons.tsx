@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Copy, Pencil, Plus, Search, TicketPercent, Pin } from "lucide-react";
+import { Copy, Pencil, Plus, Search, TicketPercent, Pin, Trash2 } from "lucide-react";
 import { Badge, Modal, useStore } from "./App";
-import { categories, date, money, post } from "./api";
+import { api, categories, date, money, post } from "./api";
 import type { Coupon, Product } from "./types";
 
 export const couponValue = (c: Coupon) =>
@@ -230,6 +230,15 @@ export function CouponManager({
                     >
                       <Pencil size={15} />
                     </button>
+                    <button className="button button-outline button-small admin-delete-button" aria-label={`Xóa mã ${c.code}`} disabled={pinBusy} onClick={async () => {
+                      if (!window.confirm(`Xóa mã giảm giá ${c.code}? Thao tác này không thể hoàn tác.`)) return;
+                      setPinBusy(true);
+                      try {
+                        await api(`/admin/coupons/${encodeURIComponent(c.code)}`, { method: "DELETE" });
+                        await saved(); notify("Đã xóa mã giảm giá.");
+                      } catch (e) { notify((e as Error).message, true); }
+                      finally { setPinBusy(false); }
+                    }}><Trash2 size={15} />Xóa</button>
                   </div>
                 </td>
               </tr>

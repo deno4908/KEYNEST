@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -70,15 +70,29 @@ export function Admin() {
     } | null>(null),
     [busy, setBusy] = useState(false),
     [orderFilter, setOrderFilter] = useState("all");
-  const load = () =>
-    api<Overview>("/admin/overview")
+  const loadVersion = useRef(0);
+  const load = () => {
+    const version = ++loadVersion.current;
+    return api<Overview>("/admin/overview")
       .then((result) => {
+        if (version !== loadVersion.current) return;
         setData(result);
         setError("");
       })
-      .catch((e) => setError(e.message));
+      .catch((e) => { if (version === loadVersion.current) setError(e.message); });
+  };
   useEffect(() => {
     load();
+    const update = () => { if (!document.hidden) void load(); };
+    const timer = window.setInterval(update, 30000);
+    window.addEventListener("focus", update);
+    document.addEventListener("visibilitychange", update);
+    return () => {
+      ++loadVersion.current;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", update);
+      document.removeEventListener("visibilitychange", update);
+    };
   }, []);
   const afterSave = async () => {
     await load();
@@ -151,11 +165,10 @@ export function Admin() {
               >
                 <I size={18} />
                 {String(label)}
-                {id === "tickets" && <span aria-label="Yêu cầu chưa xử lý">{data?.tickets.filter(t => t.status !== 'closed').length || 0}</span>}
+                {id === "tickets" && <span aria-label="Tổng số yêu cầu hỗ trợ" title="Tổng số yêu cầu hỗ trợ">{data ? data.tickets.length : "—"}</span>}
                 {id === "orders" && (
-                  <span>
-                    {data?.orders.filter((o) => o.status === "processing")
-                      .length || 0}
+                  <span aria-label="Tổng số đơn hàng" title="Tổng số đơn hàng">
+                    {data ? data.orders.length : "—"}
                   </span>
                 )}
               </button>

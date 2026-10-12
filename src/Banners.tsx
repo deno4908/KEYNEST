@@ -12,6 +12,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { api, post } from "./api";
 import { Modal, useStore } from "./App";
@@ -257,8 +258,19 @@ export function BannerManager() {
               <Pencil size={15} />
               Chỉnh sửa
             </button>
+            <button className="button button-outline admin-delete-button" aria-label={`Xóa banner ${b.title}`} disabled={busy} onClick={async () => {
+              if (!window.confirm(`Xóa banner “${b.title}”? Thao tác này không thể hoàn tác.`)) return;
+              setBusy(true); setError("");
+              try {
+                await api(`/admin/banners/${b.id}`, { method: "DELETE" });
+                setBanners(rows => rows.filter(row => row.id !== b.id));
+                notify("Đã xóa banner.");
+              } catch (e) { setError((e as Error).message); }
+              finally { setBusy(false); }
+            }}><Trash2 size={15} />Xóa</button>
           </article>
         ))}
+        {!banners.length && <p className="muted">Chưa có banner. Thêm banner để hiển thị trên trang chủ.</p>}
       </div>
       <Link className="text-button" to="/">
         <Eye size={15} />
