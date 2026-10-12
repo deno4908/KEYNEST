@@ -37,12 +37,13 @@ export async function api<T>(
   // Private routes and every mutation still wait for authentication as before.
   const publicRead = (options.method || 'GET').toUpperCase() === 'GET' &&
     ['/config', '/products', '/categories', '/catalog', '/banners', '/promotions', '/announcements'].includes(path.split('?')[0]);
-  if (!initialized && !publicRead) await refreshAccess();
+  const recovery = ['/auth/reset/verify', '/auth/reset'].includes(path);
+  if (!initialized && !publicRead && !recovery) await refreshAccess();
   const send = () => {
     const headers = new Headers(options.headers);
     if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     headers.set('X-App-Request', 'keynest');
-    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+    if (accessToken && !recovery) headers.set('Authorization', `Bearer ${accessToken}`);
     return fetch(`/api${path}`, {
     cache: 'no-store',
     ...options,
@@ -52,7 +53,7 @@ export async function api<T>(
   };
   let res = await send();
   let body = await res.json();
-  if (res.status === 401 && body.code === 'AUTH_REQUIRED' && await refreshAccess()) {
+  if (!recovery && res.status === 401 && body.code === 'AUTH_REQUIRED' && await refreshAccess()) {
     res = await send();
     body = await res.json();
   }

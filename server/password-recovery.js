@@ -1,7 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { AppError, decrypt, digest, encrypt, opaque } from "./security.js";
 
-const MAX_RECOVERY_AGE_MS = 10 * 60 * 1000;
 const INVALID_LINK =
   "Liên kết đã hết hạn hoặc không hợp lệ. Hãy yêu cầu email khôi phục mới.";
 const STORAGE_ERROR =
@@ -16,42 +15,35 @@ function emailHash(email, key) {
 export function createSupabaseRecoveryRepository(store) {
   const table = (name) => store.client.from(name);
   return {
-    async issueLink({ emailHash: hash, recoveryId, expiresAt }) {
-      const expiredBefore = new Date(
-        Date.parse(expiresAt) - MAX_RECOVERY_AGE_MS,
-      ).toISOString();
-      const { error: cleanupError } = await table("password_recovery_links")
-        .delete()
-        .lt("expires_at", expiredBefore);
-      if (cleanupError) throw new AppError(STORAGE_ERROR, 503);
-      const { error } = await table("password_recovery_links").upsert(
-        {
-          email_hash: hash,
-          recovery_id: recoveryId,
-          expires_at: expiresAt,
-          consumed_at: null,
-        },
-        { onConflict: "email_hash" },
-      );
+    async reserveSend(hash, recoveryId) {
+      const { data, error } = await store.client.rpc('reserve_password_recovery', {
+        p_email_hash: hash, p_recovery_id: recoveryId,
+      });
       if (error) throw new AppError(STORAGE_ERROR, 503);
+      if (!data) throw new AppError('Vui lòng chờ 90 giây trước khi yêu cầu email mới.', 429);
     },
-
-    async consumeLink({ emailHash: hash, recoveryId, now }) {
+    async finishSend(hash, recoveryId, sent) {
+      const { data, error } = await store.client.rpc('finish_password_recovery', {
+        p_email_hash: hash, p_recovery_id: recoveryId, p_sent: sent,
+      });
+      if (error || !data) throw new AppError(STORAGE_ERROR, 503);
+    },
+    async findLink({ emailHash: hash, recoveryId, now }) {
       const { data, error } = await table("password_recovery_links")
-        .update({ consumed_at: now })
+        .select("expires_at")
         .eq("email_hash", hash)
         .eq("recovery_id", recoveryId)
         .is("consumed_at", null)
         .gt("expires_at", now)
-        .select("expires_at")
         .maybeSingle();
       if (error) throw new AppError(STORAGE_ERROR, 503);
       return data;
     },
 
     async createTicket(ticket) {
-      const { error } = await table("password_recovery_tickets").insert(ticket);
+      const { data, error } = await store.client.rpc('redeem_password_recovery', { p_ticket: ticket });
       if (error) throw new AppError(STORAGE_ERROR, 503);
+      if (!data) throw new AppError(INVALID_LINK, 401);
     },
 
     async claimTicket(ticketHash, now) {
@@ -75,15 +67,11 @@ export function createPasswordRecovery({
 }) {
   return {
     async request(email) {
-      const now = clock();
+      email = email.trim().toLowerCase();
       const recoveryId = randomUUID();
-      const expiresAt = new Date(now + MAX_RECOVERY_AGE_MS).toISOString();
+      const hash = emailHash(email, config.encryption);
       try {
-        await repository.issueLink({
-          emailHash: emailHash(email, config.encryption),
-          recoveryId,
-          expiresAt,
-        });
+        await repository.reserveSend(hash, recoveryId);
       } catch (error) {
         if (error instanceof AppError) throw error;
         throw new AppError(STORAGE_ERROR, 503);
@@ -91,11 +79,14 @@ export function createPasswordRecovery({
 
       const redirectTo = new URL("/reset-password", config.origin);
       redirectTo.searchParams.set("recovery_id", recoveryId);
-      const { error } = await makeAuthClient().auth.resetPasswordForEmail(
-        email,
-        { redirectTo: redirectTo.toString() },
-      );
+      let error;
+      try {
+        ({ error } = await makeAuthClient().auth.resetPasswordForEmail(
+          email, { redirectTo: redirectTo.toString() },
+        ));
+      } catch (failure) { error = failure; }
       if (error) {
+        await repository.finishSend(hash, recoveryId, false);
         const message = String(error.message || "").replace(
           /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,
           "[redacted email]",
@@ -110,6 +101,7 @@ export function createPasswordRecovery({
           502,
         );
       }
+      await repository.finishSend(hash, recoveryId, true);
     },
 
     async redeem(input) {
@@ -118,14 +110,17 @@ export function createPasswordRecovery({
         token_hash: input.token_hash,
         type: "recovery",
       });
-      if (error || !data?.user?.email || !data?.session)
+      if (error || !data?.user?.email || !data?.session) {
+        logger.warn?.('Password recovery rejected', { stage: 'provider', code: error?.code || 'missing_session', status: error?.status || 0 });
+        if (error && (!error.status || error.status >= 500)) throw new AppError(STORAGE_ERROR, 503);
         throw new AppError(INVALID_LINK, 401);
+      }
 
       const nowMs = clock();
       const now = new Date(nowMs).toISOString();
       let link;
       try {
-        link = await repository.consumeLink({
+        link = await repository.findLink({
           emailHash: emailHash(data.user.email, config.encryption),
           recoveryId: input.recovery_id,
           now,
@@ -134,8 +129,10 @@ export function createPasswordRecovery({
         if (error instanceof AppError) throw error;
         throw new AppError(STORAGE_ERROR, 503);
       }
-      if (!link?.expires_at || Date.parse(link.expires_at) <= nowMs)
+      if (!link?.expires_at || Date.parse(link.expires_at) <= nowMs) {
+        logger.warn?.('Password recovery rejected', { stage: 'generation' });
         throw new AppError(INVALID_LINK, 401);
+      }
 
       const ticket = opaque();
       try {

@@ -490,7 +490,9 @@ export function App() {
           </div>
         )}
         <main>
-          {['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
+          {location.pathname === '/reset-password' ? (
+            <ResetPassword />
+          ) : ['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
             <LegalPage privacy={location.pathname.startsWith('/privacy')} />
           ) : user?.role === 'seller' && (user.seller_terms_version !== SELLER_TERMS_VERSION) ? (
             <Seller onboarding />
@@ -2001,9 +2003,10 @@ function ResetPassword() {
   const navigate = useNavigate();
   const [tokens] = useState(() => {
     const q = new URLSearchParams(window.location.search);
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
     return {
-      token_hash: q.get("token_hash"),
-      type: q.get("type"),
+      token_hash: fragment.get("token_hash") || q.get("token_hash"),
+      type: fragment.get("type") || q.get("type"),
       recovery_id: q.get("recovery_id"),
     };
   });
@@ -2014,6 +2017,7 @@ function ResetPassword() {
   const [busy, setBusy] = useState(false);
   const [ticket, setTicket] = useState<string | null>(null);
   const [checkingLink, setCheckingLink] = useState(validRecoveryLink);
+  const [linkError, setLinkError] = useState('Liên kết thiếu thông tin hoặc đã được mở. Hãy yêu cầu email khôi phục mới từ website.');
   useEffect(() => {
     window.history.replaceState(null, "", window.location.pathname);
     if (!validRecoveryLink) return;
@@ -2025,8 +2029,11 @@ function ResetPassword() {
         .then(({ ticket: resetTicket }) => {
           if (active) setTicket(resetTicket);
         })
-        .catch(() => {
-          if (active) setTicket(null);
+        .catch((error: Error) => {
+          if (active) {
+            setTicket(null);
+            setLinkError(error.message);
+          }
         })
         .finally(() => {
           if (active) setCheckingLink(false);
@@ -2083,7 +2090,7 @@ function ResetPassword() {
             </button>
           </>
         ) : (
-          <p>Liên kết đã hết hạn hoặc không hợp lệ. Hãy yêu cầu email khôi phục mới.</p>
+          <p role="alert">{linkError}</p>
         )}
       </form>
     </div>

@@ -12,6 +12,17 @@ const response = (body, status = 200, token) => new Response(JSON.stringify(body
   status, headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Access-Token': token } : {}) },
 });
 
+test('single-use recovery requests bypass refresh and are never replayed on 401', async t => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(url);
+    return response({ error: 'Expired', code: 'AUTH_REQUIRED' }, 401);
+  });
+  const { post } = await client();
+  await assert.rejects(post('/auth/reset/verify', { token_hash: 'test' }), /Expired/);
+  assert.deepEqual(calls, ['/api/auth/reset/verify']);
+});
+
 test('public storefront loads without waiting for a slow session refresh', async t => {
   let release;
   let privateRequests = 0;

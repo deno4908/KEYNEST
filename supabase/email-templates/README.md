@@ -15,4 +15,16 @@ Trong URL Configuration, đặt Site URL bằng địa chỉ frontend và thêm 
 
 Mẫu sử dụng bảng và inline CSS, không dùng JavaScript, font tải ngoài hay ảnh từ bên thứ ba. Gmail/ứng dụng email có thể điều chỉnh màu theo chế độ sáng/tối. Template không cấu hình SMTP; nếu chưa gửi được email, kiểm tra cấu hình gửi thư của Supabase riêng.
 
-Tài liệu: https://supabase.com/docs/guides/auth/auth-email-templates
+    Tài liệu: https://supabase.com/docs/guides/auth/auth-email-templates
+
+## Cập nhật luồng khôi phục (migration 028)
+
+1. Áp dụng `027_password_recovery_links.sql` nếu chưa chạy, sau đó chạy `028_password_recovery_delivery.sql` trong Supabase SQL Editor. Không chạy lại 027 nếu bảng đã tồn tại.
+2. Triển khai backend và frontend cùng phiên bản. Backend dùng `APP_ORIGIN=https://keynest.store` và khóa `INVENTORY_ENCRYPTION_KEY` ổn định, giống nhau trên mọi instance.
+3. Supabase Authentication → URL Configuration: Site URL chỉ là `https://keynest.store`; thêm Redirect URL `https://keynest.store/reset-password\?recovery_id=*`. Không điền token vào Site URL.
+4. Dán lại toàn bộ `recovery.html` vào Reset Password trên Supabase. Template mới đặt token trong phần `#token_hash=...&type=recovery`; mã yêu cầu vẫn nằm trong `?recovery_id=...`. Backend bắt buộc có mã yêu cầu nên gửi email từ chức năng Quên mật khẩu của website, không từ nút gửi recovery trên Dashboard.
+5. Tắt click tracking trong Brevo/SendinBlue, yêu cầu email mới và mở một lần trong 10 phút. Chờ ít nhất 90 giây giữa hai yêu cầu gửi. Nếu Supabase cấu hình thời gian chờ gửi dài hơn, cần chờ theo giới hạn đó.
+
+Backend chỉ thay thế mã yêu cầu sau khi dịch vụ gửi thư chấp nhận yêu cầu. Liên kết và vé cũ bị vô hiệu hóa khi yêu cầu mới được ghi nhận thành công. Việc mở trang tiêu thụ liên kết; reload cần email mới. Giao diện hiển thị lỗi dịch vụ riêng thay vì coi mọi lỗi là hết hạn. Thời hạn 10 phút tính từ lúc yêu cầu email, không được gia hạn khi mở trang.
+
+Khi điều tra 401, log backend `Password recovery rejected` có `stage: provider` (Supabase từ chối token, kèm code/status) hoặc `stage: generation` (mã yêu cầu cũ, hết hạn, đã mở, hoặc khóa HMAC không khớp). Log này không chứa token, email hay mật khẩu. Không dùng lại curl xác minh vì token chỉ dùng một lần.
