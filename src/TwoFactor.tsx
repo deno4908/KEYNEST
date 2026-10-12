@@ -1,8 +1,9 @@
-import { useEffect, useId, useState } from "react";
-import { ArrowRight, ArrowLeft, ShieldCheck, Smartphone } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { ShieldCheck, Smartphone } from "lucide-react";
 import "./two-factor.css";
 import { api, post } from "./api";
-import { useStore } from "./App";
+import { Modal, useStore } from "./App";
+import "./oauth-transition.css";
 type Status = { required: boolean; factors: { id: string; name: string }[] };
 export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
   const { mode } = useStore();
@@ -19,6 +20,24 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
   const [message, setMessage] = useState("");
   const [removing, setRemoving] = useState(false);
   const codeId = useId();
+  const codeRef = useRef<HTMLInputElement>(null);
+  const cancelling = useRef(false);
+  useEffect(() => {
+    if (challenge && status?.required && !busy) codeRef.current?.focus();
+  }, [challenge, status?.required, busy]);
+  async function cancelChallenge() {
+    if (busy || cancelling.current) return;
+    cancelling.current = true;
+    setBusy(true);
+    try {
+      await post("/auth/logout");
+      window.location.assign("/");
+    } catch (e) {
+      setError((e as Error).message);
+      setBusy(false);
+      cancelling.current = false;
+    }
+  }
   const cleanCode = (value: string) =>
     value.normalize("NFKC").replace(/\D/g, "").slice(0, 6);
   async function load() {
@@ -73,14 +92,10 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
   }
   if (challenge)
     return (
-      <div className="mfa-login-shell">
+      <Modal title="Xác thực hai bước" close={() => void cancelChallenge()} className="mfa-challenge-dialog">
         <section className="mfa-login-card" aria-labelledby={`${codeId}-title`}>
-          <div className="mfa-login-brand">
-            <span>//</span> KEYNEST{" "}
-            <span className="mfa-login-step">BƯỚC 2 / 2</span>
-          </div>
-          <div className="mfa-login-icon">
-            <ShieldCheck size={28} strokeWidth={1.6} />
+          <div className={`mfa-login-icon${busy ? " is-verifying" : ""}`} aria-hidden="true">
+            <ShieldCheck size={34} strokeWidth={1.6} />
           </div>
           <h1 id={`${codeId}-title`}>
             {status && !status.required
@@ -128,12 +143,13 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
                 </label>
               ) : (
                 <div className="mfa-login-device">
-                  <Smartphone size={16} /> Ứng dụng Authenticator
+                  Ứng dụng Authenticator
                 </div>
               )}
               <label htmlFor={codeId}>Mã xác thực</label>
               <input
                 id={codeId}
+                ref={codeRef}
                 className="mfa-login-code"
                 type="text"
                 autoComplete="one-time-code"
@@ -170,7 +186,6 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
                 disabled={busy || code.length !== 6 || !factor}
               >
                 {busy ? "Đang xác minh…" : "Xác minh và tiếp tục"}
-                <ArrowRight size={17} />
               </button>
             </form>
           )}
@@ -182,7 +197,6 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
           {status && !status.required && (
             <a className="button" href="/account">
               Vào tài khoản
-              <ArrowRight size={17} />
             </a>
           )}
           <details className="mfa-login-help">
@@ -196,22 +210,13 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
             <button
               type="button"
               disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void post("/auth/logout")
-                  .then(() => window.location.assign("/"))
-                  .catch((e) => {
-                    setError(e.message);
-                    setBusy(false);
-                  });
-              }}
+              onClick={() => void cancelChallenge()}
             >
-              <ArrowLeft size={15} />
               Đăng nhập bằng tài khoản khác
             </button>
           </div>
         </section>
-      </div>
+      </Modal>
     );
   return (
     <section
