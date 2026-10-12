@@ -1437,22 +1437,26 @@ small,
 .reset-success .modal-title .icon-button { color: #a5aab6; }
 .reset-success > p { color: #a5aab6; font-size: 14px; line-height: 1.8; margin: 0 0 24px; }
 .reset-success > .button { width: 100%; background: #f38b58; color: #17120f; border-color: #f38b58; }
-.reset-password-animation { padding: 30px 0; text-align: center; }
-.reset-password-shield { width: 42px; height: 42px; color: #f38b58; margin-bottom: 20px; }
-.reset-password-slot { position: relative; height: 76px; overflow: hidden; border: 1px solid #45414a; background: #111216; border-radius: 10px; }
-.reset-password-slot > span { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 30px; letter-spacing: 6px; }
-.reset-password-old { color: #777d88; animation: reset-password-fall .75s ease-in both; }
-.reset-password-new { color: #f3a078; animation: reset-password-arrive .65s .55s ease-out both; }
+.reset-password-animation { padding: 8px 0 22px; }
+.reset-password-caption { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; color: #a6a6ad; font-size: 12px; }
+.reset-password-saved { display: inline-flex; align-items: center; gap: 5px; color: #b9c6b7; animation: reset-password-arrive .2s .95s both; }
+.reset-password-slot { position: relative; height: 48px; overflow: hidden; border: 1px solid #303136; background: #121316; border-radius: 6px; }
+.reset-password-slot > span { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 16px; gap: 7px; }
+.reset-password-slot i { display: block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.reset-password-old { color: #777d88; }
+.reset-password-new { color: #eeeef0; }
+.reset-password-old i { animation: reset-password-fall .3s cubic-bezier(.4,0,1,1) both; }
+.reset-password-new i { animation: reset-password-arrive .22s ease-out both; }
 @keyframes reset-password-fall {
-  from { transform: translateY(0) rotate(0); opacity: 1; }
-  to { transform: translateY(90px) rotate(12deg); opacity: 0; }
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(28px); opacity: 0; }
 }
 @keyframes reset-password-arrive {
-  from { transform: translateY(-45px); opacity: 0; }
+  from { transform: translateY(-4px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .reset-password-old { animation: none; opacity: 0; }
-  .reset-password-new { animation: none; }
+  .reset-password-old { opacity: 0; }
+  .reset-password-old i, .reset-password-new i, .reset-password-saved { animation: none; }
 }
 @media (max-width: 480px) { .modal.reset-success { padding: 24px 20px; } }

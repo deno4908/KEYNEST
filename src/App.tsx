@@ -2137,15 +2137,18 @@ function ResetPassword() {
       </form>
       {completed && <Modal title="Mật khẩu đã được cập nhật" className="reset-success"
         close={() => window.location.assign('/account')}>
-        <span className="auth-brand"><span>//</span> KEYNEST</span>
         <div className="reset-password-animation" aria-hidden="true">
-          <ShieldCheck className="reset-password-shield" />
+          <div className="reset-password-caption"><span>Mật khẩu</span><span className="reset-password-saved"><Check size={13} /> Đã lưu</span></div>
           <div className="reset-password-slot">
-            <span className="reset-password-old">••••••••</span>
-            <span className="reset-password-new">•••••••• <CheckCircle2 size={20} /></span>
+            <span className="reset-password-old">
+              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${160 + i * 35}ms` }} />)}
+            </span>
+            <span className="reset-password-new">
+              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${520 + i * 35}ms` }} />)}
+            </span>
           </div>
         </div>
-        <p>Mật khẩu mới đã sẵn sàng. Bạn có thể tiếp tục sử dụng tài khoản KEYNEST.</p>
+        <p>Lần đăng nhập tiếp theo, hãy dùng mật khẩu mới của bạn.</p>
         <button className="button" data-initial-focus onClick={() => window.location.assign('/account')}>
           Tiếp tục đến tài khoản <ArrowRight size={17} />
         </button>
