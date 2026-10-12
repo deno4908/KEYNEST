@@ -94,8 +94,8 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
     return (
       <Modal title="Xác thực hai bước" close={() => void cancelChallenge()} className="mfa-challenge-dialog">
         <section className="mfa-login-card" aria-labelledby={`${codeId}-title`}>
-          <div className={`mfa-login-icon${busy ? " is-verifying" : ""}`} aria-hidden="true">
-            <ShieldCheck size={34} strokeWidth={1.6} />
+          <div className="mfa-login-icon" aria-hidden="true">
+            <ShieldCheck size={32} strokeWidth={1.8} />
           </div>
           <h1 id={`${codeId}-title`}>
             {status && !status.required

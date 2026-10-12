@@ -332,23 +332,16 @@
   box-shadow: none;
 }
 .mfa-challenge-dialog .mfa-login-icon {
-  position: relative;
-  width: 68px;
-  height: 68px;
-  margin: 12px auto 24px;
-  border-radius: 18px;
+  width: 40px;
+  height: 40px;
+  margin: 20px auto 24px;
+  color: #c3c6ce;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   --flight-x: 0px;
   --flight-y: 24px;
   animation: oauth-flight 600ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.mfa-challenge-dialog .mfa-login-icon.is-verifying::after {
-  content: "";
-  position: absolute;
-  inset: -7px;
-  border: 2px solid #efaa8720;
-  border-top-color: #efaa87;
-  border-radius: 23px;
-  animation: oauth-spin 1200ms linear infinite;
 }
 .mfa-challenge-dialog .mfa-login-card > h1,
 .mfa-challenge-dialog .mfa-login-description {
