@@ -12,7 +12,14 @@ test('confirmation must match and success opens the themed password animation', 
     } else await route.fulfill({ status: 503, json: { error: 'Store unavailable' } });
   });
   await page.goto('/reset-password?recovery_id=00000000-0000-4000-8000-000000000001#token_hash=' + 'a'.repeat(56) + '&type=recovery');
+  await page.getByLabel(/^Mật khẩu mới/).fill('abcdefghij');
+  await expect(page.locator('#reset-password-rules .met')).toHaveCount(1);
+  await page.getByLabel('Nhập lại mật khẩu mới').fill('abcdefghij');
+  await page.getByRole('button', { name: 'Lưu mật khẩu' }).click();
+  await expect(page.getByRole('alert')).toContainText('đủ ba điều kiện');
+  expect(resets).toBe(0);
   await page.getByLabel(/^Mật khẩu mới/).fill('NewPassword123!');
+  await expect(page.locator('#reset-password-rules .met')).toHaveCount(3);
   await page.getByLabel('Nhập lại mật khẩu mới').fill('OtherPassword123!');
   await page.getByRole('button', { name: 'Lưu mật khẩu' }).click();
   await expect(page.getByRole('alert')).toContainText('Hai mật khẩu chưa khớp');

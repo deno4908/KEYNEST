@@ -2002,6 +2002,12 @@ function ResetPassword() {
   const { notify } = useStore();
   const [completed, setCompleted] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const passwordChecks = [
+    [newPasswordValue.length >= 10, '10 ký tự trở lên'],
+    [/[A-Z]/.test(newPasswordValue) && /[a-z]/.test(newPasswordValue), 'Chữ hoa & thường'],
+    [/\d/.test(newPasswordValue), 'Có chữ số'],
+  ] as const;
   const [tokens] = useState(() => {
     const q = new URLSearchParams(window.location.search);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -2051,6 +2057,11 @@ function ResetPassword() {
     const form = e.currentTarget;
     const values = new FormData(form);
     const newPassword = values.get("password");
+    if (!passwordChecks.every(([met]) => met)) {
+      setPasswordError('Mật khẩu mới cần đáp ứng đủ ba điều kiện bên dưới.');
+      form.querySelector<HTMLInputElement>('[name="password"]')?.focus();
+      return;
+    }
     if (newPassword !== values.get("confirmPassword")) {
       setPasswordError('Hai mật khẩu chưa khớp. Vui lòng nhập lại.');
       form.querySelector<HTMLInputElement>('[name="confirmPassword"]')?.focus();
@@ -2067,6 +2078,7 @@ function ResetPassword() {
         },
       );
       form.reset();
+      setNewPasswordValue('');
       setTicket(null);
       setCompleted(true);
     } catch (e) {
@@ -2091,12 +2103,22 @@ function ResetPassword() {
                 name="password"
                 type="password"
                 autoComplete="new-password"
+                value={newPasswordValue}
+                disabled={busy}
+                onChange={e => { setNewPasswordValue(e.target.value); setPasswordError(''); }}
+                aria-describedby="reset-password-rules"
                 required
                 minLength={10}
                 maxLength={128}
               />
-              <small>10 ký tự trở lên, có chữ hoa, chữ thường và số.</small>
             </label>
+            <div id="reset-password-rules" className="password-rules">
+              {passwordChecks.map(([met, label]) => (
+                <span key={label} className={met ? 'met' : ''}>
+                  <Check size={12} aria-hidden="true" />{label}
+                </span>
+              ))}
+            </div>
             <label>
               Nhập lại mật khẩu mới
               <input name="confirmPassword" type="password" autoComplete="new-password"
