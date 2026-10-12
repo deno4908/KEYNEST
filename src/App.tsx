@@ -2138,15 +2138,24 @@ function ResetPassword() {
       {completed && <Modal title="Mật khẩu đã được cập nhật" className="reset-success"
         close={() => window.location.assign('/account')}>
         <div className="reset-password-animation" aria-hidden="true">
-          <div className="reset-password-caption"><span>Mật khẩu</span><span className="reset-password-saved"><Check size={13} /> Đã lưu</span></div>
+          <div className="reset-password-caption">
+            <span className="reset-password-labels"><span>Mật khẩu cũ</span><span>Mật khẩu mới</span></span>
+            <span className="reset-password-saved">Đã lưu an toàn</span>
+          </div>
           <div className="reset-password-slot">
+            <svg className="reset-password-lock" width="20" height="24" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <path className="reset-password-shackle" d="M6 12V8a6 6 0 0 1 12 0v4" />
+              <rect x="3" y="12" width="18" height="13" rx="3" /><path d="M12 17v3" />
+            </svg>
             <span className="reset-password-old">
-              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${160 + i * 35}ms` }} />)}
+              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${350 + [0, 90, 35, 140, 65, 175, 110, 210][i]}ms` }} />)}
             </span>
             <span className="reset-password-new">
-              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${520 + i * 35}ms` }} />)}
+              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${960 + i * 55}ms` }} />)}
             </span>
+            <svg className="reset-password-tick" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" pathLength="1" /></svg>
           </div>
+          <div className="reset-password-timeline"><span>Đã thay thế mật khẩu cũ</span><span>Sẵn sàng đăng nhập</span></div>
         </div>
         <p>Lần đăng nhập tiếp theo, hãy dùng mật khẩu mới của bạn.</p>
         <button className="button" data-initial-focus onClick={() => window.location.assign('/account')}>
