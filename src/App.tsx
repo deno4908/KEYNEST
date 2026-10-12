@@ -2000,7 +2000,8 @@ function SupportPage() {
 }
 function ResetPassword() {
   const { notify } = useStore();
-  const navigate = useNavigate();
+  const [completed, setCompleted] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
   const [tokens] = useState(() => {
     const q = new URLSearchParams(window.location.search);
     const fragment = new URLSearchParams(window.location.hash.slice(1));
@@ -2046,9 +2047,18 @@ function ResetPassword() {
   }, []);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy || !ticket || completed) return;
+    const form = e.currentTarget;
+    const values = new FormData(form);
+    const newPassword = values.get("password");
+    if (newPassword !== values.get("confirmPassword")) {
+      setPasswordError('Hai mật khẩu chưa khớp. Vui lòng nhập lại.');
+      form.querySelector<HTMLInputElement>('[name="confirmPassword"]')?.focus();
+      return;
+    }
+    setPasswordError('');
     setBusy(true);
     try {
-      const newPassword = new FormData(e.currentTarget).get("password");
       await post(
         "/auth/reset",
         {
@@ -2056,9 +2066,9 @@ function ResetPassword() {
           password: newPassword,
         },
       );
-      notify("Mật khẩu đã cập nhật.");
-      navigate("/account");
-      window.location.reload();
+      form.reset();
+      setTicket(null);
+      setCompleted(true);
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -2069,7 +2079,9 @@ function ResetPassword() {
     <div className="container page">
       <form className="panel form reset-form" onSubmit={submit}>
         <h1>Đặt mật khẩu mới</h1>
-        {checkingLink ? (
+        {completed ? (
+          <p>Mật khẩu của bạn đã được cập nhật.</p>
+        ) : checkingLink ? (
           <p>Đang xác minh liên kết đặt lại mật khẩu…</p>
         ) : ticket ? (
           <>
@@ -2085,14 +2097,37 @@ function ResetPassword() {
               />
               <small>10 ký tự trở lên, có chữ hoa, chữ thường và số.</small>
             </label>
+            <label>
+              Nhập lại mật khẩu mới
+              <input name="confirmPassword" type="password" autoComplete="new-password"
+                required minLength={10} maxLength={128} disabled={busy}
+                aria-invalid={!!passwordError} aria-describedby={passwordError ? 'reset-password-error' : undefined}
+                onInput={() => setPasswordError('')} />
+            </label>
+            {passwordError && <p id="reset-password-error" role="alert">{passwordError}</p>}
             <button className="button" disabled={busy}>
-              Lưu mật khẩu
+              {busy ? 'Đang cập nhật…' : 'Lưu mật khẩu'}
             </button>
           </>
         ) : (
           <p role="alert">{linkError}</p>
         )}
       </form>
+      {completed && <Modal title="Mật khẩu đã được cập nhật" className="reset-success"
+        close={() => window.location.assign('/account')}>
+        <span className="auth-brand"><span>//</span> KEYNEST</span>
+        <div className="reset-password-animation" aria-hidden="true">
+          <ShieldCheck className="reset-password-shield" />
+          <div className="reset-password-slot">
+            <span className="reset-password-old">••••••••</span>
+            <span className="reset-password-new">•••••••• <CheckCircle2 size={20} /></span>
+          </div>
+        </div>
+        <p>Mật khẩu mới đã sẵn sàng. Bạn có thể tiếp tục sử dụng tài khoản KEYNEST.</p>
+        <button className="button" data-initial-focus onClick={() => window.location.assign('/account')}>
+          Tiếp tục đến tài khoản <ArrowRight size={17} />
+        </button>
+      </Modal>}
     </div>
   );
 }
