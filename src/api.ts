@@ -7,6 +7,12 @@ function receiveToken(res: Response) {
   if (token) accessToken = token;
 }
 
+function redirectTo(path: string) {
+  if (typeof window !== 'undefined' && window.location.pathname !== path) {
+    window.location.assign(path);
+  }
+}
+
 async function refreshAccess(): Promise<boolean> {
   if (refreshing) return refreshing;
   refreshing = (async () => {
@@ -54,18 +60,22 @@ export async function api<T>(
   if (path === '/auth/logout' && res.ok) accessToken = null;
   if (body.code === "ADMIN_OTP_REQUIRED" || body.admin_otp_required) {
     if (
+      typeof window !== 'undefined' &&
       !["/admin-verification", "/two-factor"].includes(window.location.pathname)
     )
-      window.location.assign("/admin-verification");
+      redirectTo("/admin-verification");
     throw new Error("Vui lòng xác minh OTP email dành cho admin.");
   }
   if (body.code === "MFA_REQUIRED" || body.mfa_required) {
-    if (window.location.pathname !== "/two-factor")
-      window.location.assign("/two-factor");
+    redirectTo("/two-factor");
     throw new Error("Vui lòng xác minh hai bước.");
   }
   if (!res.ok) throw new Error(body.error || "Không thể kết nối.");
-  if (!['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase())) {
+  if (
+    !['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase()) &&
+    typeof window !== 'undefined' &&
+    typeof CustomEvent !== 'undefined'
+  ) {
     window.dispatchEvent(new CustomEvent('keynest:data-changed', { detail: path }));
   }
   return body;
