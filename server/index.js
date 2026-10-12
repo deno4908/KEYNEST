@@ -13,6 +13,7 @@ import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
 import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
+import { createPasswordRecovery } from "./password-recovery.js";
 import { registerSupabase } from "./registration.js";
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
@@ -210,6 +211,7 @@ function demoSession(res, id) {
   res.cookie("kn_session", token, cookieOpts);
 }
 const adminOtp = createAdminOtp({ config, makeAuthClient });
+const passwordRecovery = createPasswordRecovery({ config, makeAuthClient });
 app.post('/api/auth/refresh', async (req, res) => {
   if (config.mode === 'demo') return res.json({ ok: true });
   if (!req.cookies.kn_refresh) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
@@ -545,9 +547,7 @@ app.post(
       throw new AppError(
         "Demo không gửi email. Hãy dùng tài khoản mẫu hoặc đăng ký mới.",
       );
-    await makeAuthClient().auth.resetPasswordForEmail(input.email, {
-      redirectTo: `${config.origin}/reset-password`,
-    });
+    await passwordRecovery.request(input.email);
     res.json({
       message: "Nếu email tồn tại, hướng dẫn đặt lại mật khẩu sẽ được gửi.",
     });
@@ -557,27 +557,25 @@ app.post("/api/auth/reset", async (req, res) => {
   if (config.mode === "demo")
     throw new AppError("Chức năng này cần Supabase Auth.");
   const input = z
-    .object({
-      access_token: z.string().min(20).max(8000),
-      refresh_token: z.string().min(10).max(1000),
-      password,
-    })
-    .strict()
+    .union([
+      z
+        .object({
+          token_hash: z.string().min(20).max(1024),
+          type: z.literal("recovery"),
+          password,
+        })
+        .strict(),
+      z
+        .object({
+          access_token: z.string().min(20).max(8000),
+          refresh_token: z.string().min(10).max(1000),
+          password,
+        })
+        .strict(),
+    ])
     .parse(req.body);
-  const client = makeAuthClient();
-  const { data, error } = await client.auth.setSession({
-    access_token: input.access_token,
-    refresh_token: input.refresh_token,
-  });
-  if (error || !data.user) throw new AppError("Liên kết đã hết hạn.", 401);
-  if (
-    !data.user.recovery_sent_at ||
-    Date.now() - Date.parse(data.user.recovery_sent_at) > 60 * 60000
-  )
-    throw new AppError("Liên kết đặt lại mật khẩu không hợp lệ.", 401);
-  const updated = await client.auth.updateUser({ password: input.password });
-  if (updated.error) throw new AppError("Không thể đặt mật khẩu mới.");
-  setAuth(res, data.session);
+  const session = await passwordRecovery.complete(input);
+  setAuth(res, session);
   res.json({ message: "Mật khẩu đã được cập nhật." });
 });
 app.get("/api/me", auth, async (req, res) => res.json(req.user));
