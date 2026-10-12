@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { useDataRefresh } from './useDataRefresh';
 import { api, money, post } from "./api";
 import { Modal } from "./App";
 import {
@@ -29,6 +30,7 @@ export function AdminCustomers() {
   const [notice, setNotice] = useState("");
   const [page, setPage] = useState(1);
   const [version, setVersion] = useState(0);
+  useDataRefresh(() => setVersion(v => v + 1), ['/admin/customers/', '/admin/sellers/']);
   const [selected, setSelected] = useState<Customer | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");

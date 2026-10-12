@@ -1,6 +1,7 @@
 ﻿import { useEffect, useRef, useState } from "react";
 import { Check, FolderOpen, Package, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api, post } from "./api";
+import { useDataRefresh } from './useDataRefresh';
 import { useStore } from "./App";
 import type { Product } from "./types";
 import "./admin-categories.css";
@@ -51,6 +52,10 @@ export function AdminCategories({
   const [sort, setSort] = useState("order");
   const [expanded, setExpanded] = useState<string | null>(null);
   const nameInput = useRef<HTMLInputElement>(null);
+  useDataRefresh(async () => {
+    try { setRows(await api<CategoryRow[]>("/categories")); }
+    catch (e) { setError((e as Error).message); }
+  }, ['/admin/categories']);
   useEffect(() => {
     let active = true;
     api<CategoryRow[]>("/categories")

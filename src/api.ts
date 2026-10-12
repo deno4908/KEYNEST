@@ -38,6 +38,7 @@ export async function api<T>(
     headers.set('X-App-Request', 'keynest');
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     return fetch(`/api${path}`, {
+    cache: 'no-store',
     ...options,
     credentials: "same-origin",
     headers,
@@ -64,6 +65,9 @@ export async function api<T>(
     throw new Error("Vui lòng xác minh hai bước.");
   }
   if (!res.ok) throw new Error(body.error || "Không thể kết nối.");
+  if (!['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase())) {
+    window.dispatchEvent(new CustomEvent('keynest:data-changed', { detail: path }));
+  }
   return body;
 }
 export const post = <T>(

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDataRefresh } from './useDataRefresh';
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -98,6 +99,7 @@ export function Admin() {
     await load();
     await refresh();
   };
+  useDataRefresh(load, ['/admin/', '/seller/', '/tickets']);
   async function doAction(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -609,6 +611,14 @@ export function ProductEditor({
     [busy, setBusy] = useState(false),
     [uploading, setUploading] = useState(false),
     [variant, setVariant] = useState<Partial<Variant> | null>(null);
+  useDataRefresh(async () => {
+    if (!product.id) return;
+    try {
+      const data = await api<{ products: Product[] }>(`/${scope}/overview`);
+      const updated = data.products.find(p => p.id === product.id);
+      if (updated) setProduct(current => ({ ...current, variants: updated.variants }));
+    } catch (e) { notify((e as Error).message, true); }
+  }, [`/${scope}/inventory/`]);
   async function saveProduct(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);

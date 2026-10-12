@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 test("seller onboarding, product editor, contact and withdrawal screens", async ({
   page,
   playwright,
+  baseURL,
 }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -18,9 +19,9 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     )
     .toBe(200);
   const admin = await playwright.request.newContext({
-    baseURL: "http://127.0.0.1:5173",
+    baseURL,
     extraHTTPHeaders: {
-      Origin: "http://127.0.0.1:5173",
+      Origin: baseURL!,
       "X-App-Request": "keynest",
     },
   });
@@ -31,7 +32,7 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
   const suffix = Date.now(),
     email = `seller-ui-${suffix}@example.test`;
   const register = await page.request.post("/api/auth/register", {
-    headers: { Origin: "http://127.0.0.1:5173", "X-App-Request": "keynest" },
+    headers: { Origin: baseURL!, "X-App-Request": "keynest" },
     data: { email, password: "Seller123!", name: `Seller UI ${suffix}` },
   });
   expect(register.ok()).toBeTruthy();
@@ -111,6 +112,21 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     .last()
     .click();
   await expect(dialog.locator(".admin-variant")).toContainText("Standard");
+  // Saving must update the list behind the open editor, without navigation.
+  await expect(page.locator(".seller-product-list")).toContainText("10 tồn kho");
+  await dialog.getByRole("button", { name: "Thêm gói", exact: true }).click();
+  await dialog.locator('.variant-form input[name="name"]').fill("Instant key");
+  await dialog.locator('.variant-form select[name="delivery"]').selectOption("key");
+  await dialog.locator('.variant-form button[type="submit"], .variant-form button:not([type])').last().click();
+  const keyRow = dialog.locator(".admin-variant").filter({ hasText: "Instant key" });
+  await expect(keyRow).toContainText("Tồn 0");
+  await keyRow.getByRole("button", { name: "Nhập mã" }).click();
+  const importDialog = page.getByRole("dialog").filter({ hasText: "Nhập mã · Instant key" });
+  await importDialog.locator("textarea").fill(`UI-KEY-${suffix}-A\nUI-KEY-${suffix}-B`);
+  await importDialog.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  await expect(importDialog).not.toBeVisible();
+  await expect(keyRow).toContainText("Tồn 2");
+  await expect(page.locator(".seller-product-list")).toContainText("12 tồn kho");
   await page.keyboard.press("Escape");
   await expect(page.locator(".seller-product-list")).toContainText(
     `Seller Product ${suffix}`,

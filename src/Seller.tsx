@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDataRefresh } from './useDataRefresh';
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -235,6 +236,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     await load();
     await refresh();
   };
+  useDataRefresh(load, ['/seller/', '/admin/']);
   useEffect(() => {
     if (user?.role === "seller") void load();
   }, [user?.id, user?.role]);
@@ -650,6 +652,7 @@ export function AdminSellers() {
   useEffect(() => {
     void load();
   }, []);
+  useDataRefresh(load, ['/admin/', '/seller/']);
   async function fee(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);

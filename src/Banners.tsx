@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, post } from "./api";
+import { useDataRefresh } from './useDataRefresh';
 import { Modal, useStore } from "./App";
 import type { Banner } from "./types";
 
@@ -24,6 +25,10 @@ export function BannerSlider() {
   const [paused, setPaused] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(document.hidden);
+  useDataRefresh(async () => {
+    try { setBanners(await api<Banner[]>("/banners")); setIndex(0); }
+    catch { /* Keep the current banner on a temporary connection failure. */ }
+  }, ['/admin/banners']);
   useEffect(() => {
     const controller = new AbortController();
     api<Banner[]>("/banners", { signal: controller.signal })
@@ -183,6 +188,7 @@ export function BannerManager() {
     api<Banner[]>("/admin/banners")
       .then(setBanners)
       .catch((e) => setError(e.message));
+  useDataRefresh(load, ['/admin/banners']);
   useEffect(() => {
     load();
   }, []);

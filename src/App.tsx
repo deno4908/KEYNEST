@@ -1,4 +1,5 @@
 import { TwoFactor } from "./TwoFactor";
+import { useDataRefresh } from './useDataRefresh';
 import { AdminVerification } from "./AdminVerification";
 import { HomeAnnouncements } from "./Announcements";
 import { LegalPage, SocialLinks } from "./LegalPages";
@@ -321,21 +322,33 @@ export function App() {
     setCartState(items);
     localStorage.setItem("kn-cart", JSON.stringify(items));
   };
+  const refreshVersion = useRef(0);
   const refresh = async () => {
-    await Promise.all([
-      api<Product[]>("/products").then(setProducts),
-      api<User>("/me").catch(() => null).then(setUser),
-      api<{ id: string; name: string }[]>('/categories').then(updateCategories),
+    const version = ++refreshVersion.current;
+    const [products, user, rows] = await Promise.all([
+      api<Product[]>("/products"),
+      api<User>("/me"),
+      api<{ id: string; name: string }[]>('/categories'),
     ]);
+    if (version !== refreshVersion.current) return;
+    updateCategories(rows);
+    setProducts(products);
+    setUser(user);
   };
+  useDataRefresh(() => refresh().catch(e => notify(e.message, true)), ['/admin/', '/seller/']);
   useEffect(() => {
     // Session restoration must not delay public storefront rendering.
     api<User>("/me").then(setUser).catch(() => setUser(null)).finally(() => setReady(true));
     Promise.all([
-      api<Product[]>("/products").then(setProducts),
-      api<{ id: string; name: string }[]>('/categories').then(updateCategories),
+      api<Product[]>("/products"),
+      api<{ id: string; name: string }[]>('/categories'),
       api<{ mode: string }>("/config").then((c) => setMode(c.mode)),
     ])
+      .then(([products, rows]) => {
+        if (refreshVersion.current !== 0) return;
+        updateCategories(rows);
+        setProducts(products);
+      })
       .catch((e) => setLoadError(e.message))
       .finally(() => setCatalogReady(true));
   }, []);
