@@ -41,6 +41,37 @@ try {
       ),
     );
   pass("migration compiles with pgcrypto and all functions");
+  const recoveryUser = randomUUID();
+  const recoveryId = randomUUID();
+  const recoveryEmailHash = "a".repeat(64);
+  const recoveryTicketHash = "b".repeat(64);
+  const recoveryExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const recoveryNow = new Date().toISOString();
+  await db.query("insert into auth.users(id,email) values($1,'recovery@example.test')", [recoveryUser]);
+  await db.query(`insert into password_recovery_links(email_hash,recovery_id,expires_at,consumed_at)
+    values($1,$2,$3,$4)`, [recoveryEmailHash, recoveryId, recoveryExpires, recoveryNow]);
+  await db.query(`insert into password_recovery_tickets
+    (ticket_hash,email_hash,recovery_id,user_id,encrypted_session,expires_at)
+    values($1,$2,$3,$4,'encrypted-session',$5)`,
+    [recoveryTicketHash, recoveryEmailHash, recoveryId, recoveryUser, recoveryExpires]);
+  const firstClaim = await db.query("select * from claim_password_recovery_reset($1,$2)",
+    [recoveryTicketHash, recoveryNow]);
+  assert.equal(firstClaim.rows.length, 1);
+  assert.equal(firstClaim.rows[0].user_id, recoveryUser);
+  assert.deepEqual((await db.query("select * from claim_password_recovery_reset($1,$2)",
+    [recoveryTicketHash, recoveryNow])).rows, []);
+  const staleTicketHash = "c".repeat(64);
+  await db.query(`insert into password_recovery_tickets
+    (ticket_hash,email_hash,recovery_id,user_id,encrypted_session,expires_at)
+    values($1,$2,$3,$4,'encrypted-session',$5)`,
+    [staleTicketHash, recoveryEmailHash, recoveryId, recoveryUser, recoveryExpires]);
+  await db.query("update password_recovery_links set recovery_id=$2, consumed_at=null where email_hash=$1",
+    [recoveryEmailHash, randomUUID()]);
+  assert.deepEqual((await db.query("select * from claim_password_recovery_reset($1,$2)",
+    [staleTicketHash, recoveryNow])).rows, []);
+  assert.equal(await scalar("select has_function_privilege('authenticated','claim_password_recovery_reset(text,timestamptz)','EXECUTE')"), false);
+  assert.equal(await scalar("select has_function_privilege('service_role','claim_password_recovery_reset(text,timestamptz)','EXECUTE')"), true);
+  pass("password recovery links/tickets expire, reject replay and stale generations, and only service_role can claim");
   const missingProfile = randomUUID(), existingProfile = randomUUID();
   await db.query("insert into auth.users(id,email) values($1,'existing-profile@example.test')", [existingProfile]);
   await db.query("update profiles set role='seller',balance=12345 where id=$1", [existingProfile]);

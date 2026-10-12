@@ -2004,13 +2004,38 @@ function ResetPassword() {
     return {
       token_hash: q.get("token_hash"),
       type: q.get("type"),
+      recovery_id: q.get("recovery_id"),
     };
   });
   const validRecoveryLink =
-    tokens.type === "recovery" && Boolean(tokens.token_hash);
+    tokens.type === "recovery" &&
+    Boolean(tokens.token_hash) &&
+    Boolean(tokens.recovery_id);
   const [busy, setBusy] = useState(false);
+  const [ticket, setTicket] = useState<string | null>(null);
+  const [checkingLink, setCheckingLink] = useState(validRecoveryLink);
   useEffect(() => {
     window.history.replaceState(null, "", window.location.pathname);
+    if (!validRecoveryLink) return;
+    let active = true;
+    // Deferring one task lets React StrictMode cancel its first development-only
+    // effect pass before it consumes this single-use recovery link.
+    const timer = window.setTimeout(() => {
+      post<{ ticket: string }>("/auth/reset/verify", tokens)
+        .then(({ ticket: resetTicket }) => {
+          if (active) setTicket(resetTicket);
+        })
+        .catch(() => {
+          if (active) setTicket(null);
+        })
+        .finally(() => {
+          if (active) setCheckingLink(false);
+        });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, []);
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -2020,8 +2045,7 @@ function ResetPassword() {
       await post(
         "/auth/reset",
         {
-          token_hash: tokens.token_hash,
-          type: "recovery",
+          ticket,
           password: newPassword,
         },
       );
@@ -2038,7 +2062,9 @@ function ResetPassword() {
     <div className="container page">
       <form className="panel form reset-form" onSubmit={submit}>
         <h1>Đặt mật khẩu mới</h1>
-        {validRecoveryLink ? (
+        {checkingLink ? (
+          <p>Đang xác minh liên kết đặt lại mật khẩu…</p>
+        ) : ticket ? (
           <>
             <label>
               Mật khẩu mới
@@ -2057,7 +2083,7 @@ function ResetPassword() {
             </button>
           </>
         ) : (
-          <p>Liên kết không hợp lệ. Hãy yêu cầu email khôi phục mới.</p>
+          <p>Liên kết đã hết hạn hoặc không hợp lệ. Hãy yêu cầu email khôi phục mới.</p>
         )}
       </form>
     </div>

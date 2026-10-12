@@ -1,145 +1,232 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { AppError } from "../server/security.js";
 import { createPasswordRecovery } from "../server/password-recovery.js";
 
-test("recovery request uses the KEYNEST reset page and reports mail errors", async () => {
-  let request;
-  const logs = [];
-  const service = createPasswordRecovery({
-    config: { origin: "https://keynest.store" },
-    makeAuthClient: () => ({
-      auth: {
-        resetPasswordForEmail: async (...args) => {
-          request = args;
-          return {
-            error: {
-              code: "smtp_error",
-              status: 500,
-              message: "Delivery failed for user@example.com",
-            },
-          };
-        },
+const encryption = "ab".repeat(32);
+const emailHash = "email-hash";
+const user = { id: "user-1", email: "user@example.com" };
+const session = { access_token: "access", refresh_token: "refresh" };
+
+function memoryRepository(now) {
+  let currentLink = null;
+  const tickets = new Map();
+  return {
+    tickets,
+    get currentLink() {
+      return currentLink;
+    },
+    async issueLink(link) {
+      currentLink = { ...link, consumedAt: null };
+    },
+    async consumeLink({ recoveryId, now: timestamp }) {
+      if (
+        !currentLink ||
+        currentLink.recoveryId !== recoveryId ||
+        currentLink.consumedAt ||
+        Date.parse(currentLink.expiresAt) <= Date.parse(timestamp)
+      )
+        return null;
+      currentLink.consumedAt = timestamp;
+      return { expires_at: currentLink.expiresAt };
+    },
+    async createTicket(ticket) {
+      tickets.set(ticket.ticket_hash, { ...ticket, consumed_at: null });
+    },
+    async claimTicket(ticketHash, timestamp) {
+      const ticket = tickets.get(ticketHash);
+      if (
+        !ticket ||
+        ticket.consumed_at ||
+        Date.parse(ticket.expires_at) <= Date.parse(timestamp) ||
+        currentLink?.recoveryId !== ticket.recovery_id ||
+        !currentLink.consumedAt
+      )
+        return null;
+      ticket.consumed_at = timestamp;
+      return {
+        user_id: ticket.user_id,
+        encrypted_session: ticket.encrypted_session,
+      };
+    },
+  };
+}
+
+function authClient({ verified = true, calls = [] } = {}) {
+  return {
+    auth: {
+      resetPasswordForEmail: async (...args) => {
+        calls.push(["resetPasswordForEmail", ...args]);
+        return { error: null };
       },
-    }),
-    logger: { error: (...args) => logs.push(args) },
+      verifyOtp: async (input) => {
+        calls.push(["verifyOtp", input]);
+        return verified
+          ? { data: { user, session }, error: null }
+          : { data: {}, error: new Error("invalid token") };
+      },
+      setSession: async (input) => {
+        calls.push(["setSession", input]);
+        return { data: { session }, error: null };
+      },
+      updateUser: async (input) => {
+        calls.push(["updateUser", input]);
+        return { data: { user }, error: null };
+      },
+    },
+  };
+}
+
+test("recovery request makes a fresh, ten-minute generation in the allowed reset URL", async () => {
+  const now = Date.parse("2026-10-12T00:00:00Z");
+  const repository = memoryRepository(now);
+  const calls = [];
+  const service = createPasswordRecovery({
+    config: { origin: "https://keynest.store", encryption },
+    store: {},
+    repository,
+    clock: () => now,
+    makeAuthClient: () => authClient({ calls }),
   });
 
-  await assert.rejects(
-    service.request("user@example.com"),
-    (error) => error instanceof AppError && error.status === 502,
+  await service.request(" User@Example.com ");
+  const firstId = repository.currentLink.recoveryId;
+  await service.request("user@example.com");
+  const secondId = repository.currentLink.recoveryId;
+  const sentUrl = new URL(calls.at(-1)[2].redirectTo);
+
+  assert.notEqual(firstId, secondId);
+  assert.equal(sentUrl.origin, "https://keynest.store");
+  assert.equal(sentUrl.pathname, "/reset-password");
+  assert.equal(sentUrl.searchParams.get("recovery_id"), secondId);
+  assert.equal(
+    Date.parse(repository.currentLink.expiresAt) - now,
+    10 * 60 * 1000,
   );
-  assert.deepEqual(request, [
-    "user@example.com",
-    { redirectTo: "https://keynest.store/reset-password" },
-  ]);
-  assert.equal(logs.length, 1);
-  assert.doesNotMatch(JSON.stringify(logs), /user@example\.com/);
 });
 
-test("recovery verifies the one-time hash on submit and rejects replay", async () => {
-  const now = Date.now();
+test("opening a recovery link consumes it once and returns an in-memory reset ticket", async () => {
+  const now = Date.parse("2026-10-12T00:00:00Z");
+  const repository = memoryRepository(now);
   const calls = [];
-  let tokenUsed = false;
-  const session = { access_token: "access", refresh_token: "refresh" };
   const service = createPasswordRecovery({
-    config: { origin: "https://keynest.store" },
+    config: { origin: "https://keynest.store", encryption },
+    store: {},
+    repository,
     clock: () => now,
-    makeAuthClient: () => ({
-      auth: {
-        verifyOtp: async (input) => {
-          calls.push(["verifyOtp", input]);
-          if (tokenUsed)
-            return { data: {}, error: new Error("token already used") };
-          tokenUsed = true;
-          return {
-            data: {
-              user: { recovery_sent_at: new Date(now - 1000).toISOString() },
-              session,
-            },
-            error: null,
-          };
-        },
-        updateUser: async (input) => {
-          calls.push(["updateUser", input]);
-          return { error: null };
-        },
-      },
-    }),
+    makeAuthClient: () => authClient({ calls }),
   });
-
+  await service.request(user.email);
+  const recoveryId = repository.currentLink.recoveryId;
   const input = {
     token_hash: "a".repeat(64),
-    password: "NewPassword123!",
+    type: "recovery",
+    recovery_id: recoveryId,
   };
-  const result = await service.complete(input);
-  assert.equal(result, session);
+
+  const { ticket } = await service.redeem(input);
+  assert.ok(ticket);
+  assert.equal(repository.tickets.size, 1);
+  assert.notEqual([...repository.tickets.values()][0].email_hash, user.email);
   await assert.rejects(
-    service.complete(input),
+    service.redeem(input),
     (error) => error instanceof AppError && error.status === 401,
   );
-  assert.deepEqual(calls, [
-    ["verifyOtp", { token_hash: "a".repeat(64), type: "recovery" }],
-    ["updateUser", { password: "NewPassword123!" }],
-    ["verifyOtp", { token_hash: "a".repeat(64), type: "recovery" }],
-  ]);
+  assert.equal(calls.filter(([name]) => name === "verifyOtp").length, 2);
 });
 
-test("recovery rejects a link older than ten minutes", async () => {
-  const now = Date.now();
-  let passwordUpdated = false;
+test("an older email link and its reset ticket stop working after a newer request", async () => {
+  const now = Date.parse("2026-10-12T00:00:00Z");
+  const repository = memoryRepository(now);
   const service = createPasswordRecovery({
-    config: { origin: "https://keynest.store" },
+    config: { origin: "https://keynest.store", encryption },
+    store: {},
+    repository,
     clock: () => now,
-    makeAuthClient: () => ({
-      auth: {
-        verifyOtp: async () => ({
-          data: {
-            user: {
-              recovery_sent_at: new Date(
-                now - 10 * 60 * 1000 - 1,
-              ).toISOString(),
-            },
-            session: { access_token: "access", refresh_token: "refresh" },
-          },
-          error: null,
-        }),
-        updateUser: async () => {
-          passwordUpdated = true;
-          return { error: null };
-        },
-      },
-    }),
+    makeAuthClient: () => authClient(),
   });
-
+  await service.request(user.email);
+  const oldId = repository.currentLink.recoveryId;
+  await service.request(user.email);
   await assert.rejects(
-    service.complete({
+    service.redeem({
       token_hash: "a".repeat(64),
-      password: "NewPassword123!",
+      type: "recovery",
+      recovery_id: oldId,
     }),
     (error) => error instanceof AppError && error.status === 401,
   );
-  assert.equal(passwordUpdated, false);
+
+  const currentId = repository.currentLink.recoveryId;
+  const { ticket } = await service.redeem({
+    token_hash: "b".repeat(64),
+    type: "recovery",
+    recovery_id: currentId,
+  });
+  await service.request(user.email);
+  await assert.rejects(
+    service.complete({ ticket, password: "NewPassword123!" }),
+    (error) => error instanceof AppError && error.status === 401,
+  );
 });
 
-test("recovery rejects expired or already-invalid hashes", async () => {
+test("reset tickets can be claimed once and expire ten minutes after issuance", async () => {
+  let now = Date.parse("2026-10-12T00:00:00Z");
+  const repository = memoryRepository(now);
+  const calls = [];
   const service = createPasswordRecovery({
-    config: { origin: "https://keynest.store" },
-    makeAuthClient: () => ({
-      auth: {
-        verifyOtp: async () => ({
-          data: {},
-          error: new Error("invalid token"),
-        }),
-      },
-    }),
+    config: { origin: "https://keynest.store", encryption },
+    store: {},
+    repository,
+    clock: () => now,
+    makeAuthClient: () => authClient({ calls }),
+  });
+  await service.request(user.email);
+  const { ticket } = await service.redeem({
+    token_hash: "a".repeat(64),
+    type: "recovery",
+    recovery_id: repository.currentLink.recoveryId,
   });
 
+  const outcomes = await Promise.allSettled([
+    service.complete({ ticket, password: "NewPassword123!" }),
+    service.complete({ ticket, password: "NewPassword123!" }),
+  ]);
+  assert.equal(
+    outcomes.filter((result) => result.status === "fulfilled").length,
+    1,
+  );
+  assert.equal(calls.filter(([name]) => name === "updateUser").length, 1);
+
+  await service.request(user.email);
+  const { ticket: expiringTicket } = await service.redeem({
+    token_hash: "b".repeat(64),
+    type: "recovery",
+    recovery_id: repository.currentLink.recoveryId,
+  });
+  now += 10 * 60 * 1000;
   await assert.rejects(
-    service.complete({
-      token_hash: "a".repeat(64),
-      password: "NewPassword123!",
+    service.complete({ ticket: expiringTicket, password: "NewPassword123!" }),
+    (error) => error instanceof AppError && error.status === 401,
+  );
+});
+
+test("unknown provider hashes are rejected without producing reset tickets", async () => {
+  const repository = memoryRepository(Date.now());
+  const service = createPasswordRecovery({
+    config: { origin: "https://keynest.store", encryption },
+    store: {},
+    repository,
+    makeAuthClient: () => authClient({ verified: false }),
+  });
+  await assert.rejects(
+    service.redeem({
+      token_hash: "c".repeat(64),
+      type: "recovery",
+      recovery_id: randomUUID(),
     }),
     (error) => error instanceof AppError && error.status === 401,
   );
+  assert.equal(repository.tickets.size, 0);
 });

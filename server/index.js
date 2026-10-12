@@ -211,7 +211,7 @@ function demoSession(res, id) {
   res.cookie("kn_session", token, cookieOpts);
 }
 const adminOtp = createAdminOtp({ config, makeAuthClient });
-const passwordRecovery = createPasswordRecovery({ config, makeAuthClient });
+const passwordRecovery = createPasswordRecovery({ config, makeAuthClient, store });
 app.post('/api/auth/refresh', async (req, res) => {
   if (config.mode === 'demo') return res.json({ ok: true });
   if (!req.cookies.kn_refresh) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
@@ -553,13 +553,25 @@ app.post(
     });
   },
 );
-app.post("/api/auth/reset", async (req, res) => {
+app.post("/api/auth/reset/verify", async (req, res) => {
   if (config.mode === "demo")
     throw new AppError("Chức năng này cần Supabase Auth.");
   const input = z
     .object({
       token_hash: z.string().min(20).max(1024),
       type: z.literal("recovery"),
+      recovery_id: z.string().uuid(),
+    })
+    .strict()
+    .parse(req.body);
+  res.json(await passwordRecovery.redeem(input));
+});
+app.post("/api/auth/reset", async (req, res) => {
+  if (config.mode === "demo")
+    throw new AppError("Chức năng này cần Supabase Auth.");
+  const input = z
+    .object({
+      ticket: z.string().min(32).max(256),
       password,
     })
     .strict()
