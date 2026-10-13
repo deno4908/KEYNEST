@@ -215,7 +215,7 @@ export function createOperations(store) {
         } catch {
           identity = null;
         }
-        if (!identity || typeof identity !== "string")
+        if (!z.uuid().safeParse(identity).success)
           throw new AppError("Phiên không hợp lệ.", 401);
       }
       const token_hash = digest(`${uid}:${identity}`);
@@ -227,6 +227,7 @@ export function createOperations(store) {
             id: randomUUID(),
             user_id: uid,
             token_hash,
+            demo_token_hash: digest(token),
             user_agent: (req.get("user-agent") || "").slice(0, 300),
             created_at: now(),
             revoked_at: null,
@@ -234,24 +235,21 @@ export function createOperations(store) {
           rows("app_sessions").push(session);
           store.save();
         }
+        if (!session.demo_token_hash) {
+          session.demo_token_hash = digest(token);
+          store.save();
+        }
       } else {
-        await query(
-          store.client.from("app_sessions").upsert(
-            {
-              user_id: uid,
-              token_hash,
-              user_agent: (req.get("user-agent") || "").slice(0, 300),
-            },
-            { onConflict: "token_hash", ignoreDuplicates: true },
-          ),
-        );
         session = await query(
-          store.client
-            .from("app_sessions")
-            .select("id,revoked_at")
-            .eq("token_hash", token_hash)
-            .single(),
+          store.client.rpc("authorize_app_session", {
+            p_user: uid, p_session: identity, p_hash: token_hash,
+            p_agent: (req.get("user-agent") || "").slice(0, 300),
+          }),
         );
+        if (session?.status === "suspended")
+          throw new AppError("Tài khoản đang bị khóa. Vui lòng liên hệ hỗ trợ.", 403);
+        if (session?.status !== "ok")
+          throw new AppError("Phiên đã bị thu hồi. Vui lòng đăng nhập lại.", 401);
       }
       if (session.revoked_at)
         throw new AppError("Phiên đã bị thu hồi. Vui lòng đăng nhập lại.", 401);
@@ -279,7 +277,7 @@ export function createOperations(store) {
           current: id === current,
         }));
     },
-    async revoke(uid, id, except) {
+    async revoke(uid, id, except, accessToken) {
       if (demo) {
         const selected = rows("app_sessions").filter(
           (s) => s.user_id === uid && (!id || s.id === id) && s.id !== except,
@@ -287,17 +285,27 @@ export function createOperations(store) {
         if (id && !selected.length)
           throw new AppError("Không tìm thấy phiên.", 404);
         for (const s of selected) s.revoked_at ||= now();
+        const keep = rows("app_sessions").find(s => s.user_id === uid && s.id === except);
+        // Remove the source sessions too, including those never registered by authorize.
+        store.db.sessions = store.db.sessions.filter(s => {
+          if (s.user_id !== uid) return true;
+          // Demo tokens are stored as digests; app_sessions use the original cookie.
+          const tracked = rows("app_sessions").find(a => a.user_id === uid && a.demo_token_hash === s.token);
+          if (id) return !selected.some(a => a.id === tracked?.id);
+          return !!keep && keep.demo_token_hash === s.token;
+        });
         store.save();
       } else {
-        let q = store.client
-          .from("app_sessions")
-          .update({ revoked_at: now() })
-          .eq("user_id", uid);
-        if (id) q = q.eq("id", id);
-        if (except) q = q.neq("id", except);
-        const result = await query(q.select("id"));
-        if (id && !result.length)
+        const result = await query(store.client.rpc("revoke_app_sessions", {
+          p_user: uid, p_id: id || null, p_except: except || null,
+        }));
+        if (!result)
           throw new AppError("Không tìm thấy phiên.", 404);
+        // The DB cutoff remains effective even if the Auth provider is unavailable.
+        if (!id && accessToken) {
+          const { error } = await store.client.auth.admin.signOut(accessToken, except ? "others" : "global");
+          if (error) throw new AppError("Đã chặn các phiên trên KEYNEST nhưng chưa đồng bộ được với dịch vụ đăng nhập. Hãy thử lại.", 503);
+        }
       }
     },
     async access(actor, uid, input) {
@@ -573,7 +581,7 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
       .strict()
       .refine((v) => !!v.id !== !!v.others)
       .parse(req.body);
-    await ops.revoke(req.user.id, id, others ? req.sessionId : undefined);
+    await ops.revoke(req.user.id, id, others ? req.sessionId : undefined, req.authToken);
     res.json({ success: true });
   });
   router.get("/notifications", auth, async (req, res) =>

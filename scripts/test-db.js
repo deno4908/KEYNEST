@@ -27,6 +27,7 @@ try {
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
  create schema auth; grant usage on schema auth,public to anon,authenticated,service_role;
  create table auth.users(id uuid primary key,email text,encrypted_password text,raw_user_meta_data jsonb default '{}');
+ create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id),created_at timestamptz default now());
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant execute on function auth.uid() to anon,authenticated,service_role;`);
   for (const name of (
@@ -496,8 +497,8 @@ try {
     other,
   ]);
   await db.exec("set role authenticated");
-  assert.equal(Number(await scalar("select count(*) from orders")), 0);
-  assert.equal(Number(await scalar("select count(*) from profiles")), 1);
+  await fails("select * from orders");
+  await fails("select * from profiles");
   await fails("update profiles set role='admin'");
   await fails("select create_order($1,$2,$3)", [
     user,
@@ -1082,23 +1083,9 @@ try {
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [
     other,
   ]);
-  assert.equal(
-    Number(
-      await scalar("select count(*) from ticket_messages where ticket_id=$1", [
-        adminTicket,
-      ]),
-    ),
-    0,
-  );
+  await fails("select * from ticket_messages where ticket_id=$1", [adminTicket]);
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
-  assert.equal(
-    Number(
-      await scalar("select count(*) from ticket_messages where ticket_id=$1", [
-        adminTicket,
-      ]),
-    ),
-    3,
-  );
+  await fails("select * from ticket_messages where ticket_id=$1", [adminTicket]);
   await db.exec("reset role");
   pass(
     "support history RLS and warranty-linked external refunds do not credit wallet or execute twice",
@@ -1431,6 +1418,68 @@ try {
   assert.equal(await scalar('select status from seller_withdrawals where id=$1',[finalWithdrawal.id]),'paid');
   pass('seller ownership, terms, 7% settlement, immutable fees, duplicate callbacks, withdrawal holds and refund debt');
   }
+  // Browser credentials cannot bypass Node MFA/suspension via PostgREST.
+  await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);
+  await db.exec("select set_config('request.jwt.claim.aal','aal1',false)");
+  await db.query("update account_controls set suspended=true where user_id=$1", [user]);
+  for (const role of ['anon', 'authenticated']) {
+    for (const table of ['profiles','orders','order_items','payments','wallet_ledger','tickets','ticket_messages']) {
+      assert.equal(await scalar('select has_any_column_privilege($1,$2,\'SELECT\')', [role, table]), false);
+      await db.exec(`set role ${role}`);
+      await fails(`select * from ${table}`);
+      await db.exec('reset role');
+    }
+  }
+  await db.exec('set role service_role');
+  assert.ok(Number(await scalar('select count(*) from tickets where user_id=$1', [user])) > 0);
+  await db.exec('reset role');
+  pass('private tables deny browser SELECT including column grants, suspended owners and AAL1; backend retains access');
+
+  const sessionUser = randomUUID(), currentAuth = randomUUID(), dormantAuth = randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'session-cutoff@example.test')", [sessionUser]);
+  await db.query("insert into auth.sessions(id,user_id,created_at) values($1,$3,now()-interval '1 hour'),($2,$3,now()-interval '1 hour')", [currentAuth,dormantAuth,sessionUser]);
+  const authorizeSession = (session, hash = session, uid = sessionUser) => scalar(
+    'select authorize_app_session($1,$2,$3,$4)', [uid,session,hash,'Regression browser']);
+  await db.exec('set role service_role');
+  const currentSession = await authorizeSession(currentAuth);
+  assert.equal(currentSession.status, 'ok');
+  assert.equal((await authorizeSession(dormantAuth,dormantAuth,other)).status, 'revoked');
+  assert.equal(await scalar('select revoke_app_sessions($1,null,$2)', [sessionUser,currentSession.id]), true);
+  assert.equal((await authorizeSession(currentAuth)).status, 'ok');
+  assert.equal((await authorizeSession(dormantAuth)).status, 'revoked');
+  assert.equal((await authorizeSession(dormantAuth)).status, 'revoked');
+  assert.equal(Number(await scalar('select count(*) from app_sessions where user_id=$1', [sessionUser])), 1);
+  await db.exec('reset role');
+  const freshAuth = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [freshAuth,sessionUser]);
+  await db.exec('set role service_role');
+  const freshSession = await authorizeSession(freshAuth);
+  assert.equal(freshSession.status, 'ok');
+  assert.equal(await scalar('select revoke_app_sessions($1,$2,null)', [other,freshSession.id]), false);
+  assert.equal(await scalar('select revoke_app_sessions($1,null,$2)', [sessionUser,freshSession.id]), true);
+  assert.equal((await authorizeSession(currentAuth)).status, 'revoked');
+  assert.equal((await authorizeSession(freshAuth)).status, 'ok');
+  assert.equal(await scalar('select revoke_app_sessions($1,$2,null)', [sessionUser,freshSession.id]), true);
+  assert.equal((await authorizeSession(freshAuth)).status, 'revoked');
+  await db.exec('reset role');
+  const suspendedAuth = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [suspendedAuth,sessionUser]);
+  const pendingRevoker = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [pendingRevoker,sessionUser]);
+  const pendingSession = await authorizeSession(pendingRevoker);
+  await db.query('update account_controls set suspended=true where user_id=$1', [sessionUser]);
+  assert.equal(await scalar('select revoke_app_sessions($1,null,$2)', [sessionUser,pendingSession.id]), false);
+  assert.equal((await authorizeSession(suspendedAuth)).status, 'suspended');
+  await db.query('update account_controls set suspended=false where user_id=$1', [sessionUser]);
+  assert.equal((await authorizeSession(suspendedAuth)).status, 'revoked');
+  assert.equal((await authorizeSession(pendingRevoker)).status, 'revoked');
+  const finalAuth = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [finalAuth,sessionUser]);
+  assert.equal((await authorizeSession(finalAuth)).status, 'ok');
+  assert.equal(await scalar('select revoke_app_sessions($1)', [sessionUser]), true);
+  assert.equal((await authorizeSession(finalAuth)).status, 'revoked');
+  assert.equal((await authorizeSession(randomUUID())).status, 'revoked');
+  pass('session cutoff rejects unregistered/old sessions, preserves current, allows new login, blocks cross-owner and suspension revival');
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

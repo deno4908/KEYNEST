@@ -104,7 +104,12 @@ export function accountRouter({
             400,
           );
         }
-        await operations?.revoke(req.user.id);
+        if (operations) {
+          // Keep only the freshly password-verified replacement session.
+          const replacement = { user: req.user, get: (name) => req.get(name) };
+          await operations.authorize(replacement, data.session.access_token);
+          await operations.revoke(req.user.id, undefined, replacement.sessionId, data.session.access_token);
+        }
         setAuth(res, data.session);
       }
       res.json({ message: "Đã cập nhật mật khẩu." });

@@ -61,7 +61,17 @@ Chọn gói chỉ còn một mã; thử mua quá số lượng. Không được 
 
 ### 7. RLS
 
-`npm run test:db` chạy nguyên migration rồi dùng `SET ROLE anon/authenticated` và JWT subject stub. Anon không đọc inventory/profile; user B không đọc đơn A; authenticated không cập nhật role và không gọi RPC tiền bằng quyền trực tiếp. Kiểm tra hosted tương tự bằng anon key/access token của hai tài khoản trên dự án Supabase thử nghiệm.
+`npm run test:db` chạy nguyên migration rồi dùng `SET ROLE anon/authenticated` và JWT subject stub. Cả hai role không được đọc trực tiếp `profiles`, `orders`, `order_items`, `payments`, `wallet_ledger`, `tickets`, `ticket_messages`, kể cả dữ liệu của chính mình. Node dùng service role và kiểm tra chủ dữ liệu, MFA, khóa tài khoản và trạng thái phiên. Các bảng danh mục công khai giữ quyền đọc theo RLS.
+
+### 8. Thu hồi phiên
+
+Chạy `supabase/migrations/031_private_data_sessions.sql` sau các migration trước đó, **trước khi triển khai backend tương ứng**. Migration chỉ đọc `auth.sessions`, không sửa schema hoặc xóa dữ liệu Supabase Auth. Chạy bằng role quản trị database có quyền tạo hàm và đọc bảng Auth; không cấp quyền đó cho browser.
+
+`authorize_app_session` đối chiếu `session_id` của JWT đã được xác minh với `auth.sessions.user_id` và thời điểm tạo phiên gốc. `revoke_app_sessions` ghi mốc thu hồi theo tài khoản, giữ ngoại lệ cho phiên hiện tại khi chọn “các phiên khác”. Hai hàm khóa cùng hàng profile để tuần tự hóa việc đăng ký/thu hồi phiên. Refresh JWT không thay đổi thời điểm tạo phiên gốc. Khóa rồi mở lại tài khoản cũng không khôi phục phiên cũ.
+
+Sau khi ghi mốc thu hồi, backend gọi Supabase Auth sign-out scope `others` để thu hồi các phiên còn lại ở nhà cung cấp. Nếu dịch vụ này lỗi, mốc thu hồi vẫn chặn API KEYNEST và endpoint trả lỗi để người dùng thử lại. Thu hồi riêng một phiên chặn phiên đó tại API KEYNEST. Đổi mật khẩu giữ phiên mới vừa xác minh bằng mật khẩu và thu hồi các phiên khác.
+
+Kiểm thử HTTP tạo một phiên chưa từng gọi API riêng tư rồi thu hồi từ phiên khác; phiên chưa đăng ký phải nhận 401. Kiểm thử PostgreSQL bao gồm phiên cũ, phiên hiện tại, đăng nhập mới, thu hồi lặp, khóa/mở tài khoản, sai chủ dữ liệu và quyền RPC. PGlite dùng bảng `auth.sessions` mô phỏng; cần kiểm tra thêm trên Supabase thử nghiệm với hai trình duyệt và refresh token thật. Tham chiếu: [Supabase session_id và auth.sessions](https://supabase.com/docs/guides/auth/sessions).
 
 ## Bằng chứng kiểm tra
 

@@ -127,6 +127,7 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
   await t.test(
     "session revocation is owner-scoped and survives renewed requests",
     async () => {
+      const unregistered = (await login()).cookie;
       const second = (await login()).cookie;
       const current = (await req("/me/sessions", second)).data.find(
         (s) => s.current,
@@ -147,7 +148,10 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
         200,
       );
       assert.equal((await req("/me", second)).status, 401);
+      assert.equal((await req("/me", unregistered)).status, 401);
+      assert.equal((await req("/me", unregistered)).status, 401);
       assert.equal((await req("/me", buyer)).status, 200);
+      assert.equal((await req("/me", (await login()).cookie)).status, 200);
     },
   );
   await t.test(
