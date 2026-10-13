@@ -15,6 +15,8 @@ import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
 import { createPasswordTransport } from './password-transport.js';
+import { createSupabaseNonceStore } from './request-nonces.js';
+import { apiAccessGuard } from './api-access.js';
 import { registerSupabase } from "./registration.js";
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
@@ -194,9 +196,10 @@ function setAuth(res, s) {
 }
 const verifyCaptcha = captchaGuard(config.captcha);
 app.post(['/api/auth/login', '/api/auth/register', '/api/auth/forgot'], verifyCaptcha);
-const passwordTransport = createPasswordTransport(config.encryption);
+const passwordTransport = createPasswordTransport(config.encryption, undefined, {
+  ...(config.mode === 'supabase' ? { nonceStore: createSupabaseNonceStore(store), requireEncrypted: true } : {}),
+});
 app.get('/api/auth/password-key', (req, res) => res.json(passwordTransport.publicKey()));
-app.use('/api', passwordTransport.middleware.bind(passwordTransport));
 app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
 function clearAuth(res) {
   adminOtp.clear(res);
@@ -235,8 +238,10 @@ app.post('/api/auth/refresh', async (req, res) => {
   setAuth(res, data.session);
   res.json({ ok: true });
 });
+const authorized = Symbol('authorized-request');
 const auth = async (req, res, next) => {
   try {
+    if (req[authorized]) return next();
     let verifiedToken = req.cookies.kn_session;
     if (config.mode === "demo") {
       const s = store.db.sessions.find(
@@ -253,6 +258,7 @@ const auth = async (req, res, next) => {
       req.authUser = verified.user;
       req.authToken = verifiedToken;
     }
+    if (!req.user) throw new AppError('Vui lòng đăng nhập lại.', 401);
     await operations.authorize(req, verifiedToken);
     if (
       req.authUser &&
@@ -263,7 +269,11 @@ const auth = async (req, res, next) => {
         .status(403)
         .json({ error: "Vui lòng xác minh hai bước.", code: "MFA_REQUIRED" });
     }
-    return adminOtp.guard(req, res, next);
+    return adminOtp.guard(req, res, error => {
+      if (error) return next(error);
+      req[authorized] = true;
+      next();
+    });
   } catch (e) {
     if (e.status === 401) return res.status(401).json({ error: e.message, code: 'AUTH_REQUIRED' });
     next(e);
@@ -274,6 +284,8 @@ const admin = (req, res, next) =>
     ? next()
     : next(new AppError("Bạn không có quyền quản trị.", 403));
 const uuid = z.uuid();
+app.use('/api', apiAccessGuard({ auth, admin }));
+app.use('/api', passwordTransport.middleware.bind(passwordTransport));
 app.use("/api/auth/mfa", mfaRouter({ config, auth, limiter, setAuth }));
 app.use('/api', categoriesRouter({ categories: categoryStore, auth, admin, limiter, store }));
 app.use("/api/auth/admin-otp", adminOtp.router({ auth, limiter }));

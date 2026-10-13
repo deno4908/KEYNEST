@@ -32,6 +32,7 @@ async function refreshAccess(): Promise<boolean> {
 export async function api<T>(
   path: string,
   options: RequestInit = {},
+  prepareBody?: () => Promise<string>,
 ): Promise<T> {
   // Public storefront requests can start while the session is being restored.
   // Private routes and every mutation still wait for authentication as before.
@@ -39,7 +40,7 @@ export async function api<T>(
     ['/config', '/products', '/categories', '/catalog', '/banners', '/promotions', '/announcements'].includes(path.split('?')[0]);
   const recovery = ['/auth/reset/verify', '/auth/reset'].includes(path);
   if (!initialized && !publicRead && !recovery) await refreshAccess();
-  const send = () => {
+  const send = async () => {
     const headers = new Headers(options.headers);
     if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     headers.set('X-App-Request', 'keynest');
@@ -47,6 +48,7 @@ export async function api<T>(
     return fetch(`/api${path}`, {
     cache: 'no-store',
     ...options,
+    ...(prepareBody ? { body: await prepareBody() } : {}),
     credentials: "same-origin",
     headers,
     });
@@ -89,7 +91,8 @@ export const post = async <T>(
   if (['/auth/login', '/auth/register', '/auth/reset', '/me/password'].includes(path) &&
       body && typeof body === 'object' && 'password' in body) {
     const { protectPasswordRequest } = await import('./password-transport');
-    body = await protectPasswordRequest(path, body);
+    // A retry after session refresh is a new request with a fresh nonce.
+    return api<T>(path, { method: 'POST', headers }, async () => JSON.stringify(await protectPasswordRequest(path, body)));
   }
   return api<T>(path, { method: "POST", body: JSON.stringify(body), headers });
 };

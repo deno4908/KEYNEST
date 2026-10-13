@@ -32,3 +32,7 @@ Khi điều tra 401, log backend `Password recovery rejected` có `stage: provid
 ## Kiểm tra mật khẩu đã dùng (migration 029)
 
 Chạy `029_password_history.sql` sau 028 và trước khi triển khai backend có kiểm tra lịch sử mật khẩu. Backend chặn mật khẩu hiện tại và mật khẩu đã thay thế trong 30 ngày; nếu bị từ chối, người dùng có thể chọn mật khẩu khác trên cùng trang mà không cần email mới. Không cần sửa template email cho tính năng này. Xem [hướng dẫn triển khai và phạm vi áp dụng](../../docs/PASSWORD-SECURITY.md).
+
+## Chống phát lại request mật khẩu (migration 030)
+
+Chạy `030_password_request_nonces.sql` trước khi triển khai phiên bản bắt buộc request mật khẩu mã hóa. Nonce dùng một lần được kiểm tra chung trong database; thiếu migration, các yêu cầu đăng nhập/đăng ký/đổi/reset mật khẩu bị từ chối với 503. Cập nhật cả frontend và backend, tải lại các tab cũ. Không cần sửa template email.

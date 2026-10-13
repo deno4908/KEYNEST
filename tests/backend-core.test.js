@@ -58,10 +58,10 @@ test("non-payment backend: catalog, account, inventory and ownership", async (t)
   await t.test('encrypted browser credentials reach the normal login verifier', async () => {
     const key = await request('/auth/password-key');
     assert.equal(key.status, 200);
-    const { jwk, kid, timestamp } = key.body;
+    const { jwk, kid, timestamp, nonce } = key.body;
     assert.equal('d' in jwk, false);
     const encrypted_credentials = await new CompactEncrypt(new TextEncoder().encode(JSON.stringify({
-      path: '/auth/login', iat: timestamp, body: { email: 'student@keynest.local', password: 'Student123!' },
+      path: '/auth/login', iat: timestamp, nonce, body: { email: 'student@keynest.local', password: 'Student123!' },
     }))).setProtectedHeader({ alg: 'ECDH-ES', enc: 'A256GCM', kid, typ: 'keynest-password+jwe' })
       .encrypt(await importJWK(jwk, 'ECDH-ES'));
     const response = await request('/auth/login', { method: 'POST', body: { encrypted_credentials } });
@@ -69,6 +69,7 @@ test("non-payment backend: catalog, account, inventory and ownership", async (t)
     assert.equal(response.body.id, customer.body.id);
     assert.equal('password_hash' in response.body, false);
     assert.equal('password_history' in response.body, false);
+    assert.equal((await request('/auth/login', { method: 'POST', body: { encrypted_credentials } })).status, 409);
   });
 
   await t.test(

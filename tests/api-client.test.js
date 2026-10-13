@@ -113,3 +113,18 @@ test('frontend does not loop on rejected access tokens', async t => {
   await assert.rejects(api('/me'), /Denied/);
   assert.equal(attempts, 4);
 });
+
+test('session refresh retries prepare a fresh encrypted request body', async t => {
+  let refreshes = 0, prepared = 0;
+  const bodies = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    if (url === '/api/auth/refresh') return response({}, 200, ++refreshes === 1 ? 'expired' : 'renewed');
+    bodies.push(options.body);
+    if (options.headers.get('Authorization') === 'Bearer expired') return response({ code: 'AUTH_REQUIRED' }, 401);
+    return response({ ok: true });
+  });
+  const { api } = await client();
+  await api('/me/password', { method: 'POST' }, async () => JSON.stringify({ encrypted_credentials: `request-${++prepared}` }));
+  assert.equal(refreshes, 2);
+  assert.deepEqual(bodies, ['{"encrypted_credentials":"request-1"}', '{"encrypted_credentials":"request-2"}']);
+});
