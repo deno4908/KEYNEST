@@ -618,7 +618,7 @@ export function ProductEditor({
       const updated = data.products.find(p => p.id === product.id);
       if (updated) setProduct(current => ({ ...current, variants: updated.variants }));
     } catch (e) { notify((e as Error).message, true); }
-  }, [`/${scope}/inventory/`]);
+  }, [`/${scope}/inventory/`], { intervalMs: scope === 'seller' ? 10000 : 0 });
   async function saveProduct(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);

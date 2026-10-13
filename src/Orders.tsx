@@ -1,3 +1,4 @@
+import { OrderChatButton } from './OrderChat';
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -705,6 +706,7 @@ function OrderDetails({ id }: { id: string }) {
             </div>
             {order.items.map((item) => (
               <div className="order-delivery-item" key={item.id}>
+                {item.seller_id && <OrderChatButton itemId={item.id} />}
                 <div className="order-delivery-label">
                   <strong>{item.name}</strong>
                   <span>{item.variant_name}</span>

@@ -174,6 +174,25 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   assert.equal(order.status, 201);
   const owner = store.db.users.find((u) => u.id === seller.id),
     rawOrder = store.db.orders.find((o) => o.id === order.body.id);
+  assert.equal(owner.balance, 0);
+  assert.equal(
+    (
+      await req(
+        `/seller/items/${rawOrder.items[0].id}/fulfill`,
+        { secrets: ["Delivered"] },
+        login.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(owner.balance, 0);
+  const mature = (o) => {
+    o.items.forEach((i) => {
+      i.delivered_at = new Date(Date.now() - 49 * 3600000).toISOString();
+    });
+    settleSellerRevenue(store, o);
+  };
+  mature(rawOrder);
   assert.equal(owner.balance, 93000);
   assert.equal(rawOrder.items[0].seller_fee, 7000);
   settleSellerRevenue(store, rawOrder);
@@ -189,6 +208,8 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   const pay = store.db.payments.find((p) => p.order_id === pending.body.id);
   store.settle("seller-bank", pay.code, pay.amount);
   store.settle("seller-bank", pay.code, pay.amount);
+  assert.equal(owner.balance, 93000);
+  mature(store.db.orders.find((o) => o.id === pending.body.id));
   assert.equal(owner.balance, 186000);
   const w = {
     amount: 50000,
@@ -249,7 +270,7 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
         login.cookie,
       )
     ).status,
-    200,
+    409,
   );
   assert.equal(
     (
@@ -292,6 +313,7 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   );
   const next = await req("/orders", orderPayload, buyer.cookie);
   assert.equal(next.status, 201);
+  mature(store.db.orders.find((o) => o.id === next.body.id));
   assert.equal(owner.seller_debt, 2000);
   assert.equal(owner.balance, 0);
   const overview = await req("/seller/overview", null, login.cookie);
@@ -300,6 +322,160 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   const publicProduct = store.products().find((p) => p.id === product.id);
   assert.equal(publicProduct.seller.name, "Seller Test");
   assert.equal(publicProduct.seller.email, undefined);
+  const acceptedAt = owner.seller_terms_accepted_at;
+  assert.equal(
+    (
+      await req(
+        "/seller/profile/name",
+        { name: "Seller renamed" },
+        login.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(owner.seller_terms_accepted_at, acceptedAt);
+  assert.equal(
+    (
+      await req(
+        `/seller/products/${foreign.id}/visibility`,
+        { active: false },
+        login.cookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await req(
+        `/seller/products/${product.id}/visibility`,
+        { active: false },
+        login.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(product.active, false);
+  await req(
+    `/seller/products/${product.id}/visibility`,
+    { active: true },
+    login.cookie,
+  );
+  store.db.users.find((u) => u.email === "student@keynest.local").balance =
+    1000000;
+  const escrow = await req("/orders", orderPayload, buyer.cookie);
+  assert.equal(escrow.status, 201);
+  const escrowOrder = store.db.orders.find((o) => o.id === escrow.body.id),
+    escrowItem = escrowOrder.items[0];
+  const outsider = store.register(
+    "outsider-seller@example.test",
+    "Outsider123!",
+    "Outsider",
+  );
+  const outsiderLogin = await req("/auth/login", {
+    email: outsider.email,
+    password: "Outsider123!",
+  });
+  assert.equal(
+    (await req(`/order-chat/${escrowItem.id}`, null, outsiderLogin.cookie))
+      .status,
+    403,
+  );
+  const message = {
+    action: "message",
+    body: "Can you check my order?",
+    request_id: randomUUID(),
+  };
+  assert.equal(
+    (await req(`/order-chat/${escrowItem.id}`, message, buyer.cookie)).status,
+    200,
+  );
+  assert.equal(
+    (await req(`/order-chat/${escrowItem.id}`, message, buyer.cookie)).status,
+    200,
+  );
+  assert.equal(
+    (await req(`/order-chat/${escrowItem.id}`, null, login.cookie)).body
+      .messages.length,
+    1,
+  );
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        { action: "request", body: "Product delivery needs a refund review" },
+        buyer.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        { action: "agree" },
+        buyer.cookie,
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        { action: "agree" },
+        login.cookie,
+      )
+    ).body.dispute.status,
+    "agreed",
+  );
+  const beforeHold = owner.balance;
+  mature(escrowOrder);
+  assert.equal(owner.balance, beforeHold);
+  const escrowOverview = await req("/seller/overview", null, login.cookie);
+  assert.ok(escrowOverview.body.held >= 90000);
+  assert.equal(
+    escrowOverview.body.sales.find((s) => s.id === escrowItem.id).seller_frozen,
+    true,
+  );
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        { action: "reject", body: "Seller cannot unfreeze their own payout" },
+        login.cookie,
+      )
+    ).status,
+    403,
+  );
+  const buyerUser = store.db.users.find((u) => u.id === escrowOrder.user_id),
+    beforeRefund = buyerUser.balance;
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        {
+          action: "refund",
+          body: "Confirmed refund after reviewing the order",
+        },
+        admin.cookie,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(buyerUser.balance, beforeRefund + escrowOrder.total);
+  assert.equal(owner.balance, beforeHold);
+  assert.equal(
+    (
+      await req(
+        `/order-chat/${escrowItem.id}`,
+        { action: "refund", body: "Repeated refund must not credit again" },
+        admin.cookie,
+      )
+    ).status,
+    409,
+  );
+  settleSellerRevenue(store, escrowOrder);
+  assert.equal(owner.balance, beforeHold);
   await req(
     "/admin/sellers/role",
     { user_id: seller.id, role: "customer" },

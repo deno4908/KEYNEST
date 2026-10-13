@@ -2,7 +2,8 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError, encrypt } from "./security.js";
-import { requireSeller } from "./seller-accounting.js";
+import { requireSeller, releaseSellerFunds } from "./seller-accounting.js";
+import { sellerConversation } from "./seller-conversations.js";
 import { SELLER_TERMS_VERSION, sellerTerms } from "../shared/seller-terms.js";
 
 export function createSellers(store) {
@@ -57,7 +58,9 @@ export function createSellers(store) {
         seller_social_links: [],
         seller_terms_version: data.terms_version,
         seller_terms_accepted_at:
-          user.seller_terms_accepted_at || new Date().toISOString(),
+          user.seller_terms_version === data.terms_version
+            ? user.seller_terms_accepted_at || new Date().toISOString()
+            : new Date().toISOString(),
       });
     } else if (action === "role") {
       const target = store.db.users.find(
@@ -161,6 +164,95 @@ export function createSellers(store) {
   }
   return {
     fee,
+    async support(uid, id = null, body = null) {
+      if (!demo)
+        return store.query(
+          store.client.rpc("seller_support", {
+            p_actor: uid,
+            p_ticket: id,
+            p_body: body,
+          }),
+        );
+      const eligible = store.db.tickets.filter(
+        (t) =>
+          !t.deleted_at &&
+          (!id || t.id === id) &&
+          store.db.orders.some(
+            (o) =>
+              o.id === t.order_id &&
+              o.items.length &&
+              o.items.every((i) => i.seller_id === uid),
+          ),
+      );
+      if (body !== null) {
+        const ticket = eligible[0];
+        if (!ticket)
+          throw new AppError("Không tìm thấy yêu cầu của gian hàng.", 404);
+        if (ticket.status === "closed")
+          throw new AppError("Yêu cầu đã đóng.", 409);
+        ticket.messages ||= [];
+        ticket.messages.push({
+          id: randomUUID(),
+          role: "seller",
+          author_id: uid,
+          body,
+          created_at: new Date().toISOString(),
+        });
+        ticket.updated_at = new Date().toISOString();
+        store.db.notifications ||= [];
+        store.db.notifications.push({
+          id: `seller-reply:${randomUUID()}`,
+          user_id: ticket.user_id,
+          title: "Người bán đã phản hồi yêu cầu hỗ trợ",
+          href: "/support",
+          created_at: ticket.updated_at,
+        });
+        store.save();
+        return { ok: true };
+      }
+      return eligible.map(
+        ({
+          id,
+          subject,
+          message,
+          kind,
+          status,
+          created_at,
+          updated_at,
+          messages,
+          order_id,
+        }) => ({
+          id,
+          subject,
+          message,
+          kind,
+          status,
+          created_at,
+          updated_at,
+          messages: messages || [],
+          order_number: store.db.orders.find((o) => o.id === order_id)?.number,
+        }),
+      );
+    },
+    async visibility(uid, id, active) {
+      if (demo) {
+        ownProduct(uid, id).active = active;
+        store.save();
+      } else {
+        const rows = await store.query(
+          store.client
+            .from("products")
+            .update({ active })
+            .eq("id", id)
+            .eq("seller_id", uid)
+            .select("id"),
+        );
+        if (!rows.length)
+          throw new AppError("Không tìm thấy sản phẩm của bạn.", 404);
+      }
+      await store.audit(uid, "seller_visibility", `${id}:${active}`);
+      return { ok: true };
+    },
     async command(actor, action, data) {
       if (demo) return demoCommand(actor, action, data);
       if (data.secrets) {
@@ -176,16 +268,39 @@ export function createSellers(store) {
       );
     },
     async overview(uid) {
+      if (demo) {
+        releaseSellerFunds(store);
+        store.save();
+      } else
+        await store.query(
+          store.client.rpc("release_seller_funds", { p_seller: uid }),
+        );
       const profile = await store.profile(uid);
-      const products = (await store.products(true)).filter(
-        (p) => p.seller_id === uid,
-      );
+      // Scope at the database before pagination, rather than loading every seller.
+      const all = async (query) => {
+        const result = [];
+        for (let offset = 0; ; offset += 500) {
+          const batch = await store.query(query().range(offset, offset + 499));
+          result.push(...batch);
+          if (batch.length < 500) return result;
+        }
+      };
+      const products = demo
+        ? store.products(true).filter((p) => p.seller_id === uid)
+        : await all(() =>
+            store.client
+              .from("products")
+              .select("*,variants(*)")
+              .eq("seller_id", uid)
+              .order("id"),
+          );
       const sales = demo
         ? store.db.orders.flatMap((o) =>
             o.items
               .filter((i) => i.seller_id === uid)
               .map((i) => ({
                 ...i,
+                order_id: o.id,
                 order: {
                   number: o.number,
                   status: o.status,
@@ -195,7 +310,7 @@ export function createSellers(store) {
                 },
               })),
           )
-        : await store.query(
+        : await all(() =>
             store.client
               .from("order_items")
               .select(
@@ -204,7 +319,29 @@ export function createSellers(store) {
               .eq("seller_id", uid)
               .order("id"),
           );
+      const orderIds = [...new Set(sales.map((s) => s.order_id))];
+      const disputes = demo
+        ? (store.db.seller_disputes || []).filter((d) =>
+            orderIds.includes(d.order_id),
+          )
+        : orderIds.length
+          ? await all(() =>
+              store.client
+                .from("seller_disputes")
+                .select("order_id,status")
+                .in("order_id", orderIds)
+                .order("order_id"),
+            )
+          : [];
       for (const sale of sales) {
+        sale.seller_frozen = disputes.some(
+          (d) =>
+            d.order_id === sale.order_id &&
+            ["open", "agreed"].includes(d.status),
+        );
+        sale.seller_hold_until = sale.delivered_at
+          ? new Date(Date.parse(sale.delivered_at) + 48 * 3600000).toISOString()
+          : null;
         if (
           sale.delivery !== "manual" ||
           !["processing", "completed"].includes(sale.order.status)
@@ -213,18 +350,37 @@ export function createSellers(store) {
       }
       const withdrawals = demo
         ? store.db.seller_withdrawals.filter((w) => w.user_id === uid)
-        : await store.query(
+        : await all(() =>
             store.client
               .from("seller_withdrawals")
               .select("*")
               .eq("user_id", uid)
-              .order("created_at", { ascending: false }),
+              .order("created_at", { ascending: false })
+              .order("id"),
           );
       return {
         profile,
         products,
         sales,
         withdrawals,
+        held: sales
+          .filter(
+            (s) =>
+              s.seller_gross != null &&
+              !s.seller_settled_at &&
+              !s.seller_reversed_at,
+          )
+          .reduce((n, s) => n + Number(s.seller_net || 0), 0),
+        ledger: demo
+          ? store.ledger(uid)
+          : await all(() =>
+              store.client
+                .from("wallet_ledger")
+                .select("id,amount,description,created_at")
+                .eq("user_id", uid)
+                .order("created_at", { ascending: false })
+                .order("id"),
+            ),
         fee_bps: await fee(),
         terms_version: SELLER_TERMS_VERSION,
         terms: sellerTerms,
@@ -269,7 +425,16 @@ export function createSellers(store) {
               .select("*")
               .order("created_at", { ascending: false }),
           );
-      return { sellers, withdrawals, fee_bps: await fee() };
+      const disputes = demo
+        ? store.db.seller_disputes || []
+        : await store.query(
+            store.client
+              .from("seller_disputes")
+              .select("*")
+              .order("created_at", { ascending: false })
+              .limit(500),
+          );
+      return { sellers, withdrawals, disputes, fee_bps: await fee() };
     },
   };
 }
@@ -287,6 +452,40 @@ export function sellersRouter({
   const router = Router(),
     sellers = createSellers(store),
     uuid = z.string().uuid();
+  router.get(
+    "/order-chat/:id",
+    auth,
+    limiter(120, 60000, "order-chat-read"),
+    async (req, res) =>
+      res.json(
+        await sellerConversation(store, req.user.id, uuid.parse(req.params.id)),
+      ),
+  );
+  router.post(
+    "/order-chat/:id",
+    auth,
+    limiter(20, 60000, "order-chat-write"),
+    async (req, res) => {
+      const input = z
+        .object({
+          action: z.enum(["message", "request", "agree", "reject", "refund"]),
+          body: z.string().trim().max(3000).default(""),
+          request_id: uuid.optional(),
+        })
+        .strict()
+        .parse(req.body);
+      res.json(
+        await sellerConversation(
+          store,
+          req.user.id,
+          uuid.parse(req.params.id),
+          input.action,
+          input.body,
+          input.request_id,
+        ),
+      );
+    },
+  );
   router.use(
     "/seller",
     auth,
@@ -326,9 +525,41 @@ export function sellersRouter({
     await categoryStore.require(input.category);
     res.json(await sellers.command(req.user.id, "product", input));
   });
+  router.post("/seller/profile/name", async (req, res) => {
+    const { name } = z
+      .object({ name: z.string().trim().min(2).max(80) })
+      .strict()
+      .parse(req.body);
+    if (store.db) {
+      store.db.users.find((u) => u.id === req.user.id).seller_name = name;
+      store.save();
+    } else await store.updateProfile(req.user.id, { seller_name: name });
+    res.json(await store.profile(req.user.id));
+  });
+  router.get("/seller/support", async (req, res) =>
+    res.json(await sellers.support(req.user.id)),
+  );
+  router.post("/seller/support/:id/messages", async (req, res) => {
+    const { body } = z
+      .object({ body: z.string().trim().min(3).max(3000) })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await sellers.support(req.user.id, uuid.parse(req.params.id), body),
+    );
+  });
   router.delete("/seller/products/:id", async (req, res) => {
     await store.deleteProduct(uuid.parse(req.params.id), req.user.id);
     res.json({ ok: true });
+  });
+  router.post("/seller/products/:id/visibility", async (req, res) => {
+    const { active } = z
+      .object({ active: z.boolean() })
+      .strict()
+      .parse(req.body);
+    res.json(
+      await sellers.visibility(req.user.id, uuid.parse(req.params.id), active),
+    );
   });
   router.post("/seller/products/:id/variants", async (req, res) =>
     res.json(

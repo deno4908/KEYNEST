@@ -46,10 +46,10 @@ export function TicketHistory({
       </article>
       {messages.map((m) => (
         <article className={`thread-message ${m.role}`} key={m.id}>
-          {m.role === "admin" ? <span className="thread-avatar thread-brand" aria-label="KEYNEST">//</span> : <Avatar className="thread-avatar" name={name} url={avatarUrl} />}
+          {m.role === "admin" ? <span className="thread-avatar thread-brand" aria-label="KEYNEST">//</span> : <Avatar className="thread-avatar" name={m.role === 'seller' ? 'Người bán' : name} url={m.role === 'seller' ? null : avatarUrl} />}
           <div className="thread-bubble">
             <header>
-              <strong>{m.role === "admin" ? "KEYNEST hỗ trợ" : name}</strong>
+              <strong>{m.role === "admin" ? "KEYNEST hỗ trợ" : m.role === 'seller' ? 'Người bán' : name}</strong>
               <time>
                 {m.created_at ? date(m.created_at) : "Phản hồi trước đây"}
               </time>

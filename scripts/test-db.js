@@ -1,3 +1,4 @@
+import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
 // Executes the exact Supabase migration in an ephemeral PostgreSQL (WASM) instance.
 // Supabase Auth is replaced only by a local users table and auth.uid() claim stub.
 // No network credentials, persistent files or live databases are used.
@@ -1356,7 +1357,7 @@ try {
   await fails('select seller_command($1,$2,$3)',[user,'role',JSON.stringify({user_id:sid,role:'seller'})]);
   await sellerCommand(other,'role',{user_id:sid,role:'seller'});
   await fails('select require_seller($1)',[sid]);
-  await sellerCommand(sid,'profile',{name:'Seller DB',terms_version:'2026-10-11-v1',fee_bps:700,accepted:true});
+  await sellerCommand(sid,'profile',{name:'Seller DB',terms_version:SELLER_TERMS_VERSION,fee_bps:700,accepted:true});
   const sellerProduct=await sellerCommand(sid,'product',{slug:'seller-db',name:'Seller DB product',category:'game',platform:'PC',subcategory:'',subtitle:'',description:'',image:'',active:true});
   const sellerVariant=randomUUID();
   await db.query("insert into variants(id,product_id,name,price,original_price,delivery,stock,region) values($1,$2,'Manual',100000,100000,'manual',20,'Global')",[sellerVariant,sellerProduct.id]);
@@ -1367,6 +1368,12 @@ try {
   await fails('select create_order($1,$2,$3)',[sid,JSON.stringify(sellerPayload),randomUUID()]);
   const saleKey=randomUUID();
   const saleOrder=await scalar('select create_order($1,$2,$3)',[user,JSON.stringify(sellerPayload),saleKey]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),0);
+  const mature = async oid => {
+    await db.query("update order_items set delivered_at=clock_timestamp()-interval '49 hours' where order_id=$1",[oid]);
+    await scalar('select release_seller_funds($1)',[sid]);
+  };
+  await mature(saleOrder);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),93000);
   await scalar('select create_order($1,$2,$3)',[user,JSON.stringify(sellerPayload),saleKey]);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),93000);
@@ -1375,6 +1382,8 @@ try {
   const sellerPayment=(await db.query('select * from payments where order_id=$1',[bankSale])).rows[0];
   await scalar('select settle_payment($1,$2,$3)',['seller-bank-db',sellerPayment.code,100000]);
   await scalar('select settle_payment($1,$2,$3)',['seller-bank-db',sellerPayment.code,100000]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),93000);
+  await mature(bankSale);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),186000);
   const withdrawData={amount:50000,bank:'VCB',account_name:'Seller DB',account_number:'123456789',idempotency:randomUUID()};
   const withdrawal=await sellerCommand(sid,'withdraw',withdrawData);
@@ -1394,7 +1403,7 @@ try {
   assert.equal(Number(await scalar('select seller_debt from profiles where id=$1',[sid])),92000);
   await scalar('select settle_seller_revenue($1)',[bankSale]);
   assert.equal(Number(await scalar('select seller_debt from profiles where id=$1',[sid])),92000);
-  await scalar('select create_order($1,$2,$3)',[user,JSON.stringify(sellerPayload),randomUUID()]);
+  await mature(await scalar('select create_order($1,$2,$3)',[user,JSON.stringify(sellerPayload),randomUUID()]));
   assert.equal(Number(await scalar('select seller_debt from profiles where id=$1',[sid])),2000);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),0);
   await sellerCommand(other,'role',{user_id:sid,role:'customer'});
@@ -1411,12 +1420,96 @@ try {
   await scalar('select fulfill_order($1,$2)',[mixedOrder,JSON.stringify([{secret:'encrypted-admin-delivery',hash:randomUUID()}])]);
   assert.equal(await scalar('select status from orders where id=$1',[mixedOrder]),'completed');
   assert.equal(Number(await scalar('select count(*) from inventory where order_id=$1',[mixedOrder])),2);
+  await mature(mixedOrder);
   const finalWithdrawal=await sellerCommand(sid,'withdraw',{...withdrawData,idempotency:randomUUID()});
   const balanceBeforePaid=Number(await scalar('select balance from profiles where id=$1',[sid]));
   await sellerCommand(other,'withdrawal_review',{id:finalWithdrawal.id,status:'paid',reason:'Transfer completed',reference:'BANK-123'});
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balanceBeforePaid);
   assert.equal(await scalar('select status from seller_withdrawals where id=$1',[finalWithdrawal.id]),'paid');
   pass('seller ownership, terms, 7% settlement, immutable fees, duplicate callbacks, withdrawal holds and refund debt');
+  const newSale = () => scalar('select create_order($1,$2,$3)',[user,JSON.stringify(sellerPayload),randomUUID()]);
+  const chat = (actor,item,action='read',body='',request=null) => scalar('select seller_conversation($1,$2,$3,$4,$5)',[actor,item,action,body,request]);
+  await db.query('update profiles set balance=2000000 where id=$1',[user]);
+  const escrowOrder = await newSale();
+  const escrowItem = await scalar('select id from order_items where order_id=$1',[escrowOrder]);
+  const balance = Number(await scalar('select balance from profiles where id=$1',[sid]));
+  await scalar('select release_seller_funds($1)',[sid]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  await fails('select seller_command($1,$2,$3)',[sid,'withdraw',JSON.stringify({...withdrawData,amount:balance+90000,idempotency:randomUUID()})]);
+  const outsider = randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'chat-outsider@example.test')",[outsider]);
+  await fails('select seller_conversation($1,$2)',[outsider,escrowItem]);
+  const messageId = randomUUID();
+  await chat(user,escrowItem,'message','Need help with delivery',messageId);
+  await chat(user,escrowItem,'message','Need help with delivery',messageId);
+  assert.equal((await chat(sid,escrowItem)).messages.length,1);
+  assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1",[sid])),1);
+  await fails('select seller_conversation($1,$2,$3,$4,$5)',[user,escrowItem,'message','Changed body',messageId]);
+  await chat(sid,escrowItem,'message','We are checking the delivery',randomUUID());
+  assert.equal((await chat(user,escrowItem)).messages.length,2);
+  await sellerCommand(sid,'fulfill',{item_id:escrowItem,keys:[{secret:'escrow-test-delivered',hash:randomUUID()}]});
+  await scalar('select release_seller_funds($1)',[sid]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  const disputed = await chat(user,escrowItem,'request','The delivered product cannot be used');
+  assert.equal(disputed.dispute.status,'open');
+  await scalar('select seller_support($1,$2,$3)',[sid,disputed.dispute.ticket_id,'Seller support reply for the buyer']);
+  assert.equal((await scalar('select seller_support($1)',[sid])).find(t=>t.id===disputed.dispute.ticket_id).messages.at(-1).role,'seller');
+  await fails('select seller_support($1,$2,$3)',[outsider,disputed.dispute.ticket_id,'Not my support request']);
+  await fails('select seller_conversation($1,$2,$3)',[user,escrowItem,'agree']);
+  await chat(sid,escrowItem,'agree');
+  await mature(escrowOrder);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  assert.equal((await chat(user,escrowItem)).dispute.status,'agreed');
+  await fails('select seller_conversation($1,$2,$3,$4)',[sid,escrowItem,'reject','Cannot self resolve this dispute']);
+  const buyerBalance = Number(await scalar('select balance from profiles where id=$1',[user]));
+  await chat(other,escrowItem,'refund','Confirmed failure after checking evidence');
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),buyerBalance+100000);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  assert.equal((await chat(user,escrowItem)).dispute.status,'refunded');
+  await fails('select seller_conversation($1,$2,$3,$4)',[other,escrowItem,'refund','Duplicate refund should never credit']);
+  await scalar('select release_seller_funds($1)',[sid]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  const rejectedOrder = await newSale();
+  const rejectedItem = await scalar('select id from order_items where order_id=$1',[rejectedOrder]);
+  await chat(sid,rejectedItem,'request','Seller requests a review before delivery');
+  assert.equal((await chat(user,rejectedItem,'agree')).dispute.status,'agreed');
+  await chat(other,rejectedItem,'reject','Evidence confirms delivery can proceed');
+  await db.query("update order_items set delivered_at=clock_timestamp()-interval '47 hours 59 minutes' where id=$1",[rejectedItem]);
+  await scalar('select release_seller_funds($1)',[sid]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  await mature(rejectedOrder);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance+90000);
+  await scalar('select release_seller_funds($1)',[sid]);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance+90000);
+  await sellerCommand(other,'role',{user_id:outsider,role:'seller'});
+  await sellerCommand(outsider,'profile',{name:'Other shop',terms_version:SELLER_TERMS_VERSION,fee_bps:1000,accepted:true});
+  const otherProduct=await sellerCommand(outsider,'product',{slug:'other-seller-chat',name:'Other shop product',category:'game',platform:'PC',subcategory:'',subtitle:'',description:'',image:'',active:true});
+  const otherVariant=randomUUID();
+  await db.query("insert into variants(id,product_id,name,price,original_price,delivery,stock) values($1,$2,'Manual',100000,100000,'manual',2)",[otherVariant,otherProduct.id]);
+  const multiSellerOrder=await scalar('select create_order($1,$2,$3)',[user,JSON.stringify({...sellerPayload,items:[{variant_id:sellerVariant,quantity:1},{variant_id:otherVariant,quantity:1}]}),randomUUID()]);
+  const privateItem=await scalar('select id from order_items where order_id=$1 and seller_id=$2',[multiSellerOrder,outsider]);
+  const siblingItem=await scalar('select id from order_items where order_id=$1 and seller_id=$2',[multiSellerOrder,sid]);
+  await chat(user,privateItem,'message','Private other-shop conversation',randomUUID());
+  await fails('select seller_conversation($1,$2)',[sid,privateItem]);
+  await chat(outsider,privateItem,'request','Private refund reason for the other shop');
+  const redacted=await chat(sid,siblingItem);
+  assert.equal(redacted.messages.length,0);
+  assert.equal(redacted.dispute.status,'open');
+  assert.equal(redacted.dispute.reason,undefined);
+  assert.equal((await scalar('select seller_support($1)',[sid])).some(t=>t.order_number===redacted.order_number),false);
+  await mature(multiSellerOrder);
+  assert.equal(await scalar('select seller_settled_at from order_items where id=$1',[siblingItem]),null);
+  await chat(other,privateItem,'refund','Refund all items after reviewing both shops');
+  assert.equal(await scalar('select status from orders where id=$1',[multiSellerOrder]),'refunded');
+  for(const role of ['anon','authenticated']) {
+    await db.exec(`set role ${role}`);
+    await fails('select * from seller_chat_messages');
+    await fails('select * from seller_disputes');
+    await fails('select seller_conversation($1,$2)',[user,escrowItem]);
+    await fails('select release_seller_funds()');
+    await db.exec('reset role');
+  }
+  pass('seller chat ownership/idempotency and 48h escrow: no early withdrawal, disputes freeze, bilateral consent, admin-only refund/rejection, exactly-once release and browser denial');
   }
   // Browser credentials cannot bypass Node MFA/suspension via PostgREST.
   await db.query("select set_config('request.jwt.claim.sub',$1,false)", [user]);

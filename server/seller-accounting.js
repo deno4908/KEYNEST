@@ -46,7 +46,11 @@ export function settleSellerRevenue(store, order, reverse = false) {
     if (!user) throw new AppError("Không tìm thấy người bán.", 409);
     let amount;
     if (reverse) {
-      if (!item.seller_settled_at || item.seller_reversed_at) continue;
+      if (item.seller_reversed_at) continue;
+      if (!item.seller_settled_at) {
+        item.seller_reversed_at = new Date().toISOString();
+        continue;
+      }
       for (const withdrawal of store.db.seller_withdrawals || []) {
         if (withdrawal.user_id !== user.id || withdrawal.status !== "pending")
           continue;
@@ -86,6 +90,21 @@ export function settleSellerRevenue(store, order, reverse = false) {
       item.seller_gross = gross;
       item.seller_fee = fee;
       item.seller_net = gross - fee;
+      // Old, already credited items stay credited. New revenue is never spendable
+      // before delivery + 48 hours, or while an order refund is unresolved.
+      item.seller_hold_until = item.delivered_at
+        ? new Date(Date.parse(item.delivered_at) + 48 * 3600000).toISOString()
+        : null;
+      if (
+        !item.seller_hold_until ||
+        Date.parse(item.seller_hold_until) > Date.now() ||
+        item.seller_reversed_at ||
+        store.db.seller_disputes?.some(
+          (d) =>
+            d.order_id === order.id && ["open", "agreed"].includes(d.status),
+        )
+      )
+        continue;
       const offset = Math.min(user.seller_debt || 0, item.seller_net);
       user.seller_debt = (user.seller_debt || 0) - offset;
       amount = item.seller_net - offset;
@@ -99,5 +118,17 @@ export function settleSellerRevenue(store, order, reverse = false) {
       description: `${reverse ? "Thu hồi doanh thu" : "Doanh thu sau phí / bù trừ"} ${order.number} · ${item.name}`,
       created_at: new Date().toISOString(),
     });
+  }
+}
+
+export function releaseSellerFunds(store) {
+  for (const order of store.db.orders) {
+    if (
+      ["processing", "completed"].includes(order.status) &&
+      order.items.some(
+        (i) => i.seller_id && !i.seller_settled_at && !i.seller_reversed_at,
+      )
+    )
+      settleSellerRevenue(store, order);
   }
 }

@@ -1,24 +1,16 @@
+import { OrderChat, type SellerDispute } from "./OrderChat";
 import { useEffect, useState } from "react";
-import { useDataRefresh } from './useDataRefresh';
+import { useDataRefresh } from "./useDataRefresh";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import {
-  Package,
-  Plus,
-  Wallet,
-  Store,
-  ExternalLink,
-  ShieldCheck,
-  ArrowRight,
-} from "lucide-react";
+import { Store, ExternalLink, ShieldCheck, ArrowRight } from "lucide-react";
 import { api, post, money, date } from "./api";
 import { Loading, Modal, useStore } from "./App";
-import { ProductEditor } from "./Admin";
 import type { Product, User, OrderItem } from "./types";
 import { SELLER_TERMS_VERSION, sellerTerms } from "../shared/seller-terms.js";
 import "./seller.css";
 
-type Withdrawal = {
+export type Withdrawal = {
   id: string;
   user_id: string;
   amount: number;
@@ -30,7 +22,8 @@ type Withdrawal = {
   reference: string;
   created_at: string;
 };
-type Sale = OrderItem & {
+export type Sale = OrderItem & {
+  seller_frozen?: boolean;
   seller_gross?: number;
   seller_fee?: number;
   seller_net?: number;
@@ -42,12 +35,15 @@ type Sale = OrderItem & {
     customer_note: string;
   };
 };
-type SellerData = {
+export type SellerData = {
   profile: User;
   products: Product[];
   sales: Sale[];
   withdrawals: Withdrawal[];
   fee_bps: number;
+  held?: number;
+  disputes?: SellerDispute[];
+  ledger?: import("./types").Ledger[];
 };
 const withdrawalStatus: Record<string, string> = {
   pending: "Chờ duyệt",
@@ -72,7 +68,7 @@ export function SellerContact({
     </div>
   );
 }
-function ProfileForm({
+export function ProfileForm({
   profile,
   fee,
   saved,
@@ -82,6 +78,9 @@ function ProfileForm({
   saved: () => Promise<void>;
 }) {
   const { setUser } = useStore();
+  const accepted =
+    profile.seller_terms_version === SELLER_TERMS_VERSION &&
+    !!profile.seller_terms_accepted_at;
   const [shopName, setShopName] = useState(profile.seller_name || profile.name);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -91,12 +90,17 @@ function ProfileForm({
     setBusy(true);
     setError("");
     try {
-      const user = await post<User>("/seller/profile", {
-        name: f.get("name"),
-        accepted: f.get("accepted") === "on",
-        terms_version: SELLER_TERMS_VERSION,
-        fee_bps: fee,
-      });
+      const user = await post<User>(
+        accepted ? "/seller/profile/name" : "/seller/profile",
+        accepted
+          ? { name: f.get("name") }
+          : {
+              name: f.get("name"),
+              accepted: f.get("accepted") === "on",
+              terms_version: SELLER_TERMS_VERSION,
+              fee_bps: fee,
+            },
+      );
       setUser(user);
       await saved();
     } catch (e) {
@@ -113,7 +117,9 @@ function ProfileForm({
         </span>
         <div>
           <span className="eyebrow orange">HỒ SƠ NGƯỜI BÁN</span>
-          <h2>Thiết lập gian hàng của bạn</h2>
+          <h2>
+            {accepted ? "Hồ sơ gian hàng" : "Thiết lập gian hàng của bạn"}
+          </h2>
           <p className="muted">
             Hoàn thiện thông tin và xem điều khoản trước khi bắt đầu bán hàng
             trên KEYNEST.
@@ -196,406 +202,37 @@ function ProfileForm({
         </aside>
       </div>
       <div className="seller-setup-footer">
-        <label className="checkbox">
-          <input type="checkbox" name="accepted" required />
-          Tôi đã đọc và đồng ý với điều khoản người bán.
-        </label>
+        {accepted ? (
+          <p className="muted">
+            Đã chấp nhận điều khoản ngày{" "}
+            {date(profile.seller_terms_accepted_at!)}.
+          </p>
+        ) : (
+          <label className="checkbox">
+            <input type="checkbox" name="accepted" required />
+            Tôi đã đọc và đồng ý với điều khoản người bán.
+          </label>
+        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
           </p>
         )}
         <button className="button" disabled={busy}>
-          {busy ? "Đang lưu…" : "Đồng ý và lưu hồ sơ"}
+          {busy
+            ? "Đang lưu…"
+            : accepted
+              ? "Lưu tên gian hàng"
+              : "Đồng ý và lưu hồ sơ"}
           <ArrowRight size={16} />
         </button>
       </div>
     </form>
   );
 }
-export function Seller({ onboarding = false }: { onboarding?: boolean }) {
-  const { user, refresh, notify } = useStore();
-  const [data, setData] = useState<SellerData | null>(null),
-    [error, setError] = useState(""),
-    [tab, setTab] = useState("products");
-  const [editing, setEditing] = useState<Partial<Product> | null>(null),
-    [action, setAction] = useState<{ endpoint: string; title: string } | null>(
-      null,
-    ),
-    [busy, setBusy] = useState(false);
-  const [idempotency, setIdempotency] = useState(() => crypto.randomUUID());
-  const load = async () => {
-    try {
-      setData(await api<SellerData>("/seller/overview"));
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-  const saved = async () => {
-    await load();
-    await refresh();
-  };
-  useDataRefresh(load, ['/seller/', '/admin/']);
-  useEffect(() => {
-    if (user?.role === "seller") void load();
-  }, [user?.id, user?.role]);
-  if (user?.role !== "seller")
-    return (
-      <div className="container page">
-        <h1>Kênh người bán</h1>
-        <p>Tài khoản cần được admin cấp quyền seller.</p>
-      </div>
-    );
-  if (!data)
-    return error ? (
-      <div className="container page">
-        <p role="alert">{error}</p>
-        <button className="button" onClick={load}>
-          Thử lại
-        </button>
-      </div>
-    ) : (
-      <Loading />
-    );
-  async function submitAction(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    setBusy(true);
-    try {
-      await post(action!.endpoint, {
-        secrets: String(f.get("secrets"))
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      });
-      setAction(null);
-      await saved();
-      notify("Đã cập nhật.");
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function withdraw(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const f = new FormData(form);
-    setBusy(true);
-    try {
-      await post("/seller/withdrawals", {
-        amount: Number(f.get("amount")),
-        bank: f.get("bank"),
-        account_number: f.get("account_number"),
-        account_name: f.get("account_name"),
-        idempotency,
-      });
-      setIdempotency(crypto.randomUUID());
-      form.reset();
-      await saved();
-      notify("Đã gửi yêu cầu. Số tiền được giữ trong lúc admin duyệt.");
-    } catch (e) {
-      notify((e as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (onboarding)
-    return (
-      <div className="container page seller-page seller-onboarding">
-        <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} />
-      </div>
-    );
-  return (
-    <div className="container page seller-page">
-      <header className="page-heading">
-        <div>
-          <span className="eyebrow orange">KEYNEST / SELLER</span>
-          <h1>Gian hàng của bạn.</h1>
-          <p>Quản lý sản phẩm, giao hàng và doanh thu tại một nơi.</p>
-        </div>
-        <button className="button button-outline" onClick={load}>
-          Làm mới
-        </button>
-      </header>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="seller-stats">
-        <div>
-          <Package />
-          <small>Sản phẩm</small>
-          <strong>{data.products.length}</strong>
-        </div>
-        <div>
-          <Wallet />
-          <small>Số dư khả dụng</small>
-          <strong>{money(data.profile.balance)}</strong>
-        </div>
-        <div>
-          <Wallet />
-          <small>Đang chờ rút</small>
-          <strong>
-            {money(
-              data.withdrawals
-                .filter((w) => w.status === "pending")
-                .reduce((n, w) => n + w.amount, 0),
-            )}
-          </strong>
-        </div>
-        <div>
-          <Store />
-          <small>Phí nền tảng</small>
-          <strong>{data.fee_bps / 100}%</strong>
-        </div>
-      </div>
-      {!!data.profile.seller_debt && (
-        <p className="form-error">
-          Cần bù trừ {money(data.profile.seller_debt)} từ đơn hoàn tiền. Doanh
-          thu mới sẽ bù trừ khoản này trước khi cộng ví; tạm thời chưa thể rút
-          tiền.
-        </p>
-      )}
-      <nav className="seller-tabs" aria-label="Kênh người bán">
-        {[
-          ["products", "Sản phẩm & kho"],
-          ["sales", "Đơn bán"],
-          ["withdrawals", "Rút tiền"],
-          ["profile", "Hồ sơ & điều khoản"],
-        ].map(([key, label]) => (
-          <button
-            key={key}
-            className={tab === key ? "selected" : ""}
-            onClick={() => setTab(key)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      {tab === "profile" && (
-        <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} />
-      )}
-      {tab === "products" && (
-        <section>
-          <div className="section-title">
-            <h2>Sản phẩm của tôi</h2>
-            <button className="button" onClick={() => setEditing({})}>
-              <Plus size={16} />
-              Thêm sản phẩm
-            </button>
-          </div>
-          <div className="seller-product-list">
-            {data.products.map((p) => (
-              <article key={p.id}>
-                <img src={p.image} alt="" />
-                <div>
-                  <Link to={`/products/${p.slug}`}>
-                    <strong>{p.name}</strong>
-                  </Link>
-                  <p>
-                    {p.active ? "Đang bán" : "Đã ẩn"} · {p.variants.length} gói
-                    · {p.variants.reduce((n, v) => n + v.stock, 0)} tồn kho
-                  </p>
-                </div>
-                <button
-                  className="button button-outline"
-                  onClick={() => setEditing(p)}
-                >
-                  Quản lý
-                </button>
-              </article>
-            ))}
-          </div>
-          {!data.products.length && (
-            <div className="panel seller-empty">
-              <Package size={36} />
-              <h3>Bắt đầu với sản phẩm đầu tiên</h3>
-              <p>Thêm mô tả, ảnh, gói bán và kho mã để khách hàng đặt mua.</p>
-            </div>
-          )}
-        </section>
-      )}
-      {tab === "sales" && (
-        <section>
-          <h2>Đơn bán & giao hàng</h2>
-          <p className="muted">
-            Doanh thu được ghi nhận khi thanh toán thành công. Phí áp dụng theo
-            thời điểm đặt hàng.
-          </p>
-          <div className="panel table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>Đơn / sản phẩm</th>
-                  <th>Thanh toán</th>
-                  <th>Phí / thực nhận</th>
-                  <th>Giao hàng</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.sales.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <strong>{s.order.number}</strong>
-                      <p>
-                        {s.name} · {s.variant_name} ×{s.quantity}
-                      </p>
-                      <small>{date(s.order.created_at)}</small>
-                    </td>
-                    <td>
-                      {s.order.status === "refunded"
-                        ? "Đã hoàn tiền"
-                        : s.seller_net != null
-                          ? "Đã thanh toán"
-                          : "Chưa thanh toán"}
-                      <p>
-                        {s.seller_gross != null ? money(s.seller_gross) : "—"}
-                      </p>
-                    </td>
-                    <td>
-                      {s.seller_fee != null ? money(s.seller_fee) : "—"}
-                      <p>
-                        {s.seller_reversed_at
-                          ? "Đã thu hồi"
-                          : s.seller_net != null
-                            ? money(s.seller_net)
-                            : "—"}
-                      </p>
-                    </td>
-                    <td>
-                      {s.delivered_at ? (
-                        "Đã giao"
-                      ) : s.delivery === "manual" &&
-                        s.order.status === "processing" ? (
-                        <>
-                          <p>{s.order.customer_note}</p>
-                          <button
-                            className="button button-small"
-                            onClick={() =>
-                              setAction({
-                                endpoint: `/seller/items/${s.id}/fulfill`,
-                                title: `Giao ${s.quantity} kết quả · ${s.name}`,
-                              })
-                            }
-                          >
-                            Giao sản phẩm
-                          </button>
-                        </>
-                      ) : (
-                        "Chờ xử lý"
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!data.sales.length && (
-              <p className="seller-empty">Chưa có đơn bán.</p>
-            )}
-          </div>
-        </section>
-      )}
-      {tab === "withdrawals" && (
-        <div className="seller-withdraw-layout">
-          <form className="panel form" onSubmit={withdraw}>
-            <h2>Yêu cầu rút tiền</h2>
-            <p className="muted">
-              Tối thiểu 50.000đ. Tiền được giữ ngay khi gửi; admin chuyển khoản
-              và cập nhật kết quả. Yêu cầu bị từ chối sẽ được trả lại ví.
-            </p>
-            <label>
-              Số tiền
-              <input
-                name="amount"
-                type="number"
-                min={50000}
-                max={Math.min(data.profile.balance, 100000000)}
-                step={1}
-                required
-              />
-            </label>
-            <label>
-              Ngân hàng
-              <input name="bank" minLength={2} maxLength={100} required />
-            </label>
-            <label>
-              Số tài khoản
-              <input
-                name="account_number"
-                inputMode="numeric"
-                pattern="[0-9]{5,30}"
-                required
-              />
-            </label>
-            <label>
-              Tên chủ tài khoản
-              <input
-                name="account_name"
-                minLength={2}
-                maxLength={100}
-                required
-              />
-            </label>
-            <button
-              className="button"
-              disabled={
-                busy ||
-                data.profile.balance < 50000 ||
-                !!data.profile.seller_debt
-              }
-            >
-              Gửi yêu cầu rút
-            </button>
-          </form>
-          <section>
-            <h2>Lịch sử rút tiền</h2>
-            <WithdrawalList withdrawals={data.withdrawals} />
-          </section>
-        </div>
-      )}
-      {editing && (
-        <ProductEditor
-          scope="seller"
-          value={editing}
-          close={() => setEditing(null)}
-          changed={saved}
-          saved={async () => {
-            setEditing(null);
-            await saved();
-          }}
-          importKeys={(v) =>
-            setAction({
-              endpoint: `/seller/inventory/${v.id}`,
-              title: `Nhập mã · ${v.name}`,
-            })
-          }
-        />
-      )}
-      {action && (
-        <Modal
-          title={action.title}
-          close={() => {
-            if (!busy) setAction(null);
-          }}
-        >
-          <form className="form" onSubmit={submitAction}>
-            <label>
-              Mỗi dòng một mã hoặc kết quả giao hàng
-              <textarea name="secrets" rows={8} required />
-            </label>
-            <button className="button" disabled={busy}>
-              Xác nhận
-            </button>
-          </form>
-        </Modal>
-      )}
-    </div>
-  );
-}
-function WithdrawalList({
+export { Seller } from "./SellerDashboard";
+
+export function WithdrawalList({
   withdrawals,
   review,
 }: {
@@ -632,8 +269,10 @@ function WithdrawalList({
   );
 }
 export function AdminSellers() {
+  const [chat, setChat] = useState<string | null>(null);
   const { notify } = useStore();
   const [data, setData] = useState<{
+      disputes: SellerDispute[];
       sellers: User[];
       withdrawals: Withdrawal[];
       fee_bps: number;
@@ -652,7 +291,9 @@ export function AdminSellers() {
   useEffect(() => {
     void load();
   }, []);
-  useDataRefresh(load, ['/admin/', '/seller/']);
+  useDataRefresh(load, ["/admin/", "/seller/", "/order-chat/"], {
+    intervalMs: 5000,
+  });
   async function fee(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -702,6 +343,20 @@ export function AdminSellers() {
         !error && <Loading />
       ) : (
         <>
+          <section>
+            {data.disputes?.map((d) => (
+              <article className="panel" key={d.order_id}>
+                <strong>{d.status}</strong>
+                <p>{d.reason}</p>
+                <button
+                  className="button button-outline"
+                  onClick={() => setChat(d.item_id)}
+                >
+                  Xem và xử lý hoàn tiền
+                </button>
+              </article>
+            ))}
+          </section>
           <form className="panel form" onSubmit={fee}>
             <label>
               Phí nền tảng (%)
@@ -757,6 +412,7 @@ export function AdminSellers() {
           <WithdrawalList withdrawals={data.withdrawals} review={setReview} />
         </>
       )}
+      {chat && <OrderChat itemId={chat} close={() => setChat(null)} admin />}
       {review && (
         <Modal
           title="Xử lý rút tiền"

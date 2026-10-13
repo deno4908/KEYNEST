@@ -1,4 +1,4 @@
-export const SELLER_TERMS_VERSION = "2026-10-11-v1";
+export const SELLER_TERMS_VERSION = "2026-10-14-v2";
 export const sellerTerms = [
   [
     "Trách nhiệm về sản phẩm",
@@ -10,7 +10,7 @@ export const sellerTerms = [
   ],
   [
     "Doanh thu và phí nền tảng",
-    "Khi thanh toán được xác nhận thành công, tiền bán hàng sau giảm giá và phí nền tảng được cộng vào ví KEYNEST. Phí tính trên phần tiền thực thu phân bổ cho từng sản phẩm, làm tròn đến đồng. Mức phí được lưu tại lúc tạo đơn, không thay đổi với đơn đã tạo. Đơn chưa thanh toán, bị hủy hoặc hết hạn không tạo doanh thu.",
+    "Tiền bán hàng sau giảm giá và phí nền tảng được giữ trong 48 giờ từ lúc giao thành công từng sản phẩm, sau đó mới chuyển vào số dư khả dụng. Nếu người mua hoặc người bán yêu cầu hoàn tiền trong thời gian giữ, tiền của đơn tiếp tục bị giữ đến khi quản trị viên giải quyết; việc bên còn lại đồng ý chưa tự hoàn tiền hoặc giải ngân. Phí tính trên phần tiền thực thu phân bổ cho từng sản phẩm, làm tròn đến đồng và lưu tại lúc tạo đơn. Đơn chưa thanh toán, bị hủy hoặc hết hạn không tạo doanh thu.",
   ],
   [
     "Hoàn tiền và đối soát",

@@ -7,7 +7,7 @@ import { calculateCoupon, couponStats } from "./coupons.js";
 import { defaultBanners, subcategories } from "../shared/storefront.js";
 import { writeDemoSnapshot } from "./demo-persistence.js";
 import { searchCatalog } from "./catalog.js";
-import { sellerPublic, snapshotSeller, settleSellerRevenue } from './seller-accounting.js';
+import { sellerPublic, snapshotSeller, settleSellerRevenue, releaseSellerFunds } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, hashPassword } from "./security.js";
 export class DemoStore {
   constructor(key, path = ".data/demo.json") {
@@ -191,6 +191,7 @@ export class DemoStore {
     this.save();
   }
   expire() {
+    releaseSellerFunds(this);
     const now = Date.now();
     for (const p of this.db.payments)
       if (p.status === "pending" && Date.parse(p.expires_at) < now) {
@@ -899,6 +900,7 @@ export class DemoStore {
     }
     settleSellerRevenue(this, o, true);
     o.status = "refunded";
+    for (const d of this.db.seller_disputes || []) if (d.order_id === id) Object.assign(d, {status: "refunded", resolved_at: new Date().toISOString()});
     Object.assign(o, {
       refunded_at: new Date().toISOString(),
       refund_method: options.method,

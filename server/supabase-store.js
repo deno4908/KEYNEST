@@ -119,7 +119,8 @@ export class SupabaseStore {
     );
   }
   async expire() {
-    return this.query(this.client.rpc("expire_payments"));
+    await this.query(this.client.rpc("expire_payments"));
+    return this.query(this.client.rpc("release_seller_funds"));
   }
   async createOrder(uid, payload, idempotency) {
     const id = await this.query(

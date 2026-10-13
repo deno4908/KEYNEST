@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 test("seller onboarding, product editor, contact and withdrawal screens", async ({
   page,
+  browser,
   playwright,
   baseURL,
 }) => {
@@ -85,6 +86,19 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     page.getByRole("heading", { name: "Gian hàng của bạn." }),
   ).toBeVisible();
   await page
+    .getByRole("button", { name: "Hồ sơ & điều khoản", exact: true })
+    .click();
+  await expect(page.getByRole("checkbox", { name: /Tôi đã đọc/ })).toHaveCount(
+    0,
+  );
+  await page.getByRole("button", { name: "Lưu tên gian hàng" }).click();
+  await expect(page.getByRole("checkbox", { name: /Tôi đã đọc/ })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Sản phẩm & kho", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Thêm sản phẩm", exact: true })
     .click();
   await dialog
@@ -113,20 +127,39 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     .click();
   await expect(dialog.locator(".admin-variant")).toContainText("Standard");
   // Saving must update the list behind the open editor, without navigation.
-  await expect(page.locator(".seller-product-list")).toContainText("10 tồn kho");
+  await expect(page.locator(".seller-product-list")).toContainText(
+    "10 tồn kho",
+  );
   await dialog.getByRole("button", { name: "Thêm gói", exact: true }).click();
   await dialog.locator('.variant-form input[name="name"]').fill("Instant key");
-  await dialog.locator('.variant-form select[name="delivery"]').selectOption("key");
-  await dialog.locator('.variant-form button[type="submit"], .variant-form button:not([type])').last().click();
-  const keyRow = dialog.locator(".admin-variant").filter({ hasText: "Instant key" });
+  await dialog
+    .locator('.variant-form select[name="delivery"]')
+    .selectOption("key");
+  await dialog
+    .locator(
+      '.variant-form button[type="submit"], .variant-form button:not([type])',
+    )
+    .last()
+    .click();
+  const keyRow = dialog
+    .locator(".admin-variant")
+    .filter({ hasText: "Instant key" });
   await expect(keyRow).toContainText("Tồn 0");
   await keyRow.getByRole("button", { name: "Nhập mã" }).click();
-  const importDialog = page.getByRole("dialog").filter({ hasText: "Nhập mã · Instant key" });
-  await importDialog.locator("textarea").fill(`UI-KEY-${suffix}-A\nUI-KEY-${suffix}-B`);
-  await importDialog.getByRole("button", { name: "Xác nhận", exact: true }).click();
+  const importDialog = page
+    .getByRole("dialog")
+    .filter({ hasText: "Nhập mã · Instant key" });
+  await importDialog
+    .locator("textarea")
+    .fill(`UI-KEY-${suffix}-A\nUI-KEY-${suffix}-B`);
+  await importDialog
+    .getByRole("button", { name: "Xác nhận", exact: true })
+    .click();
   await expect(importDialog).not.toBeVisible();
   await expect(keyRow).toContainText("Tồn 2");
-  await expect(page.locator(".seller-product-list")).toContainText("12 tồn kho");
+  await expect(page.locator(".seller-product-list")).toContainText(
+    "12 tồn kho",
+  );
   await page.keyboard.press("Escape");
   await expect(page.locator(".seller-product-list")).toContainText(
     `Seller Product ${suffix}`,
@@ -139,6 +172,94 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     "Người bán chịu trách nhiệm",
   );
   await page.goto("/seller");
+  // A different authenticated browser buys and chats; seller updates without reload.
+  const buyerContext = await browser.newContext({
+    baseURL,
+    extraHTTPHeaders: { Origin: baseURL!, "X-App-Request": "keynest" },
+  });
+  const buyerLogin = await buyerContext.request.post("/api/auth/login", {
+    data: { email: "student@keynest.local", password: "Student123!" },
+  });
+  expect(buyerLogin.ok()).toBeTruthy();
+  const product = await (
+    await buyerContext.request.get(`/api/products/seller-product-${suffix}`)
+  ).json();
+  const purchased = await buyerContext.request.post("/api/orders", {
+    headers: { "Idempotency-Key": crypto.randomUUID() },
+    data: {
+      items: [
+        {
+          variant_id: product.variants.find(
+            (v: { name: string }) => v.name === "Standard",
+          ).id,
+          quantity: 1,
+        },
+      ],
+      method: "wallet",
+      coupon: "",
+      customer_note: "Player UI",
+    },
+  });
+  expect(purchased.ok()).toBeTruthy();
+  const order = await purchased.json();
+  await page.getByRole("button", { name: "Đơn bán", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: order.number, exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Tin nhắn", { exact: true })
+    .fill("Seller draft stays while polling");
+  const buyerPage = await buyerContext.newPage();
+  await buyerPage.goto(`/orders/${order.id}`);
+  await buyerPage.getByRole("button", { name: "Chat với người bán" }).click();
+  await buyerPage
+    .getByRole("dialog")
+    .getByLabel("Tin nhắn", { exact: true })
+    .fill("Please check my delivery");
+  await buyerPage
+    .getByRole("button", { name: "Gửi tin nhắn", exact: true })
+    .click();
+  await expect(page.getByRole("log")).toContainText(
+    "Please check my delivery",
+    { timeout: 15000 },
+  );
+  await expect(
+    page.getByRole("dialog").getByLabel("Tin nhắn", { exact: true }),
+  ).toHaveValue("Seller draft stays while polling");
+  await page.getByRole("button", { name: "Gửi tin nhắn", exact: true }).click();
+  await expect(buyerPage.getByRole("log")).toContainText(
+    "Seller draft stays while polling",
+    { timeout: 15000 },
+  );
+  await buyerPage
+    .getByRole("button", { name: "Yêu cầu hoàn tiền", exact: true })
+    .click();
+  await buyerPage
+    .getByLabel("Lý do", { exact: true })
+    .fill("Please refund the undelivered order");
+  await buyerPage
+    .getByRole("button", { name: "Gửi yêu cầu và giữ tiền" })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Đồng ý đề nghị hoàn tiền, chuyển admin",
+    }),
+  ).toBeVisible({ timeout: 15000 });
+  await page
+    .getByRole("button", { name: "Đồng ý đề nghị hoàn tiền, chuyển admin" })
+    .click();
+  await expect(buyerPage.getByRole("dialog")).toContainText(
+    "Hai bên đã đồng ý",
+    { timeout: 15000 },
+  );
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Doanh thu", exact: true }).click();
+  await expect(
+    page.getByRole("cell", { name: "Đóng băng · chờ xử lý hoàn tiền" }),
+  ).toBeVisible({ timeout: 15000 });
+  await buyerContext.close();
   await page.getByRole("button", { name: "Rút tiền", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Gửi yêu cầu rút" }),

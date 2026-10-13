@@ -57,6 +57,10 @@ export type Payment = {
   demo: boolean;
 };
 export type OrderItem = {
+  seller_id?: string;
+  seller_name?: string;
+  seller_settled_at?: string;
+  seller_hold_until?: string;
   id: string;
   product_id: string;
   variant_id: string;
