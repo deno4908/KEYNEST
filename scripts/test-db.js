@@ -26,7 +26,7 @@ async function fails(sql, params = []) {
 try {
   await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
  create schema auth; grant usage on schema auth,public to anon,authenticated,service_role;
- create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb default '{}');
+ create table auth.users(id uuid primary key,email text,encrypted_password text,raw_user_meta_data jsonb default '{}');
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant execute on function auth.uid() to anon,authenticated,service_role;`);
   for (const name of (
