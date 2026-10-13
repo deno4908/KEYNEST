@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import express from "express";
+import { CompactEncrypt, importJWK } from 'jose';
 import { accountRouter } from "../server/accounts.js";
 
 process.env.NODE_ENV = "test";
@@ -53,6 +54,22 @@ test("non-payment backend: catalog, account, inventory and ownership", async (t)
   const customer = await login("student@keynest.local", "Student123!");
   const admin = await login("admin@keynest.local", "Admin123!");
   const product = store.products()[0];
+
+  await t.test('encrypted browser credentials reach the normal login verifier', async () => {
+    const key = await request('/auth/password-key');
+    assert.equal(key.status, 200);
+    const { jwk, kid, timestamp } = key.body;
+    assert.equal('d' in jwk, false);
+    const encrypted_credentials = await new CompactEncrypt(new TextEncoder().encode(JSON.stringify({
+      path: '/auth/login', iat: timestamp, body: { email: 'student@keynest.local', password: 'Student123!' },
+    }))).setProtectedHeader({ alg: 'ECDH-ES', enc: 'A256GCM', kid, typ: 'keynest-password+jwe' })
+      .encrypt(await importJWK(jwk, 'ECDH-ES'));
+    const response = await request('/auth/login', { method: 'POST', body: { encrypted_credentials } });
+    assert.equal(response.status, 200);
+    assert.equal(response.body.id, customer.body.id);
+    assert.equal('password_hash' in response.body, false);
+    assert.equal('password_history' in response.body, false);
+  });
 
   await t.test(
     "catalog is bounded, stable and filters all conditions on the same variant",
@@ -307,6 +324,7 @@ test("Supabase password adapter reauthenticates the same user and handles provid
     "wrong-user",
     "bad-password",
     "update-failed",
+    "reused",
   ]) {
     await t.test(scenario, async () => {
       let updated = false,
@@ -318,6 +336,12 @@ test("Supabase password adapter reauthenticates the same user and handles provid
         accountRouter({
           config: { mode: "supabase" },
           store: {},
+          passwordHistory: { async change(id, password, update) {
+            assert.equal(id, 'owner');
+            assert.equal(password, 'NewPassword123!');
+            if (scenario === 'reused') throw new Error('Mật khẩu đã dùng trong 30 ngày qua.');
+            return update();
+          } },
           auth: (req, res, next) => {
             req.user = { id: "owner", email: "owner@example.test" };
             next();
@@ -372,7 +396,7 @@ test("Supabase password adapter reauthenticates the same user and handles provid
       assert.equal(result.status, scenario === "ok" ? 200 : 400);
       assert.equal(updated, ["ok", "update-failed"].includes(scenario));
       assert.equal(sessionSet, scenario === "ok");
-      assert.equal(signedOut, scenario === "update-failed");
+      assert.equal(signedOut, ["update-failed", "reused"].includes(scenario));
     });
   }
 });

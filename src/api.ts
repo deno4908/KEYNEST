@@ -81,11 +81,18 @@ export async function api<T>(
   }
   return body;
 }
-export const post = <T>(
+export const post = async <T>(
   path: string,
   body: unknown = {},
   headers: Record<string, string> = {},
-) => api<T>(path, { method: "POST", body: JSON.stringify(body), headers });
+) => {
+  if (['/auth/login', '/auth/register', '/auth/reset', '/me/password'].includes(path) &&
+      body && typeof body === 'object' && 'password' in body) {
+    const { protectPasswordRequest } = await import('./password-transport');
+    body = await protectPasswordRequest(path, body);
+  }
+  return api<T>(path, { method: "POST", body: JSON.stringify(body), headers });
+};
 export const money = (n: number) =>
   new Intl.NumberFormat("vi-VN", {
     style: "currency",

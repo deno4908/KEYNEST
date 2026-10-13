@@ -50,6 +50,7 @@ export function ChangePassword({ locked = false }: { locked?: boolean }) {
         <KeyRound size={18} aria-hidden="true" /> Đổi mật khẩu
       </h3>
       <p>Dùng ít nhất 10 ký tự, có chữ hoa, chữ thường và số.</p>
+      <p>Không dùng lại mật khẩu hiện tại hoặc mật khẩu đã dùng trong 30 ngày qua.</p>
       <div>
         <label htmlFor="current-password">Mật khẩu hiện tại</label>
         <input

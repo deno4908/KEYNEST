@@ -3,8 +3,9 @@ import { config } from "./config.js";
 import { productImages } from "../shared/product-images.js";
 import { sellerPublic } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, digest } from "./security.js";
-export const makeAuthClient = () =>
+export const makeAuthClient = ({ timeoutMs } = {}) =>
   createClient(config.url, config.anon, {
+    ...(timeoutMs ? { global: { fetch: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) }) } } : {}),
     auth: {
       persistSession: false,
       autoRefreshToken: false,

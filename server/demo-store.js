@@ -112,7 +112,7 @@ export class DemoStore {
   }
   publicUser(u) {
     if (!u) return null;
-    const { password_hash, ...result } = u;
+    const { password_hash, password_history, ...result } = u;
     return result;
   }
   products(admin = false) {

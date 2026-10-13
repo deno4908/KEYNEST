@@ -4,7 +4,10 @@ import { randomUUID } from "node:crypto";
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { AppError } from "../server/security.js";
-import { createPasswordRecovery } from "../server/password-recovery.js";
+import { createPasswordRecovery as createRecovery } from "../server/password-recovery.js";
+const createPasswordRecovery = options => createRecovery({
+  passwordHistory: { change: async (_user, _password, update) => update() }, ...options,
+});
 
 const encryption = "ab".repeat(32);
 const emailHash = "email-hash";
@@ -93,6 +96,11 @@ function memoryRepository(now) {
       if (currentLink.consumedAt || currentLink.recoveryId !== ticket.recovery_id) throw new AppError('Invalid link', 401);
       currentLink.consumedAt = new Date(now).toISOString();
       tickets.set(ticket.ticket_hash, { ...ticket, consumed_at: null });
+    },
+    async inspectTicket(ticketHash) {
+      const ticket = tickets.get(ticketHash);
+      if (!ticket || ticket.consumed_at || currentLink?.recoveryId !== ticket.recovery_id) return null;
+      return { user_id: ticket.user_id };
     },
     async claimTicket(ticketHash, timestamp) {
       const ticket = tickets.get(ticketHash);
@@ -289,4 +297,25 @@ test("unknown provider hashes are rejected without producing reset tickets", asy
     (error) => error instanceof AppError && error.status === 401,
   );
   assert.equal(repository.tickets.size, 0);
+});
+
+test('reuse rejection preserves the reset ticket so another password can be entered', async () => {
+  const now = Date.now(), repository = memoryRepository(now), calls = [];
+  const service = createPasswordRecovery({
+    config: { origin: 'https://keynest.store', encryption }, store: {}, repository,
+    clock: () => now, makeAuthClient: () => authClient({ calls }),
+    passwordHistory: { async change(id, password, update) {
+      assert.equal(id, user.id);
+      if (password === 'PreviousPassword123!') throw new AppError('Mật khẩu đã dùng trong 30 ngày qua.', 400);
+      return update();
+    } },
+  });
+  await service.request(user.email);
+  const { ticket } = await service.redeem({ token_hash: 'a'.repeat(56), type: 'recovery', recovery_id: repository.currentLink.recoveryId });
+  await assert.rejects(service.complete({ ticket, password: 'PreviousPassword123!' }), /30 ngày/);
+  assert.equal(calls.filter(([name]) => name === 'updateUser').length, 0);
+  assert.equal([...repository.tickets.values()][0].consumed_at, null);
+  await service.complete({ ticket, password: 'DifferentPassword123!' });
+  assert.equal(calls.filter(([name]) => name === 'updateUser').length, 1);
+  await assert.rejects(service.complete({ ticket, password: 'AnotherPassword123!' }), error => error.status === 401);
 });

@@ -28,3 +28,7 @@ Mẫu sử dụng bảng và inline CSS, không dùng JavaScript, font tải ngo
 Backend chỉ thay thế mã yêu cầu sau khi dịch vụ gửi thư chấp nhận yêu cầu. Liên kết và vé cũ bị vô hiệu hóa khi yêu cầu mới được ghi nhận thành công. Việc mở trang tiêu thụ liên kết; reload cần email mới. Giao diện hiển thị lỗi dịch vụ riêng thay vì coi mọi lỗi là hết hạn. Thời hạn 10 phút tính từ lúc yêu cầu email, không được gia hạn khi mở trang.
 
 Khi điều tra 401, log backend `Password recovery rejected` có `stage: provider` (Supabase từ chối token, kèm code/status) hoặc `stage: generation` (mã yêu cầu cũ, hết hạn, đã mở, hoặc khóa HMAC không khớp). Log này không chứa token, email hay mật khẩu. Không dùng lại curl xác minh vì token chỉ dùng một lần.
+
+## Kiểm tra mật khẩu đã dùng (migration 029)
+
+Chạy `029_password_history.sql` sau 028 và trước khi triển khai backend có kiểm tra lịch sử mật khẩu. Backend chặn mật khẩu hiện tại và mật khẩu đã thay thế trong 30 ngày; nếu bị từ chối, người dùng có thể chọn mật khẩu khác trên cùng trang mà không cần email mới. Không cần sửa template email cho tính năng này. Xem [hướng dẫn triển khai và phạm vi áp dụng](../../docs/PASSWORD-SECURITY.md).

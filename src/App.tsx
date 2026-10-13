@@ -2116,7 +2116,7 @@ function ResetPassword() {
           <div className="auth-heading">
             <span className="auth-kicker">TÀI KHOẢN KEYNEST</span>
             <h1>{completed ? 'Đã đổi mật khẩu.' : 'Đặt mật khẩu mới'}</h1>
-            <p>{completed ? 'Mật khẩu của bạn đã được cập nhật.' : 'Nhập mật khẩu mới và xác nhận lại bên dưới.'}</p>
+            <p>{completed ? 'Mật khẩu của bạn đã được cập nhật.' : 'Chọn mật khẩu chưa dùng trong 30 ngày qua và xác nhận lại bên dưới.'}</p>
           </div>
       <form className="auth-form recovery-form" onSubmit={submit}>
         {completed ? (

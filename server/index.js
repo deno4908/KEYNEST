@@ -14,6 +14,7 @@ import { createAdminOtp } from "./admin-otp.js";
 import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
+import { createPasswordTransport } from './password-transport.js';
 import { registerSupabase } from "./registration.js";
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
@@ -150,7 +151,7 @@ app.use("/api/auth", (req, res, next) => {
   // have their own limits; logout must remain available to a blocked session.
   if (
     (req.method === "GET" &&
-      ["/mfa/status", "/admin-otp/status"].includes(req.path)) ||
+      ["/mfa/status", "/admin-otp/status", "/password-key"].includes(req.path)) ||
     (req.method === "POST" &&
       [
         "/mfa/enroll",
@@ -193,6 +194,9 @@ function setAuth(res, s) {
 }
 const verifyCaptcha = captchaGuard(config.captcha);
 app.post(['/api/auth/login', '/api/auth/register', '/api/auth/forgot'], verifyCaptcha);
+const passwordTransport = createPasswordTransport(config.encryption);
+app.get('/api/auth/password-key', (req, res) => res.json(passwordTransport.publicKey()));
+app.use('/api', passwordTransport.middleware.bind(passwordTransport));
 app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
 function clearAuth(res) {
   adminOtp.clear(res);

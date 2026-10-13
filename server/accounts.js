@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
-import { AppError, hashPassword, verifyPassword } from "./security.js";
+import { AppError, verifyPassword } from "./security.js";
+import { createPasswordHistory, changeDemoPassword } from './password-history.js';
 
 export const strongPassword = z
   .string()
@@ -39,6 +40,7 @@ export function accountRouter({
   makeAuthClient,
   setAuth,
   demoSession,
+  passwordHistory = createPasswordHistory(store),
 }) {
   const router = Router();
   router.get("/me/password-policy", auth, (req, res) =>
@@ -73,7 +75,7 @@ export function accountRouter({
           !verifyPassword(input.current_password, user.password_hash)
         )
           throw new AppError("Mật khẩu hiện tại không đúng.", 400);
-        user.password_hash = hashPassword(input.password);
+        changeDemoPassword(user, input.password);
         store.db.sessions = store.db.sessions.filter(
           (s) => s.user_id !== user.id,
         );
@@ -81,16 +83,20 @@ export function accountRouter({
         demoSession(res, user.id);
       } else {
         // A stolen session alone must not be sufficient to change the password.
-        const client = makeAuthClient();
+        const client = makeAuthClient({ timeoutMs: 15000 });
         const { data, error } = await client.auth.signInWithPassword({
           email: req.user.email,
           password: input.current_password,
         });
         if (error || !data.session || data.user?.id !== req.user.id)
           throw new AppError("Không thể xác minh mật khẩu hiện tại.", 400);
-        const updated = await client.auth.updateUser({
-          password: input.password,
-        });
+        let updated;
+        try {
+          updated = await passwordHistory.change(req.user.id, input.password, () => client.auth.updateUser({ password: input.password }));
+        } catch (error) {
+          await client.auth.signOut({ scope: 'local' });
+          throw error;
+        }
         if (updated.error) {
           await client.auth.signOut({ scope: "local" });
           throw new AppError(

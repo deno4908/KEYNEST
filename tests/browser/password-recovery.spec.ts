@@ -1,13 +1,17 @@
 import { test, expect } from '@playwright/test';
+import { createPasswordTransport } from '../../server/password-transport.js';
+const transport = createPasswordTransport('ab'.repeat(32));
 
 test('confirmation must match and success opens the themed password animation', async ({ page }) => {
   let resets = 0;
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
-    if (path === '/api/auth/reset/verify') await route.fulfill({ json: { ticket: 't'.repeat(48) } });
+    if (path === '/api/auth/password-key') await route.fulfill({ json: transport.publicKey() });
+    else if (path === '/api/auth/reset/verify') await route.fulfill({ json: { ticket: 't'.repeat(48) } });
     else if (path === '/api/auth/reset') {
       resets++;
-      expect(route.request().postDataJSON()).toEqual({ ticket: 't'.repeat(48), password: 'NewPassword123!' });
+      expect(route.request().postData()).not.toContain('NewPassword123!');
+      expect(await transport.open(route.request().postDataJSON().encrypted_credentials, '/auth/reset')).toEqual({ ticket: 't'.repeat(48), password: 'NewPassword123!' });
       await route.fulfill({ json: { message: 'Updated' } });
     } else await route.fulfill({ status: 503, json: { error: 'Store unavailable' } });
   });
@@ -47,12 +51,13 @@ test('recovery redeems once under StrictMode, submits ticket and rejects reload'
   let verifies = 0;
   await page.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname;
-    if (path === '/api/auth/reset/verify') {
+    if (path === '/api/auth/password-key') await route.fulfill({ json: transport.publicKey() });
+    else if (path === '/api/auth/reset/verify') {
       verifies++;
       expect(route.request().postDataJSON()).toEqual({ token_hash: 'a'.repeat(56), type: 'recovery', recovery_id: '00000000-0000-4000-8000-000000000001' });
       await route.fulfill({ json: { ticket: 't'.repeat(48) } });
     } else if (path === '/api/auth/reset') {
-      expect(route.request().postDataJSON()).toEqual({ ticket: 't'.repeat(48), password: 'NewPassword123!' });
+      expect(await transport.open(route.request().postDataJSON().encrypted_credentials, '/auth/reset')).toEqual({ ticket: 't'.repeat(48), password: 'NewPassword123!' });
       await route.fulfill({ status: 503, json: { error: 'Temporary server error' } });
     } else await route.fulfill({ status: 503, json: { error: 'Store unavailable' } });
   });
