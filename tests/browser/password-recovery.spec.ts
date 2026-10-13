@@ -13,6 +13,10 @@ test('confirmation must match and success opens the themed password animation', 
   });
   await page.goto('/reset-password?recovery_id=00000000-0000-4000-8000-000000000001#token_hash=' + 'a'.repeat(56) + '&type=recovery');
   await page.getByLabel(/^Mật khẩu mới/).fill('abcdefghij');
+  await page.locator('.recovery-dialog').screenshot({ path: 'test-results/recovery-form-desktop.png' });
+  await page.getByRole('button', { name: 'Hiện mật khẩu mới', exact: true }).click();
+  await expect(page.getByLabel(/^Mật khẩu mới/)).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Ẩn mật khẩu mới', exact: true }).click();
   await expect(page.locator('#reset-password-rules .met')).toHaveCount(1);
   await page.getByLabel('Nhập lại mật khẩu mới').fill('abcdefghij');
   await page.getByRole('button', { name: 'Lưu mật khẩu' }).click();
@@ -29,7 +33,12 @@ test('confirmation must match and success opens the themed password animation', 
   const dialog = page.getByRole('dialog', { name: 'Mật khẩu đã được cập nhật' });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('button', { name: /Tiếp tục/ })).toBeFocused();
-  await expect(page.locator('.reset-password-new')).toHaveCSS('opacity', '1');
+  await expect(dialog.locator('.password-change-saved')).toHaveCSS('opacity', '1');
+  await dialog.screenshot({ path: 'test-results/recovery-success-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog.getByRole('button', { name: /Tiếp tục/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await dialog.screenshot({ path: 'test-results/recovery-success-mobile.png' });
   expect(await dialog.textContent()).not.toContain('NewPassword123!');
   expect(resets).toBe(1);
 });

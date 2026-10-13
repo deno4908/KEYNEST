@@ -1,4 +1,5 @@
 import { TwoFactor } from "./TwoFactor";
+import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
 import { AdminVerification } from "./AdminVerification";
 import { HomeAnnouncements } from "./Announcements";
@@ -21,6 +22,9 @@ import {
 } from "react-router-dom";
 import {
   ArrowDownLeft,
+  Eye,
+  EyeOff,
+  LockKeyhole,
   ArrowRight,
   ArrowUpRight,
   Check,
@@ -2003,6 +2007,8 @@ function ResetPassword() {
   const [completed, setCompleted] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [newPasswordValue, setNewPasswordValue] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const passwordChecks = [
     [newPasswordValue.length >= 10, '10 ký tự trở lên'],
     [/[A-Z]/.test(newPasswordValue) && /[a-z]/.test(newPasswordValue), 'Chữ hoa & thường'],
@@ -2088,20 +2094,51 @@ function ResetPassword() {
     }
   }
   return (
-    <div className="container page">
-      <form className="panel form reset-form" onSubmit={submit}>
-        <h1>Đặt mật khẩu mới</h1>
+    <Modal title={completed ? 'Mật khẩu đã được cập nhật' : 'Đặt mật khẩu mới'} className="auth-dialog recovery-dialog"
+      close={() => window.location.assign(completed ? '/account' : '/')}>
+      <div className="auth-layout">
+        <aside className="auth-art" data-mode="login">
+          <span className="auth-art-background auth-art-background-login" aria-hidden="true" />
+          <span className="auth-brand"><span>//</span> KEYNEST</span>
+          <div className="auth-art-copy">
+            <span className="auth-kicker">TÀI KHOẢN KEYNEST</span>
+            <h2>Đặt lại<br />mật khẩu.</h2>
+            <p>Cập nhật mật khẩu để tiếp tục<br />sử dụng tài khoản của bạn.</p>
+            <div className="auth-benefits">
+              <span><Package size={16} /> Theo dõi đơn hàng đã mua</span>
+              <span><Wallet size={16} /> Quản lý số dư và lịch sử ví</span>
+              <span><Headphones size={16} /> Tiếp tục yêu cầu hỗ trợ</span>
+            </div>
+          </div>
+          <span className="auth-art-caption">ELDEN RING · PC / STEAM</span>
+        </aside>
+        <div className="auth-content">
+          <div className="auth-heading">
+            <span className="auth-kicker">TÀI KHOẢN KEYNEST</span>
+            <h1>{completed ? 'Đã đổi mật khẩu.' : 'Đặt mật khẩu mới'}</h1>
+            <p>{completed ? 'Mật khẩu của bạn đã được cập nhật.' : 'Nhập mật khẩu mới và xác nhận lại bên dưới.'}</p>
+          </div>
+      <form className="auth-form recovery-form" onSubmit={submit}>
         {completed ? (
-          <p>Mật khẩu của bạn đã được cập nhật.</p>
+          <div className="recovery-complete">
+            <PasswordChangeAnimation />
+            <p>Dùng mật khẩu mới cho những lần đăng nhập tiếp theo.</p>
+            <button type="button" className="button auth-submit" autoFocus onClick={() => window.location.assign('/account')}>
+              Tiếp tục đến tài khoản <ArrowRight size={17} />
+            </button>
+          </div>
         ) : checkingLink ? (
           <p>Đang xác minh liên kết đặt lại mật khẩu…</p>
         ) : ticket ? (
           <>
-            <label>
-              Mật khẩu mới
+            <div className="auth-field">
+              <label htmlFor="recovery-password">Mật khẩu mới</label>
+              <div className="password-control">
               <input
+                id="recovery-password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Nhập mật khẩu mới"
                 autoComplete="new-password"
                 value={newPasswordValue}
                 disabled={busy}
@@ -2111,7 +2148,9 @@ function ResetPassword() {
                 minLength={10}
                 maxLength={128}
               />
-            </label>
+              <button type="button" aria-label={showPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'} aria-pressed={showPassword} onClick={() => setShowPassword(v => !v)}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+              </div>
+            </div>
             <div id="reset-password-rules" className="password-rules">
               {passwordChecks.map(([met, label]) => (
                 <span key={label} className={met ? 'met' : ''}>
@@ -2119,49 +2158,30 @@ function ResetPassword() {
                 </span>
               ))}
             </div>
-            <label>
-              Nhập lại mật khẩu mới
-              <input name="confirmPassword" type="password" autoComplete="new-password"
+            <div className="auth-field">
+              <label htmlFor="recovery-confirmation">Nhập lại mật khẩu mới</label>
+              <div className="password-control">
+              <input id="recovery-confirmation" name="confirmPassword" type={showConfirmation ? 'text' : 'password'} autoComplete="new-password"
+                placeholder="Nhập lại để xác nhận"
                 required minLength={10} maxLength={128} disabled={busy}
                 aria-invalid={!!passwordError} aria-describedby={passwordError ? 'reset-password-error' : undefined}
                 onInput={() => setPasswordError('')} />
-            </label>
-            {passwordError && <p id="reset-password-error" role="alert">{passwordError}</p>}
-            <button className="button" disabled={busy}>
+              <button type="button" aria-label={showConfirmation ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'} aria-pressed={showConfirmation} onClick={() => setShowConfirmation(v => !v)}>{showConfirmation ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+              </div>
+            </div>
+            {passwordError && <p className="recovery-error" id="reset-password-error" role="alert">{passwordError}</p>}
+            <button className="button auth-submit" disabled={busy}>
               {busy ? 'Đang cập nhật…' : 'Lưu mật khẩu'}
+              <ArrowRight size={17} aria-hidden="true" />
             </button>
           </>
         ) : (
-          <p role="alert">{linkError}</p>
+          <p className="recovery-error" role="alert">{linkError}</p>
         )}
       </form>
-      {completed && <Modal title="Mật khẩu đã được cập nhật" className="reset-success"
-        close={() => window.location.assign('/account')}>
-        <div className="reset-password-animation" aria-hidden="true">
-          <div className="reset-password-caption">
-            <span className="reset-password-labels"><span>Mật khẩu cũ</span><span>Mật khẩu mới</span></span>
-            <span className="reset-password-saved">Đã lưu an toàn</span>
-          </div>
-          <div className="reset-password-slot">
-            <svg className="reset-password-lock" width="20" height="24" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="1.6">
-              <path className="reset-password-shackle" d="M6 12V8a6 6 0 0 1 12 0v4" />
-              <rect x="3" y="12" width="18" height="13" rx="3" /><path d="M12 17v3" />
-            </svg>
-            <span className="reset-password-old">
-              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${350 + [0, 90, 35, 140, 65, 175, 110, 210][i]}ms` }} />)}
-            </span>
-            <span className="reset-password-new">
-              {Array.from({ length: 8 }, (_, i) => <i key={i} style={{ animationDelay: `${960 + i * 55}ms` }} />)}
-            </span>
-            <svg className="reset-password-tick" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" pathLength="1" /></svg>
-          </div>
-          <div className="reset-password-timeline"><span>Đã thay thế mật khẩu cũ</span><span>Sẵn sàng đăng nhập</span></div>
+          <div className="recovery-footer"><LockKeyhole size={14} /> {completed ? 'Mật khẩu cũ đã được thay thế.' : 'Liên kết chỉ dùng một lần và có hiệu lực trong 10 phút.'}</div>
         </div>
-        <p>Lần đăng nhập tiếp theo, hãy dùng mật khẩu mới của bạn.</p>
-        <button className="button" data-initial-focus onClick={() => window.location.assign('/account')}>
-          Tiếp tục đến tài khoản <ArrowRight size={17} />
-        </button>
-      </Modal>}
-    </div>
+      </div>
+    </Modal>
   );
 }
