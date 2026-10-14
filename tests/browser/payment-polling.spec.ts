@@ -1,5 +1,35 @@
 import { test, expect } from '@playwright/test';
 
+test('dynamic QR appears after preparation and updates to paid without reload', async ({page})=>{
+  expect((await (await page.request.get('/api/health')).json()).mode).toBe('demo');
+  await page.request.post('/api/auth/login', {headers:{Origin:'http://127.0.0.1:5173','X-App-Request':'keynest'},data:{email:'admin@keynest.local',password:'Admin123!'}});
+  const now=Date.now();
+  const pending={id:'dynamic-test',user_id:'test',order_id:null,code:'KN-DYNAMIC',amount:100000,status:'pending',
+    demo:false,created_at:new Date(now).toISOString(),expires_at:new Date(now+14*60000).toISOString(),qr_url:null,
+    provider:null,qr_state:'creating',bank:'',account:'',account_name:''};
+  const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPfkAAAAASUVORK5CYII=';
+  let phase='creating';
+  await page.route('**/api/wallet',route=>route.fulfill({json:{balance:100000,ledger:[],payments:[phase==='creating'?pending:{...pending,
+    provider:'tingee',qr_state:'ready',bill_id:'BILL-DYNAMIC-TEST',qr_url:png,bank:'970418',account:'QR-ACCOUNT-TEST',account_name:'KEYNEST',status:phase==='paid'?'paid':'pending'}]}}));
+  await page.route('**/api/wallet/topup',route=>route.fulfill({status:201,json:pending}));
+  await page.clock.install({time:now});
+  await page.goto('/wallet');
+  await page.getByRole('button',{name:'Tạo mã nạp tiền'}).click();
+  const modal=page.locator('.payment-modal');
+  await expect(modal).toContainText('Đang tạo mã QR');
+  phase='ready';
+  await page.clock.fastForward(4500);
+  await expect(modal.locator('.payment-qr')).toHaveAttribute('src',png);
+  await expect(modal).toContainText('BILL-DYNAMIC-TEST');
+  await expect(modal).toContainText('QR-ACCOUNT-TEST');
+  await expect(modal).not.toContainText('Giữ nguyên nội dung');
+  await page.setViewportSize({width:390,height:844});
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  phase='paid';
+  await page.clock.fastForward(4500);
+  await expect(modal.getByRole('heading',{name:'Đã nhận thanh toán.'})).toBeVisible();
+});
+
 test('wallet hides expired requests and removes pending requests as they expire', async ({ page }) => {
   expect((await (await page.request.get('/api/health')).json()).mode).toBe('demo');
   const login = await page.request.post('/api/auth/login', {

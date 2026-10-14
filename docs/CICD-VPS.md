@@ -135,7 +135,12 @@ SUPABASE_URL=https://PROJECT.supabase.co
 SUPABASE_ANON_KEY=DIEN_GIA_TRI_THAT
 SUPABASE_SERVICE_ROLE_KEY=DIEN_GIA_TRI_THAT
 INVENTORY_ENCRYPTION_KEY=GIU_NGUYEN_KHOA_64_HEX_DANG_DUNG
-BANK_PAYMENT_PROVIDER=pay2s
+BANK_PAYMENT_PROVIDER=tingee
+TINGEE_CLIENT_ID=DIEN_CLIENT_ID_THAT
+TINGEE_SECRET_TOKEN=DIEN_SECRET_TOKEN_THAT
+TINGEE_BANK_BIN=DIEN_BIN_NGAN_HANG_6_CHU_SO
+TINGEE_VA_ACCOUNT=DIEN_TAI_KHOAN_VA_TINGEE
+TINGEE_ACCOUNT_NAME=DIEN_TEN_NGUOI_NHAN
 BANK_CODE=MB
 BANK_ACCOUNT_NUMBER=DIEN_SO_TAI_KHOAN
 BANK_ACCOUNT_NAME=DIEN_TEN_CHU_TAI_KHOAN
@@ -148,7 +153,7 @@ AUTH_DISCORD_ENABLED=true
 
 Chỉ bật OAuth đã cấu hình. OTP email admin bắt buộc; cấu hình SMTP và mẫu Magic Link theo `docs/ADMIN-OTP.md` trước khi deploy. Cờ cũ `ADMIN_OTP_ENABLED=false` không còn tắt được OTP. Production yêu cầu thông tin ngân hàng và token webhook đầy đủ; không dùng placeholder để nhận thanh toán. Giữ nguyên khóa mã hóa khi dùng database đã có key sản phẩm. File `.env` ở VPS không đi qua GitHub và không bị thay khi deploy.
 
-Chạy các migration Supabase còn thiếu, theo thứ tự đến 016. Không chạy lại toàn bộ trên database đã có schema. Pipeline **không tự chạy migration hosted**: cập nhật schema tương thích trước khi deploy code cần nó. Rollback code không rollback database.
+Chạy các migration Supabase còn thiếu theo thứ tự đến 037. Không chạy lại toàn bộ trên database đã có schema. Pipeline **không tự chạy migration hosted**. Với migration 037, tạm dừng Node/payment worker và triển khai đồng bộ schema, backend, frontend theo [hướng dẫn Tingee](../deploy/tingee-payments.md). Rollback code không rollback database.
 
 ```bash
 sudo systemctl daemon-reload
@@ -228,7 +233,7 @@ Supabase → Auth → URL Configuration:
 - Site URL: `https://shop.example.com`
 - Redirect URLs: `https://shop.example.com/api/auth/oauth/callback` và `https://shop.example.com/reset-password`.
 
-Pay2S webhook: `https://shop.example.com/api/webhooks/pay2s`, token trùng `.env`.
+Tingee là cổng QR động mặc định, đối soát bằng API Credentials; không cần webhook Tingee. Pay2S tự dự phòng khi tạo QR Tingee lỗi. Giữ webhook Pay2S: `https://shop.example.com/api/webhooks/pay2s`, token trùng `.env`. Các biến `BANK_*` là tài khoản Pay2S dự phòng, có thể khác VA Tingee. Xem [cấu hình và kiểm tra Tingee](../deploy/tingee-payments.md).
 
 Mở website HTTPS kiểm tra danh mục, đăng nhập, avatar, đặt hàng, ví và phản hồi hỗ trợ. Health check của pipeline không kiểm tra các luồng này. Kafka tắt thì xử lý thanh toán đồng bộ, không chạy worker. Redis tắt thì rate limit trong RAM của một tiến trình, reset khi restart.
 

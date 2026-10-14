@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { captchaConfig } from './captcha.js';
+import { tingeeReady } from './tingee.js';
 export const config = {
   receipts: {
     enabled: process.env.ORDER_RECEIPTS_ENABLED === 'true',
@@ -17,7 +18,13 @@ export const config = {
   service: process.env.SUPABASE_SERVICE_ROLE_KEY,
   encryption: process.env.INVENTORY_ENCRYPTION_KEY,
   webhook: process.env.SEPAY_WEBHOOK_KEY,
-  paymentProvider: process.env.BANK_PAYMENT_PROVIDER || "pay2s",
+  paymentProvider: process.env.BANK_PAYMENT_PROVIDER || "tingee",
+  tingee: {
+    clientId: process.env.TINGEE_CLIENT_ID || '', secret: process.env.TINGEE_SECRET_TOKEN || '',
+    baseUrl: process.env.TINGEE_BASE_URL || 'https://open-api.tingee.vn',
+    bankBin: process.env.TINGEE_BANK_BIN || '', vaAccount: process.env.TINGEE_VA_ACCOUNT || '',
+    accountName: process.env.TINGEE_ACCOUNT_NAME || '', merchantId: Number(process.env.TINGEE_MERCHANT_ID || 0),
+  },
   pay2sWebhook: process.env.PAY2S_WEBHOOK_TOKEN || "",
   bank:
     process.env.BANK_CODE ||
@@ -33,8 +40,11 @@ export const config = {
     discord: process.env.AUTH_DISCORD_ENABLED === "true",
   },
 };
-if (!["sepay", "pay2s"].includes(config.paymentProvider))
-  throw new Error("BANK_PAYMENT_PROVIDER phải là pay2s hoặc sepay.");
+if (!["sepay", "pay2s", "tingee"].includes(config.paymentProvider))
+  throw new Error("BANK_PAYMENT_PROVIDER phải là tingee, pay2s hoặc sepay.");
+if (!['https://open-api.tingee.vn','https://uat-open-api.tingee.vn'].includes(config.tingee.baseUrl) ||
+  !Number.isSafeInteger(config.tingee.merchantId) || config.tingee.merchantId < 0)
+  throw new Error('Cấu hình endpoint / merchant Tingee không hợp lệ.');
 if (config.receipts.enabled && (!config.receipts.apiKey || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.receipts.sender)))
   throw new Error('Email biên nhận cần BREVO_API_KEY và ORDER_RECEIPTS_FROM hợp lệ.');
 if (!["demo", "supabase"].includes(config.mode))
@@ -52,6 +62,7 @@ if (
 if (
   config.production &&
   (!config.origin.startsWith("https://") ||
+    (config.paymentProvider === 'tingee' && !tingeeReady(config.tingee)) ||
     (config.paymentProvider === "pay2s" &&
       (!config.pay2sWebhook || !config.account || !config.accountName)) ||
     (config.paymentProvider === "sepay" &&
@@ -61,7 +72,7 @@ if (
         !config.accountName)))
 )
   throw new Error(
-    "Production yêu cầu HTTPS, thông tin ngân hàng và token webhook của nhà cung cấp đã chọn.",
+    "Production yêu cầu HTTPS và cấu hình xác thực của nhà cung cấp thanh toán đã chọn.",
   );
 // Demo key persisted by DemoStore. Never replace the production key after importing stock.
 if (config.mode === "demo")

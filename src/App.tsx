@@ -1351,7 +1351,7 @@ function CartPage() {
   );
 }
 export function PaymentModal({
-  payment,
+  payment: initialPayment,
   onClose,
   onPaid,
 }: {
@@ -1360,6 +1360,7 @@ export function PaymentModal({
   onPaid: () => void;
 }) {
   const { notify } = useStore();
+  const [payment,setPayment]=useState(initialPayment);
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(payment.status),
     [remaining, setRemaining] = useState(
@@ -1395,6 +1396,7 @@ export function PaymentModal({
           : (await api<{ payments: Payment[] }>('/wallet', options)).payments.find(p => p.id === payment.id);
         if (controller.signal.aborted) return;
         if (p) {
+          setPayment(p);
           terminal = p.status !== 'pending';
           setStatus(p.status);
           if (p.status === 'paid') onPaidRef.current();
@@ -1463,7 +1465,7 @@ export function PaymentModal({
                 <h2>{money(payment.amount)}</h2>
               </div>
               <span className="transfer-label">
-                {payment.demo ? "Bản demo" : "VietQR"}
+                {payment.demo ? "Bản demo" : payment.provider==='tingee' ? "QR động" : "VietQR"}
               </span>
             </div>
             <div className="transfer-grid">
@@ -1505,15 +1507,15 @@ export function PaymentModal({
                 ) : (
                   <div className="transfer-placeholder">
                     <Landmark size={36} />
-                    <strong>Chưa có mã QR</strong>
-                    <p>Chưa cấu hình tài khoản nhận tiền.</p>
+                    <strong>{payment.qr_state==='creating' ? 'Đang tạo mã QR' : 'Chưa có mã QR'}</strong>
+                    <p>{payment.qr_state==='failed' ? 'Chưa thể tạo mã thanh toán. Vui lòng liên hệ hỗ trợ.' : 'Vui lòng chờ hệ thống cập nhật mã thanh toán.'}</p>
                   </div>
                 )}
               </div>
               <div className="transfer-information">
                 <h3>Thông tin chuyển khoản</h3>
                 <div className="bank-details">
-                  {!payment.demo && (
+                  {!payment.demo && payment.qr_url && (
                     <>
                       <span>
                         Ngân hàng<strong>{payment.bank}</strong>
@@ -1544,15 +1546,15 @@ export function PaymentModal({
                     </>
                   )}
                   <span className="transfer-code">
-                    Nội dung chuyển khoản
+                    {payment.provider==='tingee' ? 'Mã hóa đơn thanh toán' : 'Nội dung chuyển khoản'}
                     <strong>
-                      {payment.code}
+                      {payment.provider==='tingee' ? payment.bill_id : payment.code}
                       <button
                         className="icon-button"
                         aria-label="Sao chép mã"
                         onClick={() =>
                           navigator.clipboard
-                            .writeText(payment.code)
+                            .writeText(payment.provider==='tingee' ? payment.bill_id || '' : payment.code)
                             .then(() => notify("Đã sao chép nội dung."))
                             .catch(() => notify("Không thể sao chép.", true))
                         }
@@ -1563,8 +1565,7 @@ export function PaymentModal({
                   </span>
                 </div>
                 <p className="transfer-instruction">
-                  Giữ nguyên nội dung và chuyển đúng số tiền để giao dịch được
-                  xác nhận tự động.
+                  {payment.provider==='tingee' ? 'Quét mã QR động của giao dịch này và kiểm tra số tiền trong ứng dụng ngân hàng. Hệ thống tự đối soát theo mã hóa đơn.' : 'Giữ nguyên nội dung và chuyển đúng số tiền để giao dịch được xác nhận tự động.'}
                 </p>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { AppError, safeEqual } from "./security.js";
+import { bankSourceEnabled } from './payment-routing.js';
 
 const identifier = z.union([
   z.number().int().positive().max(Number.MAX_SAFE_INTEGER).transform(String),
@@ -55,7 +56,7 @@ export function createPay2SRouter({ config, bankPayments, paymentIngress }) {
   router.post("/webhooks/pay2s", async (req, res) => {
     if (
       config.mode !== "supabase" ||
-      config.paymentProvider !== "pay2s" ||
+      !bankSourceEnabled(config, 'pay2s') ||
       !config.pay2sWebhook ||
       !config.account
     )

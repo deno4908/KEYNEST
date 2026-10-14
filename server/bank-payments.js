@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { AppError, digest, webhookCode } from "./security.js";
+import { bankSourceEnabled, pay2sReady } from './payment-routing.js';
+import { tingeeReady } from './tingee.js';
 
 export const bankTransaction = z
   .object({
@@ -20,6 +22,12 @@ export const bankTransaction = z
 export function createBankPayments({ config, store }) {
   let lastReceivedAt = null;
   function status() {
+    if(config.paymentProvider==='tingee') {
+      const primary=tingeeReady(config.tingee), backup=pay2sReady(config);
+      return {provider:'tingee',configured:primary,ready:config.mode!=='demo'&&(primary||backup),
+        reason:config.mode==='demo'?'demo':primary?null:'tingee_credentials_missing',
+        webhook_path:null,mode:'api_polling',fallback_provider:'pay2s',fallback_ready:backup,last_received_at:lastReceivedAt};
+    }
     const key =
       config.paymentProvider === "pay2s" ? config.pay2sWebhook : config.webhook;
     const reason =
@@ -46,7 +54,7 @@ export function createBankPayments({ config, store }) {
   async function accept(source, input) {
     if (
       !["sepay", "pay2s"].includes(source) ||
-      source !== config.paymentProvider
+      !bankSourceEnabled(config, source)
     )
       throw new AppError("Nguồn thanh toán không được bật.", 503);
     const transaction = bankTransaction.parse(input);
@@ -64,7 +72,7 @@ export function createBankPayments({ config, store }) {
     } catch {
       code = `UNMATCHED:${id}`;
     }
-    return store.settle(id, code, transaction.amount);
+    return store.settleBank ? store.settleBank(source,id,code,transaction.amount) : store.settle(id, code, transaction.amount);
   }
   function received() {
     lastReceivedAt = new Date().toISOString();

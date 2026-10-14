@@ -1668,6 +1668,59 @@ try {
   await fails('select finish_order_receipt($1,$2,true)',[receipt.id,retryReceipt.claim_token]);
   await db.exec('reset role');
   pass('receipt queue leases, crash retry, backoff, stale acknowledgement protection and browser access denial');
+  {
+  const routeUser=randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'routing@example.test')",[routeUser]);
+  const paymentId=await scalar('select id from create_wallet_topup($1,33000)',[routeUser]);
+  const paymentCode=await scalar('select code from payments where id=$1',[paymentId]);
+  const claimA=randomUUID(),claimB=randomUUID();
+  const claim=(id,token)=>db.query('select * from claim_payment_route($1,$2)',[id,token]);
+  assert.equal((await claim(paymentId,claimA)).rows[0].claim_token,claimA);
+  assert.equal((await claim(paymentId,claimB)).rows[0].claim_token,claimA);
+  const routeData={provider:'tingee',bill_id:'TEST-BILL-001',qr_account:'TEST-QR',qr_image:'data:image/png;base64,TEST',
+    bank:'970418',bank_bin:'970418',va_account:'TEST-VA',account:'TEST-QR',account_name:'TEST',expires_at:new Date(Date.now()+10*60000).toISOString()};
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[paymentId,claimB,JSON.stringify(routeData)]),false);
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[paymentId,claimA,JSON.stringify(routeData)]),true);
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[paymentId,claimA,JSON.stringify({provider:'pay2s'})]),false);
+  assert.equal((await claim(paymentId,claimB)).rows[0].provider,'tingee');
+  assert.ok(Date.parse(await scalar('select expires_at from payments where id=$1',[paymentId]))<=Date.parse(routeData.expires_at));
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4)', ['pay2s','wrong-provider',paymentCode,33000])).ignored,true);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','wrong-bill',paymentCode,33000,'OTHER'])).ignored,true);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','wrong-amount',paymentCode,32000,routeData.bill_id])).review,true);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),0);
+  const polls=await db.query('select * from claim_tingee_polls()');
+  assert.equal(polls.rows.length,1);assert.equal((await db.query('select * from claim_tingee_polls()')).rows.length,0);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','tingee-paid',paymentCode,33000,routeData.bill_id])).paid,true);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','tingee-paid',paymentCode,33000,routeData.bill_id])).duplicate,true);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),33000);
+  assert.equal(await scalar("select outcome from payment_events where transaction_id='wrong-provider'"),'provider_mismatch');
+  await fails('select credit_reviewed_payment($1,$2,$3,$4)', ['wrong-provider',routeUser,'Must not double credit',other]);
+  pass('dynamic QR claims are exclusive, expiry is aligned, source/bill/amount mismatches cannot credit, polling and settlement deduplicate');
+  const backupId=await scalar('select id from create_wallet_topup($1,34000)',[routeUser]);
+  const backupCode=await scalar('select code from payments where id=$1',[backupId]);
+  await claim(backupId,claimA);
+  await db.query("update payment_routes set lease_until=now()-interval '1 second' where payment_id=$1",[backupId]);
+  assert.equal((await claim(backupId,claimB)).rows[0].attempts,2);
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[backupId,claimA,JSON.stringify(routeData)]),false);
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[backupId,claimB,JSON.stringify({provider:'pay2s',bank:'MB',account:'BACKUP',account_name:'TEST'})]),true);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','stale-tingee',backupCode,34000,'UNKNOWN-BILL'])).ignored,true);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4)', ['pay2s','backup-paid',backupCode,34000])).paid,true);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),67000);
+  const lateId=await scalar('select id from create_wallet_topup($1,35000)',[routeUser]);
+  const lateCode=await scalar('select code from payments where id=$1',[lateId]);
+  await claim(lateId,claimA);
+  await scalar('select finish_payment_route($1,$2,$3)',[lateId,claimA,JSON.stringify({...routeData,bill_id:'LATE-BILL'})]);
+  await db.query("update payments set expires_at=now()-interval '1 second' where id=$1",[lateId]);
+  assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','late-paid',lateCode,35000,'LATE-BILL'])).review,true);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),67000);
+  await db.exec('set role authenticated');
+  await fails('select * from payment_routes');
+  await fails('select * from claim_payment_route($1,$2)',[lateId,claimA]);
+  await fails('select * from claim_tingee_polls()');
+  await fails('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','forged-paid',lateCode,35000,'LATE-BILL']);
+  await db.exec('reset role');
+  pass('stale generation cannot overwrite fallback, late payment is reviewed without credit and browser roles cannot create or settle QR bills');
+  }
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

@@ -148,11 +148,16 @@ export class SupabaseStore {
         .abortSignal(AbortSignal.timeout(20000)),
     );
   }
+  async settleBank(source,transaction_id,code,amount) {
+    return this.query(this.client.rpc('settle_routed_payment',{
+      p_source:source,p_transaction:String(transaction_id),p_code:code,p_amount:amount,
+    }).abortSignal(AbortSignal.timeout(20000)));
+  }
   async orders(uid, admin = false, id) {
     await this.expire();
     let q = this.client
       .from("orders")
-      .select("*,items:order_items(*),payment:payments(*)")
+      .select("*,items:order_items(*),payment:payments(*,route:payment_routes(*))")
       .order("created_at", { ascending: false });
     if (!admin) q = q.eq("user_id", uid);
     if (id) q = q.eq("id", id);
@@ -190,7 +195,7 @@ export class SupabaseStore {
     return this.query(
       this.client
         .from("payments")
-        .select("*")
+        .select("*,route:payment_routes(*)")
         .eq("user_id", uid)
         .order("created_at", { ascending: false }),
     );

@@ -12,6 +12,7 @@ import { createOAuthRouter } from "./oauth.js";
 import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
 import { createReceiptWorker } from './order-receipts.js';
+import { createPaymentRouting } from './payment-routing.js';
 import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
@@ -55,10 +56,17 @@ export const store =
         process.env.DEMO_DATA_PATH || ".data/demo.json",
       )
     : new SupabaseStore();
+if (config.mode === 'supabase') {
+  // Do not pass deployment health checks with an incompatible payment schema.
+  const { error } = await store.client.from('payment_routes').select('payment_id').limit(0)
+    .abortSignal(AbortSignal.timeout(10000));
+  if (error) throw new Error('Không truy cập được payment_routes. Kiểm tra kết nối Supabase và áp dụng migration 037 trước khi triển khai.');
+}
 export const bankPayments = createBankPayments({
   config,
   store,
 });
+const paymentRouting = createPaymentRouting({store,config});
 const infraConfig = infrastructureConfig();
 export const infrastructure = await createInfrastructure(infraConfig);
 const paymentIngress = createPaymentIngress({
@@ -400,33 +408,40 @@ const variantSchema = z
   .strict().refine(v => !v.is_preorder || (v.delivery === 'manual' && !!v.expected_delivery),
     'Đặt trước cần giao thủ công và ngày giao dự kiến.');
 app.use('/api', sellersRouter({ store, auth, admin, limiter, categoryStore, productSchema, variantSchema, secretsSchema }));
-function paymentInfo(p) {
+async function paymentInfo(p) {
   if (!p) return null;
+  const route = await paymentRouting.prepare(p);
+  const bank=route?.bank || config.bank, account=route?.account || config.account,
+    accountName=route?.account_name || config.accountName;
   const query = new URLSearchParams({
-    acc: config.account,
-    bank: config.bank,
+    acc: account,
+    bank,
     amount: String(p.amount),
     des: p.code,
     template: "compact",
-    holder: config.accountName,
+    holder: accountName,
   });
   return {
-    ...p,
+    id:p.id,user_id:p.user_id,order_id:p.order_id,amount:p.amount,code:p.code,status:p.status,
+    created_at:p.created_at,expires_at:route?.qr_expires_at || p.expires_at,
+    provider:route?.provider || (route ? null : 'legacy'),
+    qr_state:route?.state || 'ready',
+    bill_id:route?.bill_id || null,
     qr_url:
-      config.mode === "supabase" && config.account
+      route && route.state!=='ready' ? null : route?.provider==='tingee' ? route.qr_image : config.mode === "supabase" && account
         ? `https://vietqr.app/img?${query}`
         : null,
-    bank: config.bank,
-    account: config.account,
-    account_name: config.accountName,
+    bank,
+    account:route && route.state!=='ready' ? '' : account,
+    account_name:accountName,
     demo: config.mode === "demo",
   };
 }
-function orderInfo(o) {
+async function orderInfo(o) {
   const { fingerprint, idempotency, ...result } = o;
   return {
     ...result,
-    payment: paymentInfo(o.payment),
+    payment: await paymentInfo(o.payment),
     items: o.items.map((i) => ({
       ...i,
       product_image: i.product_image || productImages[i.product_slug] || "",
@@ -630,7 +645,7 @@ app.post("/api/auth/logout", async (req, res) => {
   res.json({ ok: true });
 });
 app.get("/api/orders", auth, async (req, res) =>
-  res.json((await store.orders(req.user.id)).map(orderInfo)),
+  res.json(await Promise.all((await store.orders(req.user.id)).map(orderInfo))),
 );
 app.post("/api/coupons/preview", auth, limiter(40), async (req, res) => {
   const input = z
@@ -652,7 +667,7 @@ app.get("/api/orders/:id", auth, async (req, res) => {
   const order = (await store.orders(req.user.id, false, id))[0];
   if (!order) throw new AppError("Không tìm thấy đơn hàng.", 404);
   res.json({
-    ...orderInfo(order),
+    ...await orderInfo(order),
     warranty_requests: (await store.tickets(req.user.id)).filter(
       (t) => t.kind === "warranty" && t.order_id === id,
     ),
@@ -691,7 +706,7 @@ app.post("/api/orders", auth, limiter(15), async (req, res) => {
   if (payload.method === "sepay") bankPayments.assertReady();
   const o = await store.createOrder(req.user.id, payload, idempotency);
   const result = (await store.orders(req.user.id)).find((x) => x.id === o.id);
-  res.status(201).json(orderInfo(result));
+  res.status(201).json(await orderInfo(result));
 });
 app.post("/api/orders/:id/cancel", auth, async (req, res) => {
   await store.cancel(req.user.id, uuid.parse(req.params.id));
@@ -704,9 +719,9 @@ app.get("/api/wallet", auth, async (req, res) => {
   res.json({
     balance: profile.balance,
     ledger,
-    payments: payments
+    payments: await Promise.all(payments
       .filter((p) => !p.order_id)
-      .map(paymentInfo),
+      .map(paymentInfo)),
   });
 });
 app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
@@ -717,7 +732,7 @@ app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
   bankPayments.assertReady();
   res
     .status(201)
-    .json(paymentInfo(await store.createTopup(req.user.id, amount)));
+    .json(await paymentInfo(await store.createTopup(req.user.id, amount)));
 });
 app.post("/api/demo/pay/:id", auth, async (req, res) => {
   if (config.mode !== "demo") throw new AppError("Không tìm thấy.", 404);
@@ -861,7 +876,7 @@ app.get("/api/admin/orders/:id", async (req, res) => {
     store.tickets(order.user_id),
   ]);
   res.json({
-    ...orderInfo(order),
+    ...await orderInfo(order),
     customer,
     warranty_requests: tickets.filter(
       (t) => t.kind === "warranty" && t.order_id === id,
@@ -890,7 +905,7 @@ app.get("/api/admin/overview", async (req, res) => {
   const data = await store.overview();
   res.json({
     ...data,
-    orders: data.orders.map(orderInfo),
+    orders: await Promise.all(data.orders.map(orderInfo)),
     products: await store.products(true),
   });
 });
@@ -1154,12 +1169,16 @@ if (process.env.NODE_ENV !== "test") {
   const receiptTimer = setInterval(() => void receiptWorker.tick(), 15000);
   receiptTimer.unref();
   void receiptWorker.tick();
+  const tingeeTimer=setInterval(()=>void paymentRouting.tick(),15000);
+  tingeeTimer.unref();
+  void paymentRouting.tick();
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(timer);
     clearInterval(receiptTimer);
+    clearInterval(tingeeTimer);
     const force = setTimeout(() => process.exit(1), 30000);
     force.unref();
     await new Promise((done) => server.close(done));

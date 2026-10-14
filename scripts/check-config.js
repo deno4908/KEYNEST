@@ -1,4 +1,5 @@
 import "dotenv/config";
+const provider=process.env.BANK_PAYMENT_PROVIDER || 'tingee';
 const required = [
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
@@ -6,7 +7,8 @@ const required = [
   "INVENTORY_ENCRYPTION_KEY",
   "BANK_ACCOUNT_NUMBER",
   "BANK_ACCOUNT_NAME",
-  "PAY2S_WEBHOOK_TOKEN",
+  ...(provider==='sepay' ? ['SEPAY_WEBHOOK_KEY'] : ['PAY2S_WEBHOOK_TOKEN']),
+  ...(provider==='tingee' ? ['TINGEE_CLIENT_ID','TINGEE_SECRET_TOKEN','TINGEE_BANK_BIN','TINGEE_VA_ACCOUNT','TINGEE_ACCOUNT_NAME'] : []),
 ];
 let missing = false;
 for (const name of required) {
@@ -19,13 +21,14 @@ const valid = (name, result) => {
   if (!result) missing = true;
 };
 valid("APP_MODE=supabase", process.env.APP_MODE === "supabase");
+if (provider === 'tingee') valid('TINGEE_BANK_BIN (6 chu so)', /^\d{6}$/.test(process.env.TINGEE_BANK_BIN || ''));
 valid(
-  "BANK_PAYMENT_PROVIDER=pay2s",
-  process.env.BANK_PAYMENT_PROVIDER === "pay2s",
+  "BANK_PAYMENT_PROVIDER (tingee/pay2s/sepay)",
+  ['tingee','pay2s','sepay'].includes(provider),
 );
 valid(
-  "BANK_CODE=MB",
-  ["MB", "MBBANK", "970422"].includes(process.env.BANK_CODE?.toUpperCase()),
+  "BANK_CODE (ngan hang Pay2S du phong)",
+  !!process.env.BANK_CODE,
 );
 valid(
   "INVENTORY_ENCRYPTION_KEY (64 hex)",
@@ -42,7 +45,7 @@ valid(
     }
   })(),
 );
-valid(
+if(provider!=='sepay') valid(
   "PAY2S_WEBHOOK_TOKEN (khong gom Bearer)",
   Boolean(
     process.env.PAY2S_WEBHOOK_TOKEN &&
@@ -50,6 +53,6 @@ valid(
   ),
 );
 console.log(
-  "Chỉ kiểm tra cấu hình; không gọi Pay2S/Supabase, không xác nhận token hợp lệ và không in secret.",
+  "Chỉ kiểm tra cấu hình; không gọi Tingee/Pay2S/Supabase, không xác nhận credentials hợp lệ và không in secret.",
 );
 process.exitCode = missing ? 1 : 0;

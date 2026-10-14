@@ -6,7 +6,8 @@ type BankStatus = {
   configured: boolean;
   ready: boolean;
   reason: string | null;
-  webhook_path: string;
+  webhook_path: string | null;
+  fallback_ready?: boolean;
   last_received_at: string | null;
   infrastructure?: {
     kafka_enabled: boolean;
@@ -19,6 +20,7 @@ const reasons: Record<string, string> = {
   demo: "Đang chạy mô phỏng, không nhận tiền thật.",
   bank_details_missing: "Chưa cấu hình đủ thông tin tài khoản ngân hàng.",
   webhook_key_missing: "Chưa cấu hình token webhook ở server.",
+  tingee_credentials_missing: "Thiếu cấu hình Tingee. Kiểm tra API Credentials và tài khoản VA.",
 };
 export function BankPaymentStatus() {
   const [status, setStatus] = useState<BankStatus | null>(null);
@@ -48,18 +50,21 @@ export function BankPaymentStatus() {
   return (
     <section className="panel" aria-label="Kết nối ngân hàng">
       <h3>
-        {status?.provider === "pay2s"
+        {status?.provider === 'tingee' ? 'Tingee · QR động' : status?.provider === "pay2s"
           ? "Pay2S · Chuyển khoản ngân hàng"
           : "Kết nối ngân hàng"}
       </h3>
       <p className="muted" role="status">
         {!status
           ? "Đang kiểm tra cấu hình…"
-          : status.ready
-            ? "Đã cấu hình tiếp nhận webhook"
+          : status.reason
+            ? reasons[status.reason] || "Chưa sẵn sàng"
+            : status.ready
+            ? (status.provider==='tingee' ? 'Đối soát bằng API trạng thái bill · Không dùng webhook Tingee' : "Đã cấu hình tiếp nhận webhook")
             : reasons[status.reason || ""] || "Chưa sẵn sàng"}
       </p>
-      {status && (
+      {status?.provider==='tingee' && <p className="muted">Pay2S dự phòng: {status.fallback_ready ? 'đã cấu hình; tự dùng khi tạo QR Tingee thất bại' : 'chưa cấu hình'}. QR đã cấp sẽ tiếp tục được đối soát qua cổng ban đầu.</p>}
+      {status?.webhook_path && (
         <p className="muted">
           Đường dẫn webhook: <code>{status.webhook_path}</code>
         </p>
@@ -67,7 +72,7 @@ export function BankPaymentStatus() {
       {status?.infrastructure && (
         <p className="muted">
           Xử lý thanh toán:{" "}
-          {status.infrastructure.kafka_enabled ? "Kafka + worker" : "trực tiếp"}
+          {status.provider==='tingee' ? 'Tingee: API polling; Pay2S: ' : ''}{status.infrastructure.kafka_enabled ? "Kafka + worker" : "trực tiếp"}
           . Giới hạn truy cập:{" "}
           {status.infrastructure.redis_enabled
             ? status.infrastructure.redis_ready
@@ -85,7 +90,7 @@ export function BankPaymentStatus() {
           {date(status.last_received_at)}
         </p>
       ) : (
-        status?.ready && (
+        status?.ready && status.provider!=='tingee' && (
           <p className="muted">
             Chưa nhận webhook trong phiên chạy này. Kiểm tra giao dịch thử và
             lịch sử gửi trên Pay2S.

@@ -44,6 +44,9 @@ export type User = {
   balance: number;
 };
 export type Payment = {
+  provider?: string | null;
+  qr_state?: string;
+  bill_id?: string | null;
   id: string;
   amount: number;
   code: string;

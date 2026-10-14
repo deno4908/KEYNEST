@@ -3,6 +3,7 @@ import { createClient } from "redis";
 import { RedisStore } from "rate-limit-redis";
 import { z } from "zod";
 import { bankTransaction } from "./bank-payments.js";
+import { bankSourceEnabled } from './payment-routing.js';
 import { AppError, digest, webhookCode } from "./security.js";
 
 export function infrastructureConfig(env = process.env) {
@@ -85,7 +86,7 @@ export function createPaymentIngress({
     },
     async acceptBatch(source, inputs) {
       // Validate the entire callback before writing any message.
-      if (source !== config.paymentProvider)
+      if (!bankSourceEnabled(config,source))
         throw new AppError("Nguồn thanh toán không được bật.", 503);
       const transactions = z
         .array(bankTransaction)
