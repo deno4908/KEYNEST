@@ -58,9 +58,9 @@ export const store =
     : new SupabaseStore();
 if (config.mode === 'supabase') {
   // Do not pass deployment health checks with an incompatible payment schema.
-  const { error } = await store.client.from('payment_routes').select('payment_id').limit(0)
+  const { error } = await store.client.from('payment_routes').select('payment_id,qr_kind').limit(0)
     .abortSignal(AbortSignal.timeout(10000));
-  if (error) throw new Error('Không truy cập được payment_routes. Kiểm tra kết nối Supabase và áp dụng migration 037 trước khi triển khai.');
+  if (error) throw new Error('Không truy cập được payment_routes/qr_kind. Kiểm tra kết nối Supabase và áp dụng migration 037, 038 theo đúng thứ tự trước khi triển khai.');
 }
 export const bankPayments = createBankPayments({
   config,
@@ -426,6 +426,7 @@ async function paymentInfo(p) {
     created_at:p.created_at,expires_at:route?.qr_expires_at || p.expires_at,
     provider:route?.provider || (route ? null : 'legacy'),
     qr_state:route?.state || 'ready',
+    qr_kind:route?.qr_kind || null,
     bill_id:route?.bill_id || null,
     qr_url:
       route && route.state!=='ready' ? null : route?.provider==='tingee' ? route.qr_image : config.mode === "supabase" && account

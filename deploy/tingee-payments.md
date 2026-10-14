@@ -1,56 +1,57 @@
-# Tingee QR động chính, Pay2S tự động dự phòng
+# Tingee QR tĩnh VCB, Pay2S tự động dự phòng
 
-## Cập nhật ứng dụng
+KEYNEST mặc định tạo VietQR tĩnh qua Tingee cho tài khoản VCB cá nhân. Pay2S chỉ được gán cho giao dịch mới nếu Tingee không tạo được QR hoặc không đọc được lịch sử giao dịch. Cổng thanh toán được lưu cố định theo từng giao dịch; không đổi QR của một giao dịch đã phát hành.
 
-Tạm dừng API Node và payment worker khi nâng cấp. Chạy `supabase/migrations/037_tingee_payments.sql` một lần sau migration 036. Triển khai frontend/backend, chạy `npm ci` và `npm run build`, rồi khởi động lại cả hai. Không chạy backend cũ sau khi áp dụng migration mới. Giữ nguyên khóa mã hóa kho và các cấu hình Supabase hiện có.
+Tingee ghi rõ VCB cá nhân không hỗ trợ QR động, nhưng hỗ trợ QR tĩnh. QR tĩnh có thể điền sẵn số tiền và nội dung chuyển khoản; nó không phải bill QR một lần của API động. [Bảng hỗ trợ QR của Tingee](https://developers.tingee.vn/docs/luu-y-quan-trong/) · [API tạo VietQR tĩnh](https://developers.tingee.vn/docs/qr/static/generate-viet-qr/).
 
-Backend kiểm tra bảng `payment_routes` khi khởi động. Nếu chưa chạy migration hoặc Supabase không truy cập được, bản mới sẽ không vượt qua health check triển khai. Pipeline không tự chạy SQL hoặc thay `.env` trên VPS.
+## Triển khai
 
-Trong `.env` trên VPS:
+1. Tạm dừng API Node và worker thanh toán trong lúc áp dụng schema.
+2. Chạy `supabase/migrations/037_tingee_payments.sql`, sau đó `supabase/migrations/038_tingee_static_qr.sql` trong Supabase SQL Editor. Không chạy migration 038 trước 037.
+3. Cập nhật `.env` trên VPS, triển khai frontend/backend mới, rồi khởi động lại API và worker.
+4. Tạo **giao dịch mới** để kiểm tra. Những giao dịch đã phát hành QR Pay2S tiếp tục dùng Pay2S.
+
+Pipeline không tự chạy SQL hoặc thay `.env` trên VPS. Backend kiểm tra bảng `payment_routes` và cột `qr_kind` khi khởi động; thiếu migration thì health check sẽ thất bại.
+
+## Cấu hình VPS
 
 ```dotenv
 BANK_PAYMENT_PROVIDER=tingee
+TINGEE_QR_MODE=static
 TINGEE_CLIENT_ID=YOUR_CLIENT_ID
 TINGEE_SECRET_TOKEN=YOUR_SECRET_TOKEN
-TINGEE_BANK_BIN=YOUR_BANK_BIN
-TINGEE_VA_ACCOUNT=YOUR_LINKED_VA_ACCOUNT
-TINGEE_ACCOUNT_NAME=YOUR_BENEFICIARY_NAME
-# Chỉ dùng với credentials Master Merchant; tài khoản thường để trống.
-TINGEE_MERCHANT_ID=
-# Production mặc định; UAT chỉ dùng cùng credentials thử nghiệm.
+TINGEE_BANK_BIN=970436
+TINGEE_ACCOUNT_NUMBER=YOUR_LINKED_VCB_ACCOUNT_NUMBER
+TINGEE_ACCOUNT_NAME=YOUR_VCB_ACCOUNT_NAME
 TINGEE_BASE_URL=https://open-api.tingee.vn
 
-# Pay2S dự phòng: giữ cấu hình đang hoạt động.
+# Chỉ dùng với QR động/VA; để trống khi dùng VCB cá nhân và QR tĩnh.
+TINGEE_VA_ACCOUNT=
+# Chỉ credentials Master Merchant mới cần giá trị này.
+TINGEE_MERCHANT_ID=
+
+# Pay2S tự động dự phòng; giữ đúng thông tin nhận tiền và webhook đang hoạt động.
 BANK_CODE=MB
 BANK_ACCOUNT_NUMBER=YOUR_PAY2S_BANK_ACCOUNT
 BANK_ACCOUNT_NAME=YOUR_PAY2S_ACCOUNT_NAME
 PAY2S_WEBHOOK_TOKEN=YOUR_EXISTING_PAY2S_TOKEN
 ```
 
-Trong Tingee BaaS Portal → **API Credentials**, tạo Client ID/Secret Token được cấp quyền QR. Tài khoản VA và ngân hàng phải hỗ trợ QR động và được liên kết trước. `TINGEE_BANK_BIN` là mã BIN ngân hàng 6 chữ số; `TINGEE_VA_ACCOUNT` là tài khoản định danh của Tingee, không tự lấy số tài khoản Pay2S điền thay. [Hướng dẫn Credentials chính thức](https://developers.tingee.vn/docs/config-info/).
+`TINGEE_ACCOUNT_NUMBER` là **số tài khoản VCB nhận tiền đã liên kết với Tingee**, không phải số VA. `TINGEE_VA_ACCOUNT` chỉ dành cho QR động. `TINGEE_BANK_BIN=970436` là BIN VCB; tên chủ tài khoản phải khớp tài khoản ngân hàng. Không điền `TINGEE_ACCOUNT_NUMBER` bằng số tài khoản Pay2S.
 
-Credentials chỉ nằm ở backend. Yêu cầu API được ký HMAC-SHA512 trên timestamp UTC+7 và JSON body. Frontend nhận ảnh PNG của chuỗi QR Tingee trả về, mã bill và thông tin thanh toán; không nhận Secret Token.
+Trong Tingee BaaS Portal → **API Credentials**, dùng Client ID/Secret Token có quyền tạo VietQR và truy vấn lịch sử giao dịch. Tài khoản VCB cần được liên kết/cấp quyền nhận biến động cho merchant. Secrets chỉ lưu ở backend. [Hướng dẫn API Credentials](https://developers.tingee.vn/docs/config-info/).
 
-Tingee dùng API tạo QR `dynamic-one-time-payment`, có `billId`, số tiền, thời hạn tính bằng phút. Server tự render đúng chuỗi QR trả về thành ảnh; không tạo lại QR chuyển khoản tĩnh từ nội dung. [API tạo QR động](https://developers.tingee.vn/docs/qr/dynamic/generate-dynamic-qr/).
+Nếu `TINGEE_QR_MODE=dynamic`, cấu hình `TINGEE_VA_ACCOUNT` thay cho `TINGEE_ACCOUNT_NUMBER`; tài khoản/ngân hàng phải hỗ trợ QR động. Để dùng VCB cá nhân, giữ chế độ `static`.
 
-## Tự dự phòng
+## Đối soát QR tĩnh
 
-Môi trường thử nghiệm Tingee dùng `TINGEE_BASE_URL=https://uat-open-api.tingee.vn`. Không dùng credentials production trên UAT.
+Mỗi giao dịch có QR VietQR điền sẵn số tiền và mã `KN…` riêng. Người mua phải giữ nguyên nội dung và chuyển đúng số tiền. Worker backend đọc API lịch sử giao dịch Tingee, chỉ tự ghi nhận giao dịch `CREDIT` khớp ngân hàng, tài khoản nhận, mã đơn, thời gian và số tiền. [API lịch sử giao dịch Tingee](https://developers.tingee.vn/docs/banking/get-paging-transaction/).
 
-- Khi tạo thanh toán mới, backend thử Tingee trước. Timeout, lỗi HTTP, phản hồi không hợp lệ hoặc lỗi API sẽ chọn Pay2S nếu cấu hình dự phòng đầy đủ.
-- Cổng thanh toán, tài khoản nhận và QR được lưu theo từng giao dịch. Khách không cần chọn cổng.
-- QR Tingee đã cấp sẽ tiếp tục dùng Tingee. Lỗi tra cứu được thử lại, không chuyển QR đó sang Pay2S.
-- Nếu tiến trình dừng giữa lúc tạo QR và lưu kết quả, sau 45 giây giao dịch được phục hồi sang Pay2S khi được tải lại. QR Tingee chưa lưu không được hiển thị cho khách; không tạo thêm bill Tingee cho giao dịch đó.
-- Nếu cả hai cổng không dùng được, màn hình không hiển thị QR/tài khoản để nhận tiền. Kiểm tra cấu hình và liên hệ hỗ trợ; đơn chưa thanh toán vẫn tuân theo thời hạn hết hạn.
-- Các giao dịch cũ trước migration giữ luồng chuyển khoản cũ. Duy trì webhook Pay2S và tài khoản nhận cũ để xử lý chúng. Không thay credentials sang merchant khác khi còn QR chờ thanh toán.
+Worker truy vấn định kỳ, không cần webhook Tingee. Nếu lịch sử giao dịch không khả dụng ngay lúc tạo QR, hệ thống không phát hành QR Tingee cho giao dịch đó và sẽ thử Pay2S dự phòng. Nếu QR Tingee đã được phát hành, lỗi truy vấn chỉ được thử lại; không chuyển giao dịch đó sang Pay2S.
 
-**Không cần webhook Tingee.** Worker chạy cùng Node, gọi API trạng thái theo `billId` và `qrAccount`, kiểm tra ngân hàng/VA/số tiền, chỉ tự ghi nhận khi `fully-paid` và số tiền khớp. Worker kiểm tra theo đợt khoảng 30 giây; trình duyệt cập nhật từ backend, kể cả khách đóng trang thì worker vẫn đối soát. [API trạng thái QR](https://developers.tingee.vn/docs/qr/dynamic/get-status-dynamic-qr/).
+QR tĩnh không thể bị vô hiệu hóa ở phía ngân hàng. KEYNEST chỉ tự đối soát giao dịch trong hạn thanh toán; giao dịch đến muộn hoặc sai số tiền cần admin kiểm tra, không được tự cộng tiền/giao hàng. Backend tiếp tục dò lịch sử tối đa 7 ngày để đưa các khoản chuyển muộn vào danh sách cần đối soát. Chuyển khoản thiếu/thừa hoặc sai nội dung không được tự xác nhận.
 
-Pay2S dự phòng vẫn dùng webhook có xác thực hiện có tại `/api/webhooks/pay2s`. Nếu bật Kafka, giữ payment worker đang chạy để xử lý Pay2S; Tingee được đối soát trực tiếp trong tiến trình API Node. Chỉ thêm API Credentials Tingee không thay đổi cách nhận giao dịch Pay2S.
-
-Báo cáo từ cổng khác với cổng đã gắn cho giao dịch được lưu với trạng thái `provider_mismatch`, không cộng tiền và không cho cộng tiền thủ công từ báo cáo đó. Điều này tránh cùng một chuyển khoản được Tingee và Pay2S báo lại rồi ghi có hai lần.
-
-QR hết hạn hoặc đơn bị hủy được kiểm tra rồi vô hiệu hóa qua Tingee; tiền đã vào nhưng được phát hiện sau khi đơn hết hạn sẽ vào danh sách cần đối soát, không tự giao sản phẩm đã giải phóng khỏi đơn. Thanh toán thiếu/thừa cũng cần kiểm tra. [API vô hiệu hóa QR](https://developers.tingee.vn/docs/qr/dynamic/delete-dynamic-qr/).
+Khi Tingee tạo QR lỗi, giao dịch mới tự dùng Pay2S nếu cấu hình dự phòng đầy đủ. Mã QR của giao dịch đã gắn với Pay2S/Tingee không bị đổi sau đó, tránh cùng một khoản chuyển bị ghi nhận hai lần. Giao dịch cũ trước migration vẫn giữ luồng thanh toán cũ.
 
 ## Kiểm tra trên VPS
 
@@ -61,13 +62,12 @@ sudo systemctl status keynest --no-pager
 sudo journalctl -u keynest -n 60 --no-pager
 ```
 
-Các lệnh systemd áp dụng khi dịch vụ tên `keynest`. `check:config` chỉ kiểm tra biến môi trường, không xác nhận credentials hoạt động. Trong quản trị → trạng thái ngân hàng, kiểm tra Tingee và Pay2S dự phòng.
-
-Truy vấn chẩn đoán trong Supabase SQL Editor:
+`check:config` kiểm tra biến môi trường nhưng không gọi Tingee/Supabase và không xác nhận credentials có hiệu lực. Tạo giao dịch mới rồi kiểm tra route:
 
 ```sql
 select p.id, p.status, p.amount, p.expires_at,
-       r.provider, r.state, r.bill_id, r.attempts, r.last_error, r.remote_closed
+       r.provider, r.qr_kind, r.state, r.bill_id, r.attempts,
+       r.last_error, r.remote_closed
 from public.payments p
 join public.payment_routes r on r.payment_id = p.id
 order by p.created_at desc limit 30;
@@ -77,15 +77,6 @@ from public.payment_events where outcome = 'needs_review'
 order by created_at desc limit 30;
 ```
 
-`creating` quá 45 giây sẽ được phục hồi khi tải lại giao dịch. `failed` thường cần kiểm tra cả Tingee và Pay2S. `tingee_status_unavailable` cho biết tra cứu lỗi hoặc dữ liệu bill không khớp; không tự ghi có khi chưa xác minh được. Xem nhật ký Tingee để xác định nguyên nhân.
+Với QR VCB tĩnh, route mới phải có `provider='tingee'`, `qr_kind='static'` và `state='ready'`. Nếu vẫn thấy MB/Pay2S, đó có thể là giao dịch cũ hoặc Tingee đã lỗi và route mới dùng fallback. Xem log `Tingee QR creation failed (...)` và cột `last_error`; các mã lỗi đã được rút gọn, không log Secret Token hoặc nội dung response thô. Sửa cấu hình xong hãy tạo giao dịch mới.
 
-Nếu vẫn thấy QR MB/Pay2S, kiểm tra log `Tingee QR creation failed (...)`. Mã trong ngoặc và cột `last_error` của route Pay2S cho biết nguyên nhân tạo QR Tingee thất bại:
-
-- `tingee_rejected_XX`: Tingee trả mã lỗi `XX`; đối chiếu danh sách mã lỗi hoặc gửi mã này cho hỗ trợ Tingee.
-- `tingee_http_401` / `tingee_http_403` (có thể kèm `_code_XX`): kiểm tra API Credentials, quyền QR, môi trường production/UAT và đồng hồ VPS.
-- `tingee_timeout` / `tingee_network_error`: kiểm tra kết nối từ VPS tới Tingee.
-- `tingee_invalid_response`: phản hồi không đúng định dạng API mong đợi.
-
-Nhật ký không chứa Secret Token, chữ ký, VA hoặc nguyên văn response. Sau khi sửa cấu hình/triển khai, kiểm tra bằng một yêu cầu thanh toán mới; yêu cầu cũ đã chuyển Pay2S sẽ giữ nguyên cổng. Nạp cùng số tiền có thể trả lại yêu cầu đang chờ, nên có thể dùng số tiền khác để kiểm tra tạo QR mới, không cần thực hiện chuyển tiền.
-
-Sau triển khai, thử một khoản nhỏ: tạo QR, kiểm tra bill trong Tingee, thanh toán và xác nhận số dư/đơn cập nhật đúng một lần. Thử dự phòng bằng môi trường thử nghiệm có API Tingee giả lập lỗi; không sửa Secret Token production khi còn bill đang chờ. Kiểm thử trong repo dùng API giả lập và PostgreSQL cục bộ; chưa chứng minh cấu hình tài khoản Tingee thật của bạn đã hoạt động.
+`creating` quá 45 giây được phép thử lại khi tải giao dịch. Nếu giao dịch không xuất hiện trong Tingee, kiểm tra BIN, số tài khoản VCB đã liên kết, quyền API tạo QR/lịch sử giao dịch, môi trường production/UAT và đồng hồ VPS. Không đổi merchant/credentials khi còn giao dịch đang chờ thanh toán.

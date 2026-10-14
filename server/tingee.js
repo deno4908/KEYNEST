@@ -18,14 +18,33 @@ const bill = z.object({
   totalAmountPaid: z.number().int().nonnegative(),
   status: text,
 });
+const historyPage = z.object({
+  totalCount: z.number().int().nonnegative().safe(),
+  items: z.array(z.object({
+    transactionId: text,
+    accountNumber: text,
+    bankBin: text,
+    amount: z.number().int().positive().safe(),
+    type: z.enum(['CREDIT','DEBIT']),
+    transactionTime: z.string().datetime({offset:true}),
+    description: z.string().max(5000),
+  })).max(100),
+});
+export const STATIC_MONITOR_MS = 7 * 24 * 3600000;
+export function staticPaymentCode(description) {
+  // Reject partial codes and transfers mentioning multiple different orders.
+  const codes = [...new Set((description.toUpperCase().match(/\bKN[A-F0-9]{16}\b/g) || []))];
+  return codes.length === 1 ? codes[0] : null;
+}
 export const tingeeReady = (c) =>
   !!(
     c?.clientId &&
     c.secret &&
     /^\d{6}$/.test(c.bankBin || "") &&
-    c.vaAccount &&
+    (c.qrMode === 'static' ? /^\d{6,20}$/.test(c.accountNumber || '') : c.vaAccount) &&
     c.accountName
   );
+const tingeeBankName = (bin) => bin === '970436' ? 'VCB' : bin;
 export function tingeeTimestamp(now = Date.now()) {
   return new Date(now + 7 * 3600000).toISOString().replace(/[-:TZ.]/g, "");
 }
@@ -35,7 +54,7 @@ export function tingeeFailureCode(error) {
   if (error instanceof z.ZodError) return "tingee_invalid_response";
   const message = error?.message;
   return typeof message === "string" &&
-    /^(?:tingee_(?:timeout|network_error|invalid_response|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
+    /^(?:tingee_(?:timeout|network_error|invalid_response|history_page_limit|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
       message,
     )
     ? message
@@ -92,6 +111,24 @@ export function createTingeeClient(config, fetcher = fetch) {
   }
   return {
     async generate(payment) {
+      if (config.qrMode === 'static') {
+        // Check history permission before showing a QR that we cannot reconcile.
+        historyPage.parse(await call('transaction/get-paging', {
+          filter:payment.code,skipCount:0,maxResultCount:1,
+          bankBin:config.bankBin,
+          startTime:tingeeTimestamp(Date.parse(payment.created_at)).slice(0,14),
+          endTime:tingeeTimestamp().slice(0,14),
+        }));
+        const data=z.object({qrCode:z.string().min(20).max(4096)}).parse(await call('generate-viet-qr', {
+          bankBin:config.bankBin,accountNumber:config.accountNumber,amount:payment.amount,content:payment.code,
+        }));
+        return {
+          provider:'tingee',qr_kind:'static',bill_id:null,qr_account:config.accountNumber,
+          qr_image:await QRCode.toDataURL(data.qrCode,{errorCorrectionLevel:'M',margin:4,width:400}),
+          expires_at:payment.expires_at,bank:tingeeBankName(config.bankBin),bank_bin:config.bankBin,
+          va_account:null,account:config.accountNumber,account_name:config.accountName,
+        };
+      }
       const started = Date.now();
       const minutes = Math.floor(
         (Date.parse(payment.expires_at) - started) / 60000,
@@ -110,6 +147,7 @@ export function createTingeeClient(config, fetcher = fetch) {
       );
       return {
         provider: "tingee",
+        qr_kind: "dynamic",
         bill_id: data.billId,
         qr_account: data.qrAccount,
         expires_at: new Date(started + minutes * 60000).toISOString(),
@@ -118,12 +156,34 @@ export function createTingeeClient(config, fetcher = fetch) {
           margin: 4,
           width: 400,
         }),
-        bank: config.bankBin,
+        bank: tingeeBankName(config.bankBin),
         bank_bin: config.bankBin,
         va_account: config.vaAccount,
         account: data.qrAccount,
         account_name: config.accountName,
       };
+    },
+    async transactions(route) {
+      const start=Date.parse(route.payment.created_at);
+      const end=Math.min(Date.now(),Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end<start || end-start>10*24*3600000)
+        throw new Error('tingee_invalid_response');
+      const items=[];
+      for (let skip=0;skip<300;skip+=100) {
+        const page=historyPage.parse(await call('transaction/get-paging', {
+          filter:route.payment.code,skipCount:skip,maxResultCount:100,
+          bankBin:route.bank_bin,
+          startTime:tingeeTimestamp(start).slice(0,14),endTime:tingeeTimestamp(end).slice(0,14),
+        }));
+        items.push(...page.items);
+        if (skip+page.items.length>=page.totalCount) return items.filter(t=>
+          t.type==='CREDIT' && t.accountNumber===route.account && t.bankBin===route.bank_bin &&
+          Date.parse(t.transactionTime)>=Math.floor(start/1000)*1000 && Date.parse(t.transactionTime)<=end &&
+          staticPaymentCode(t.description)===route.payment.code);
+        if (page.items.length<100) throw new Error('tingee_invalid_response');
+      }
+      // Do not declare a scan complete or close a route when pages were omitted.
+      throw new Error('tingee_history_page_limit');
     },
     async status(route) {
       const result = await call("get-status-dynamic-qr", {

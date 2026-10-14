@@ -24,7 +24,7 @@ export function createBankPayments({ config, store }) {
   function status() {
     if(config.paymentProvider==='tingee') {
       const primary=tingeeReady(config.tingee), backup=pay2sReady(config);
-      return {provider:'tingee',configured:primary,ready:config.mode!=='demo'&&(primary||backup),
+      return {provider:'tingee',qr_mode:config.tingee?.qrMode || 'static',configured:primary,ready:config.mode!=='demo'&&(primary||backup),
         reason:config.mode==='demo'?'demo':primary?null:'tingee_credentials_missing',
         webhook_path:null,mode:'api_polling',fallback_provider:'pay2s',fallback_ready:backup,last_received_at:lastReceivedAt};
     }

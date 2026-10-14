@@ -1361,6 +1361,7 @@ export function PaymentModal({
 }) {
   const { notify } = useStore();
   const [payment,setPayment]=useState(initialPayment);
+  const dynamicTingee=payment.provider==='tingee' && payment.qr_kind!=='static';
   const [busy, setBusy] = useState(false),
     [status, setStatus] = useState(payment.status),
     [remaining, setRemaining] = useState(
@@ -1465,7 +1466,7 @@ export function PaymentModal({
                 <h2>{money(payment.amount)}</h2>
               </div>
               <span className="transfer-label">
-                {payment.demo ? "Bản demo" : payment.provider==='tingee' ? "QR động" : "VietQR"}
+                {payment.demo ? "Bản demo" : dynamicTingee ? "QR động" : "VietQR"}
               </span>
             </div>
             <div className="transfer-grid">
@@ -1546,15 +1547,15 @@ export function PaymentModal({
                     </>
                   )}
                   <span className="transfer-code">
-                    {payment.provider==='tingee' ? 'Mã hóa đơn thanh toán' : 'Nội dung chuyển khoản'}
+                    {dynamicTingee ? 'Mã hóa đơn thanh toán' : 'Nội dung chuyển khoản'}
                     <strong>
-                      {payment.provider==='tingee' ? payment.bill_id : payment.code}
+                      {dynamicTingee ? payment.bill_id : payment.code}
                       <button
                         className="icon-button"
                         aria-label="Sao chép mã"
                         onClick={() =>
                           navigator.clipboard
-                            .writeText(payment.provider==='tingee' ? payment.bill_id || '' : payment.code)
+                            .writeText(dynamicTingee ? payment.bill_id || '' : payment.code)
                             .then(() => notify("Đã sao chép nội dung."))
                             .catch(() => notify("Không thể sao chép.", true))
                         }
@@ -1565,7 +1566,7 @@ export function PaymentModal({
                   </span>
                 </div>
                 <p className="transfer-instruction">
-                  {payment.provider==='tingee' ? 'Quét mã QR động của giao dịch này và kiểm tra số tiền trong ứng dụng ngân hàng. Hệ thống tự đối soát theo mã hóa đơn.' : 'Giữ nguyên nội dung và chuyển đúng số tiền để giao dịch được xác nhận tự động.'}
+                  {dynamicTingee ? 'Quét mã QR động của giao dịch này và kiểm tra số tiền trong ứng dụng ngân hàng. Hệ thống tự đối soát theo mã hóa đơn.' : 'Giữ nguyên nội dung và chuyển đúng số tiền để giao dịch được xác nhận tự động.'}
                 </p>
               </div>
             </div>

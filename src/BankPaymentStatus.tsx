@@ -3,6 +3,7 @@ import { api, date } from "./api";
 
 type BankStatus = {
   provider: string;
+  qr_mode?: string;
   configured: boolean;
   ready: boolean;
   reason: string | null;
@@ -20,7 +21,7 @@ const reasons: Record<string, string> = {
   demo: "Đang chạy mô phỏng, không nhận tiền thật.",
   bank_details_missing: "Chưa cấu hình đủ thông tin tài khoản ngân hàng.",
   webhook_key_missing: "Chưa cấu hình token webhook ở server.",
-  tingee_credentials_missing: "Thiếu cấu hình Tingee. Kiểm tra API Credentials và tài khoản VA.",
+  tingee_credentials_missing: "Thiếu cấu hình Tingee. Kiểm tra API Credentials, BIN và số tài khoản theo chế độ QR.",
 };
 export function BankPaymentStatus() {
   const [status, setStatus] = useState<BankStatus | null>(null);
@@ -50,7 +51,7 @@ export function BankPaymentStatus() {
   return (
     <section className="panel" aria-label="Kết nối ngân hàng">
       <h3>
-        {status?.provider === 'tingee' ? 'Tingee · QR động' : status?.provider === "pay2s"
+        {status?.provider === 'tingee' ? `Tingee · QR ${status.qr_mode === 'static' ? 'tĩnh' : 'động'}` : status?.provider === "pay2s"
           ? "Pay2S · Chuyển khoản ngân hàng"
           : "Kết nối ngân hàng"}
       </h3>
@@ -60,7 +61,7 @@ export function BankPaymentStatus() {
           : status.reason
             ? reasons[status.reason] || "Chưa sẵn sàng"
             : status.ready
-            ? (status.provider==='tingee' ? 'Đối soát bằng API trạng thái bill · Không dùng webhook Tingee' : "Đã cấu hình tiếp nhận webhook")
+            ? (status.provider==='tingee' ? (status.qr_mode === 'static' ? 'Đối soát bằng API lịch sử giao dịch · Không cần webhook Tingee' : 'Đối soát bằng API trạng thái bill · Không dùng webhook Tingee') : "Đã cấu hình tiếp nhận webhook")
             : reasons[status.reason || ""] || "Chưa sẵn sàng"}
       </p>
       {status?.provider==='tingee' && <p className="muted">Pay2S dự phòng: {status.fallback_ready ? 'đã cấu hình; tự dùng khi tạo QR Tingee thất bại' : 'chưa cấu hình'}. QR đã cấp sẽ tiếp tục được đối soát qua cổng ban đầu.</p>}

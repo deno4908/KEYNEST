@@ -3,6 +3,7 @@ import {
   createTingeeClient,
   tingeeReady,
   tingeeFailureCode,
+  STATIC_MONITOR_MS,
 } from "./tingee.js";
 export const pay2sReady = (c) =>
   !!(c.pay2sWebhook && c.account && c.accountName);
@@ -97,6 +98,24 @@ export function createPaymentRouting({
         await Promise.all(
           rows.slice(i, i + 4).map(async (route) => {
             try {
+              if (route.qr_kind === 'static') {
+                const transactions=await client.transactions(route);
+                for (const tx of transactions) {
+                  const id='tingee-static:'+createHash('sha256')
+                    .update(JSON.stringify([route.bank_bin,route.account,tx.transactionId])).digest('hex');
+                  await rpc('settle_tingee_static', {
+                    p_transaction:id,p_code:route.payment.code,p_amount:tx.amount,
+                    p_account:tx.accountNumber,p_bank:tx.bankBin,p_time:tx.transactionTime,
+                  });
+                }
+                // A static QR cannot be disabled. Keep scanning paid/cancelled/
+                // expired orders for seven days to flag extra or late transfers.
+                await store.query(store.client.from('payment_routes').update({
+                  remote_closed:Date.now()>=Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS,
+                  last_error:null,
+                }).eq('payment_id',route.payment_id));
+                return;
+              }
               const status = await client.status(route);
               if (
                 status.status === "fully-paid" &&
@@ -145,15 +164,16 @@ export function createPaymentRouting({
                     .eq("payment_id", route.payment_id),
                 );
               }
-            } catch {
+            } catch (error) {
+              const failure=tingeeFailureCode(error);
               logger.error(
-                "Tingee status check deferred; retaining the original payment provider.",
+                `Tingee status check deferred (${failure}); retaining the original payment provider.`,
               );
               await store
                 .query(
                   store.client
                     .from("payment_routes")
-                    .update({ last_error: "tingee_status_unavailable" })
+                    .update({ last_error: failure })
                     .eq("payment_id", route.payment_id),
                 )
                 .catch(() => {});
@@ -163,7 +183,8 @@ export function createPaymentRouting({
                   store.client
                     .from("payment_routes")
                     .update({
-                      next_poll_at: new Date(Date.now() + 30000).toISOString(),
+                      next_poll_at: new Date(Date.now() + (route.qr_kind==='static' &&
+                        (route.payment.status!=='pending' || Date.parse(route.payment.expires_at)<=Date.now()) ? 600000 : 30000)).toISOString(),
                     })
                     .eq("payment_id", route.payment_id),
                 )

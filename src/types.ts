@@ -46,6 +46,7 @@ export type User = {
 export type Payment = {
   provider?: string | null;
   qr_state?: string;
+  qr_kind?: 'static' | 'dynamic' | null;
   bill_id?: string | null;
   id: string;
   amount: number;

@@ -20,9 +20,12 @@ export const config = {
   webhook: process.env.SEPAY_WEBHOOK_KEY,
   paymentProvider: process.env.BANK_PAYMENT_PROVIDER || "tingee",
   tingee: {
+    qrMode: process.env.TINGEE_QR_MODE || 'static',
     clientId: process.env.TINGEE_CLIENT_ID || '', secret: process.env.TINGEE_SECRET_TOKEN || '',
     baseUrl: process.env.TINGEE_BASE_URL || 'https://open-api.tingee.vn',
-    bankBin: process.env.TINGEE_BANK_BIN || '', vaAccount: process.env.TINGEE_VA_ACCOUNT || '',
+    bankBin: process.env.TINGEE_BANK_BIN || '',
+    accountNumber: process.env.TINGEE_ACCOUNT_NUMBER || '',
+    vaAccount: process.env.TINGEE_VA_ACCOUNT || '',
     accountName: process.env.TINGEE_ACCOUNT_NAME || '', merchantId: Number(process.env.TINGEE_MERCHANT_ID || 0),
   },
   pay2sWebhook: process.env.PAY2S_WEBHOOK_TOKEN || "",
@@ -43,8 +46,11 @@ export const config = {
 if (!["sepay", "pay2s", "tingee"].includes(config.paymentProvider))
   throw new Error("BANK_PAYMENT_PROVIDER phải là tingee, pay2s hoặc sepay.");
 if (!['https://open-api.tingee.vn','https://uat-open-api.tingee.vn'].includes(config.tingee.baseUrl) ||
+  !['static','dynamic'].includes(config.tingee.qrMode) ||
   !Number.isSafeInteger(config.tingee.merchantId) || config.tingee.merchantId < 0)
   throw new Error('Cấu hình endpoint / merchant Tingee không hợp lệ.');
+if (config.tingee.qrMode === 'static' && config.tingee.accountNumber && !/^\d{6,20}$/.test(config.tingee.accountNumber))
+  throw new Error('TINGEE_ACCOUNT_NUMBER phải là số tài khoản ngân hàng từ 6 đến 20 chữ số.');
 if (config.receipts.enabled && (!config.receipts.apiKey || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.receipts.sender)))
   throw new Error('Email biên nhận cần BREVO_API_KEY và ORDER_RECEIPTS_FROM hợp lệ.');
 if (!["demo", "supabase"].includes(config.mode))
