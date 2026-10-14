@@ -33,8 +33,22 @@ Triển khai: cập nhật và khởi động lại **tất cả** instance Node
 
 Giữ endpoint đa năng phù hợp với kiến trúc hiện tại vì kiểm tra quyền nằm ở server và SQL. Tách endpoint admin, chuyển nonce sang Redis hoặc buộc tách API gỡ MFA không tự sửa lỗi cookie đã xác nhận; không thực hiện các thay đổi đó chỉ dựa trên tên endpoint/frontend.
 
+## Rà soát lần hai: thu hồi một thiết bị chưa thu hồi phiên tại Auth
+
+Mức độ: trung bình; tác động có thể tăng nếu kẻ khác đang giữ thông tin phiên và cấu hình Auth cho phép thay đổi thông tin tài khoản mà không xác thực lại. Không xác nhận chiếm tài khoản trên production.
+
+`revoke_app_sessions` trước đây chỉ đánh dấu bản ghi trong `app_sessions` khi thu hồi một thiết bị. Node chặn phiên đó, nhưng `auth.sessions` vẫn tồn tại. Nhánh thu hồi nhiều phiên trong `server/operations.js` có gọi Auth `signOut`, còn nhánh một thiết bị không gọi. Kiểm thử SQL trước bản sửa xác nhận phiên Auth vẫn còn sau thao tác thu hồi.
+
+Migration **034_revoke_provider_session.sql** sửa việc này trong cùng transaction: lấy mã phiên Auth từ bản ghi thiết bị thuộc đúng user, đánh dấu thu hồi và xóa phiên Auth tương ứng. Không nhận mã phiên Auth trực tiếp từ trình duyệt. Phiên cũ thiếu mã thiết bị bị từ chối với hướng dẫn dùng “Thu hồi các phiên khác”. Migration cũng dọn các phiên Auth đã được ghi nhận là bị thu hồi trước đó.
+
+Đối chiếu mã nguồn Auth: middleware kiểm tra sự tồn tại của phiên trong [auth.go](https://github.com/supabase/auth/blob/master/internal/api/auth.go); quan hệ refresh token → session dùng `ON DELETE CASCADE` trong [migration tạo sessions](https://github.com/supabase/auth/blob/master/migrations/20220811173540_add_sessions_table.up.sql). Kiểm thử local mô phỏng cấu trúc này, xác nhận phiên/refresh token mục tiêu bị xóa, thiết bị khác và tài khoản khác được giữ lại. Chưa kiểm chứng phiên bản Auth và schema đang chạy trên hosted project.
+
+Triển khai bản sửa lần hai: chạy migration **034** sau các migration trước đó trong Supabase SQL Editor. Migration chỉ thao tác bản ghi `auth.sessions`, không sửa schema Auth hoặc cấp quyền bảng Auth cho browser. Dòng “không cần migration SQL” ở phần OTP phía trên chỉ áp dụng cho bản sửa OTP. Chưa chạy migration 034 trên production.
+
 ## Giới hạn và kiểm thử
 
 - `npm test`: 123 test đạt, gồm HTTP, phân quyền, ảnh, MFA/OTP, JWE và nghiệp vụ.
-- `npm run test:db`: 35 kiểm tra đạt; áp dụng migrations và kiểm tra quyền/RLS, metadata, escrow, hoàn tiền, nonce và thu hồi phiên trên PGlite.
-- Chưa kiểm thử nhiều kết nối PostgreSQL thực, cấu hình Auth/Storage production hoặc trạng thái triển khai migrations 030–033. Kết quả không phải cam kết website không còn lỗ hổng khác.
+- `npm run test:db`: 36 kiểm tra đạt; áp dụng migrations và kiểm tra quyền/RLS, metadata, escrow, hoàn tiền, nonce và thu hồi phiên trên PGlite.
+- `npm audit --omit=dev`: không có cảnh báo lỗ hổng dependency production tại thời điểm kiểm tra; kết quả này không đánh giá lỗi logic ứng dụng.
+- Chưa kiểm thử nhiều kết nối PostgreSQL thực, cấu hình Auth/Storage production hoặc trạng thái triển khai migrations 030–034. Các chính sách riêng của Node, như lịch sử mật khẩu 30 ngày, cần được đánh giá thêm đối với đường gọi Auth trực tiếp; không suy ra rằng mã hóa request hoặc guard Node tự bảo vệ mọi endpoint của nhà cung cấp.
+- Chưa xác nhận thêm lỗi mức cao trong phạm vi rà soát lần hai. Kết quả không phải cam kết website không còn lỗ hổng khác.

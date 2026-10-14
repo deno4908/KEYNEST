@@ -29,6 +29,7 @@ try {
  create schema auth; grant usage on schema auth,public to anon,authenticated,service_role;
  create table auth.users(id uuid primary key,email text,encrypted_password text,raw_user_meta_data jsonb default '{}');
  create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id),created_at timestamptz default now());
+ create table auth.refresh_tokens(id uuid primary key,session_id uuid references auth.sessions(id) on delete cascade);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant execute on function auth.uid() to anon,authenticated,service_role;`);
   for (const name of (
@@ -1553,6 +1554,10 @@ try {
   await db.exec('reset role');
   const freshAuth = randomUUID();
   await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [freshAuth,sessionUser]);
+  const unaffectedAuth = randomUUID(), unrelatedAuth = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2),($3,$4)', [unaffectedAuth,sessionUser,unrelatedAuth,other]);
+  for (const sessionId of [freshAuth, unaffectedAuth, unrelatedAuth])
+    await db.query('insert into auth.refresh_tokens(id,session_id) values($1,$2)', [randomUUID(), sessionId]);
   await db.exec('set role service_role');
   const freshSession = await authorizeSession(freshAuth);
   assert.equal(freshSession.status, 'ok');
@@ -1563,6 +1568,27 @@ try {
   assert.equal(await scalar('select revoke_app_sessions($1,$2,null)', [sessionUser,freshSession.id]), true);
   assert.equal((await authorizeSession(freshAuth)).status, 'revoked');
   await db.exec('reset role');
+  assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [freshAuth])), 0,
+    'Revoking one device must remove its provider session, not only deny the Node API');
+  assert.equal(Number(await scalar('select count(*) from auth.refresh_tokens where session_id=$1', [freshAuth])), 0);
+  for (const sessionId of [unaffectedAuth, unrelatedAuth]) {
+    assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [sessionId])), 1);
+    assert.equal(Number(await scalar('select count(*) from auth.refresh_tokens where session_id=$1', [sessionId])), 1);
+  }
+  assert.equal(await scalar('select revoke_app_sessions($1,$2,null)', [sessionUser, freshSession.id]), true);
+  const legacySession = randomUUID();
+  await db.query('insert into app_sessions(id,user_id,token_hash) values($1,$2,$3)', [legacySession, sessionUser, 'legacy-unmapped']);
+  await fails('select revoke_app_sessions($1,$2,null)', [sessionUser, legacySession]);
+  assert.equal(await scalar('select revoked_at from app_sessions where id=$1', [legacySession]), null);
+  // Migration cleanup only touches previously revoked sessions with a matching owner.
+  const cleanupAuth = randomUUID(), cleanupApp = randomUUID();
+  await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [cleanupAuth,sessionUser]);
+  await db.query('insert into app_sessions(id,user_id,token_hash,auth_session_id,revoked_at) values($1,$2,$3,$4,now())',
+    [cleanupApp, sessionUser, 'previously-revoked', cleanupAuth]);
+  await db.exec(await readFile(new URL('../supabase/migrations/034_revoke_provider_session.sql', import.meta.url), 'utf8'));
+  assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [cleanupAuth])), 0);
+  assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [unrelatedAuth])), 1);
+  pass('single-device revocation removes provider session and refresh tokens, preserves unrelated devices, rejects unmapped legacy records and cleans up old revocations');
   const suspendedAuth = randomUUID();
   await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [suspendedAuth,sessionUser]);
   const pendingRevoker = randomUUID();
