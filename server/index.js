@@ -411,6 +411,9 @@ app.use('/api', sellersRouter({ store, auth, admin, limiter, categoryStore, prod
 async function paymentInfo(p) {
   if (!p) return null;
   const route = await paymentRouting.prepare(p);
+  const unmonitorableStaticTingee = route?.provider === 'tingee' &&
+    route.qr_kind === 'static' &&
+    (!route.va_account || !route.account || route.account !== route.va_account);
   const bank=route?.bank || config.bank, account=route?.account || config.account,
     accountName=route?.account_name || config.accountName;
   const query = new URLSearchParams({
@@ -425,15 +428,15 @@ async function paymentInfo(p) {
     id:p.id,user_id:p.user_id,order_id:p.order_id,amount:p.amount,code:p.code,status:p.status,
     created_at:p.created_at,expires_at:route?.qr_expires_at || p.expires_at,
     provider:route?.provider || (route ? null : 'legacy'),
-    qr_state:route?.state || 'ready',
+    qr_state:unmonitorableStaticTingee ? 'failed' : route?.state || 'ready',
     qr_kind:route?.qr_kind || null,
     bill_id:route?.bill_id || null,
     qr_url:
-      route && route.state!=='ready' ? null : route?.provider==='tingee' ? route.qr_image : config.mode === "supabase" && account
+      route && (route.state!=='ready' || unmonitorableStaticTingee) ? null : route?.provider==='tingee' ? route.qr_image : config.mode === "supabase" && account
         ? `https://vietqr.app/img?${query}`
         : null,
     bank,
-    account:route && route.state!=='ready' ? '' : account,
+    account:route && (route.state!=='ready' || unmonitorableStaticTingee) ? '' : account,
     account_name:accountName,
     demo: config.mode === "demo",
   };
