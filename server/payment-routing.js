@@ -218,7 +218,7 @@ export function createPaymentRouting({
                     .update({
                       next_poll_at: new Date(Date.now() + (route.qr_kind==='static' &&
                         (route.payment.status!=='pending' || Date.parse(route.payment.expires_at)<=Date.now()) ? 600000 :
-                        route.qr_kind==='static' ? 30000 : 10000)).toISOString(),
+                        route.qr_kind==='static' ? 30000 : 5000)).toISOString(),
                     })
                     .eq("payment_id", route.payment_id),
                 )

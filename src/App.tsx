@@ -1661,7 +1661,7 @@ function WalletPage() {
   const hasPendingTopup = visiblePayments.some(p => p.status === 'pending');
   useEffect(() => {
     if (!hasPendingTopup || payment) return;
-    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 5000);
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 3000);
     return () => window.clearInterval(timer);
   }, [hasPendingTopup, payment, user?.id]);
   async function topup(e: FormEvent) {

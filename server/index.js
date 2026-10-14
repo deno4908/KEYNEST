@@ -1173,7 +1173,7 @@ if (process.env.NODE_ENV !== "test") {
   const receiptTimer = setInterval(() => void receiptWorker.tick(), 15000);
   receiptTimer.unref();
   void receiptWorker.tick();
-  const tingeeTimer=setInterval(()=>void paymentRouting.tick(),5000);
+  const tingeeTimer=setInterval(()=>void paymentRouting.tick(),2000);
   tingeeTimer.unref();
   void paymentRouting.tick();
   let shuttingDown = false;
