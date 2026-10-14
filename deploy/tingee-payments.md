@@ -77,4 +77,6 @@ order by created_at desc limit 30;
 
 Với QR VCB tĩnh, route mới phải có `provider='tingee'`, `qr_kind='static'` và `state='ready'`. Nếu vẫn thấy MB/Pay2S, đó có thể là giao dịch cũ hoặc Tingee đã lỗi và route mới dùng fallback. Xem log `Tingee QR creation failed (...)` và cột `last_error`; các mã lỗi đã được rút gọn, không log Secret Token hoặc nội dung response thô. Sửa cấu hình xong hãy tạo giao dịch mới. Nếu tiền đã được chuyển vào STK VCB gốc thay vì VA, Tingee có thể không cung cấp giao dịch đó cho hệ thống; cần kiểm tra lịch sử trong app Tingee/ngân hàng và xử lý đơn thủ công.
 
+Các QR tĩnh VCB đã phát hành trước khi sửa sang VA không thể tự đổi đích nhận tiền. Nếu route cũ có `last_error='tingee_static_va_required'`, hệ thống sẽ không gửi yêu cầu lịch sử với VA trống/sai. Nếu khách đã chuyển vào STK VCB gốc, hãy đối chiếu sao kê ngân hàng trước khi hỗ trợ cộng tiền; đừng yêu cầu chuyển lần nữa khi chưa kiểm tra. Với nạp ví, yêu cầu cùng số tiền sẽ tái sử dụng giao dịch đang chờ, nên cần đợi giao dịch cũ hết hạn rồi tạo giao dịch mới để nhận QR VA mới.
+
 `creating` quá 45 giây được phép thử lại khi tải giao dịch. Nếu giao dịch không xuất hiện trong Tingee, kiểm tra BIN, số VA đã liên kết với VCB, quyền API tạo QR/lịch sử giao dịch, môi trường production/UAT và đồng hồ VPS. Không đổi merchant/credentials khi còn giao dịch đang chờ thanh toán.

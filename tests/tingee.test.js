@@ -114,6 +114,26 @@ test("Tingee rejects bill identity, receiving account, type and amount mismatche
   }));
   await assert.rejects(client.status(route), /tingee_rejected/);
 });
+test("Tingee refuses to auto-reconcile legacy static routes without their linked VA", async () => {
+  let requests = 0;
+  const client = createTingeeClient(cfg, async () => {
+    requests++;
+    throw new Error("must not call provider for an invalid route");
+  });
+  await assert.rejects(
+    client.transactions({
+      ...route,
+      qr_kind: "static",
+      account: "ORIGINAL-VCB-ACCOUNT",
+      va_account: null,
+    }),
+    (error) => {
+      assert.equal(tingeeFailureCode(error), "tingee_static_va_required");
+      return true;
+    },
+  );
+  assert.equal(requests, 0);
+});
 
 function memoryStore(
   initial = { payment_id: payment.id, state: "unassigned", attempts: 0 },

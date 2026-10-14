@@ -54,7 +54,7 @@ export function tingeeFailureCode(error) {
   if (error instanceof z.ZodError) return "tingee_invalid_response";
   const message = error?.message;
   return typeof message === "string" &&
-    /^(?:tingee_(?:timeout|network_error|invalid_response|history_page_limit|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
+    /^(?:tingee_(?:timeout|network_error|invalid_response|history_page_limit|static_va_required|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
       message,
     )
     ? message
@@ -164,6 +164,13 @@ export function createTingeeClient(config, fetcher = fetch) {
       };
     },
     async transactions(route) {
+      // Old static routes may point at the bank's original account. Tingee
+      // cannot reconcile those VCB personal-account transfers; only the linked
+      // VA is visible. Keep the immutable route intact and surface a safe error.
+      if (!route.va_account || !route.account || route.account !== route.va_account ||
+          !/^\d{6}$/.test(route.bank_bin || "")) {
+        throw new Error('tingee_static_va_required');
+      }
       const start=Date.parse(route.payment.created_at);
       const end=Math.min(Date.now(),Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS);
       if (!Number.isFinite(start) || !Number.isFinite(end) || end<start || end-start>10*24*3600000)
