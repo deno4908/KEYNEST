@@ -121,7 +121,6 @@ test("Tingee rejects bill identity, receiving account, type and amount mismatche
     { vaAccountNumber: "other" },
     { amount: 9999 },
     { qrCodeType: "dynamic-recurring-payment" },
-    { totalAmountPaid: "10000" },
   ]) {
     const client = createTingeeClient(cfg, async () => ({
       ok: true,
@@ -137,6 +136,38 @@ test("Tingee rejects bill identity, receiving account, type and amount mismatche
     json: async () => ({ code: "97", message: "sensitive provider details" }),
   }));
   await assert.rejects(client.status(route), /tingee_rejected/);
+});
+test("Tingee bill status accepts safe integer amounts serialized as digit strings", async () => {
+  const client = createTingeeClient(cfg, async () => ({
+    ok: true,
+    json: async () => ({
+      code: "00",
+      data: {
+        billInfo: {
+          ...bill,
+          amount: "10000",
+          totalAmountPaid: "10000",
+        },
+      },
+    }),
+  }));
+
+  assert.equal((await client.status(route)).totalAmountPaid, 10000);
+});
+test("Tingee invalid bill diagnostics name schema fields without returning values", async () => {
+  const client = createTingeeClient(cfg, async () => ({
+    ok: true,
+    json: async () => ({
+      code: "00",
+      data: { billInfo: { ...bill, totalAmountPaid: "12,000" } },
+    }),
+  }));
+
+  await assert.rejects(client.status(route), (error) => {
+    assert.equal(tingeeFailureCode(error), "tingee_invalid_response_totalAmountPaid");
+    assert.equal(error.message.includes("12,000"), false);
+    return true;
+  });
 });
 test("Tingee refuses to auto-reconcile legacy static routes without their linked VA", async () => {
   let requests = 0;
@@ -238,6 +269,7 @@ test("Tingee static history tolerates incomplete unrelated rows but only returns
 
 function memoryStore(
   initial = { payment_id: payment.id, state: "unassigned", attempts: 0 },
+  settlementResult = { paid: true },
 ) {
   let saved = { ...initial };
   const settlements = [];
@@ -269,7 +301,7 @@ function memoryStore(
           return { data: [{ ...saved, payment: saved.payment || payment }] };
         if (name === "settle_routed_payment") {
           settlements.push(args);
-          return { data: { paid: true } };
+          return { data: settlementResult };
         }
         throw new Error("Unexpected RPC");
       },
@@ -398,6 +430,39 @@ test("polling credits a fully paid exact bill and status failures never switch t
       assert.match(db.settlements[0].p_transaction, /^tingee:[a-f0-9]{64}$/);
     }
   }
+});
+
+test("a database-ignored Tingee settlement remains pollable and records a diagnostic", async () => {
+  const db = memoryStore(route, { ignored: true });
+  const logs = [];
+  const router = createPaymentRouting({
+    store: db.store,
+    config,
+    logger: { error: (message) => logs.push(message) },
+    client: { status: async () => bill },
+  });
+
+  await router.tick();
+
+  assert.equal(db.read().remote_closed, undefined);
+  assert.equal(db.read().last_error, "tingee_settlement_ignored");
+  assert.equal(db.settlements.length, 1);
+  assert.ok(logs.some((message) => message.includes("tingee_settlement_ignored")));
+});
+
+test("a provider-paid bill that needs review is not reported as a successful settlement", async () => {
+  const db = memoryStore(route, { review: true });
+  const router = createPaymentRouting({
+    store: db.store,
+    config,
+    logger,
+    client: { status: async () => bill },
+  });
+
+  await router.tick();
+
+  assert.equal(db.read().remote_closed, true);
+  assert.equal(db.read().last_error, "tingee_payment_review");
 });
 
 test("expired and cancelled QR is disabled and a final read catches money arriving during deletion", async () => {

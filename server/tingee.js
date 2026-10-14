@@ -8,14 +8,18 @@ const generated = z.object({
   qrAccount: text,
   qrCode: z.string().min(20).max(4096),
 });
+const providerInteger = (minimum) => z.preprocess(
+  (value) => typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value,
+  z.number().int().safe().min(minimum),
+);
 const bill = z.object({
   billId: text,
   qrAccount: text,
   bankBin: text,
   vaAccountNumber: text,
   qrCodeType: z.literal("dynamic-one-time-payment"),
-  amount: z.number().int().positive(),
-  totalAmountPaid: z.number().int().nonnegative(),
+  amount: providerInteger(1),
+  totalAmountPaid: providerInteger(0),
   status: text,
 });
 const historyText = z.preprocess(
@@ -80,7 +84,7 @@ export function tingeeFailureCode(error) {
   if (error instanceof z.ZodError) return "tingee_invalid_response";
   const message = error?.message;
   return typeof message === "string" &&
-    /^(?:tingee_(?:timeout|network_error|invalid_response|history_page_limit|static_va_required|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
+    /^(?:tingee_(?:timeout|network_error|invalid_response(?:_(?:billInfo|billId|qrAccount|bankBin|vaAccountNumber|qrCodeType|amount|totalAmountPaid|status)(?:_(?:billInfo|billId|qrAccount|bankBin|vaAccountNumber|qrCodeType|amount|totalAmountPaid|status)){0,7})?|history_page_limit|static_va_required|bill_mismatch|settlement_ignored|settlement_unconfirmed|payment_review|duplicate_review|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
       message,
     )
     ? message
@@ -228,7 +232,18 @@ export function createTingeeClient(config, fetcher = fetch) {
         qrAccount: route.qr_account,
         billId: route.bill_id,
       });
-      const data = bill.parse(result.billInfo);
+      const parsed = bill.safeParse(result.billInfo);
+      if (!parsed.success) {
+        const allowed = new Set([
+          "billInfo", "billId", "qrAccount", "bankBin", "vaAccountNumber",
+          "qrCodeType", "amount", "totalAmountPaid", "status",
+        ]);
+        const fields = [...new Set(parsed.error.issues.flatMap((issue) =>
+          issue.path.length ? issue.path.map(String) : ["billInfo"],
+        ).filter((field) => allowed.has(field)))];
+        throw new Error(`tingee_invalid_response${fields.length ? `_${fields.join("_")}` : ""}`);
+      }
+      const data = parsed.data;
       if (
         data.billId !== route.bill_id ||
         data.qrAccount !== route.qr_account ||

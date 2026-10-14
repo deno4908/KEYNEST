@@ -125,13 +125,45 @@ export function createPaymentRouting({
                 const tx =
                   "tingee:" +
                   createHash("sha256").update(route.bill_id).digest("hex");
-                await rpc("settle_routed_payment", {
+                const settlement = await rpc("settle_routed_payment", {
                   p_source: "tingee",
                   p_transaction: tx,
                   p_code: route.payment.code,
                   p_amount: status.totalAmountPaid,
                   p_bill: route.bill_id,
                 });
+                if (settlement?.ignored) {
+                  // Keep polling when the database rejected the provider event;
+                  // closing here would strand a paid bill as pending forever.
+                  throw new Error("tingee_settlement_ignored");
+                }
+                if (settlement?.review) {
+                  await store.query(
+                    store.client
+                      .from("payment_routes")
+                      .update({
+                        remote_closed: true,
+                        last_error: "tingee_payment_review",
+                      })
+                      .eq("payment_id", route.payment_id),
+                  );
+                  return;
+                }
+                if (settlement?.duplicate) {
+                  await store.query(
+                    store.client
+                      .from("payment_routes")
+                      .update({
+                        remote_closed: true,
+                        last_error: "tingee_duplicate_review",
+                      })
+                      .eq("payment_id", route.payment_id),
+                  );
+                  return;
+                }
+                if (!settlement?.paid) {
+                  throw new Error("tingee_settlement_unconfirmed");
+                }
                 await store.query(
                   store.client
                     .from("payment_routes")
