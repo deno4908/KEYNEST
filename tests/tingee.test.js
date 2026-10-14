@@ -134,6 +134,62 @@ test("Tingee refuses to auto-reconcile legacy static routes without their linked
   );
   assert.equal(requests, 0);
 });
+test("Tingee static history tolerates incomplete unrelated rows but only returns exact credits", async () => {
+  const receivedAt = new Date();
+  const staticPayment = {
+    ...payment,
+    code: "KNF47E142417EC73C6",
+    created_at: new Date(receivedAt.getTime() - 60_000).toISOString(),
+  };
+  const linkedVa = "TGE61014104613VCB";
+  const client = createTingeeClient(cfg, async () => ({
+    ok: true,
+    json: async () => ({
+      code: "00",
+      data: {
+        totalCount: 4,
+        items: [
+          {
+            transactionId: "tx-matching",
+            accountNumber: `1072631208VA: ${linkedVa}`,
+            bankBin: cfg.bankBin,
+            amount: "10000",
+            type: "CREDIT",
+            transactionTime: receivedAt.toISOString(),
+            description: `Thanh toan ${staticPayment.code}`,
+          },
+          {
+            transactionId: "tx-no-memo",
+            accountNumber: linkedVa,
+            bankBin: cfg.bankBin,
+            amount: 10000,
+            type: "CREDIT",
+            transactionTime: receivedAt.toISOString(),
+            description: null,
+          },
+          {
+            transactionId: "tx-substring-only",
+            accountNumber: `PREFIX${linkedVa}SUFFIX`,
+            bankBin: cfg.bankBin,
+            amount: 10000,
+            type: "CREDIT",
+            transactionTime: receivedAt.toISOString(),
+            description: `Thanh toan ${staticPayment.code}`,
+          },
+          null,
+        ],
+      },
+    }),
+  }));
+  const matches = await client.transactions({
+    ...route,
+    qr_kind: "static",
+    account: linkedVa,
+    va_account: linkedVa,
+    payment: staticPayment,
+  });
+  assert.deepEqual(matches.map((row) => row.transactionId), ["tx-matching"]);
+});
 
 function memoryStore(
   initial = { payment_id: payment.id, state: "unassigned", attempts: 0 },

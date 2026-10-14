@@ -45,6 +45,8 @@ Nếu `TINGEE_QR_MODE=dynamic`, giữ `TINGEE_VA_ACCOUNT` và chỉ dùng với 
 
 Mỗi giao dịch có QR VietQR điền sẵn số tiền và mã `KN…` riêng. Người mua phải giữ nguyên nội dung và chuyển đúng số tiền. Worker backend đọc API lịch sử giao dịch Tingee, chỉ tự ghi nhận giao dịch `CREDIT` khớp ngân hàng, tài khoản nhận, mã đơn, thời gian và số tiền. [API lịch sử giao dịch Tingee](https://developers.tingee.vn/docs/banking/get-paging-transaction/).
 
+Tingee có thể trả trường tài khoản nhận dưới dạng `STK_gốc: VA`; bộ đối soát lấy VA khi nó là một thành phần tách chính xác bằng dấu `:` rồi gửi VA chuẩn hóa vào bước xác nhận trong database. Không khớp bằng chuỗi con.
+
 Worker truy vấn định kỳ, không cần webhook Tingee. Nếu lịch sử giao dịch không khả dụng ngay lúc tạo QR, hệ thống không phát hành QR Tingee cho giao dịch đó và sẽ thử Pay2S dự phòng. Nếu QR Tingee đã được phát hành, lỗi truy vấn chỉ được thử lại; không chuyển giao dịch đó sang Pay2S.
 
 QR tĩnh không thể bị vô hiệu hóa ở phía ngân hàng. KEYNEST chỉ tự đối soát giao dịch trong hạn thanh toán; giao dịch đến muộn hoặc sai số tiền cần admin kiểm tra, không được tự cộng tiền/giao hàng. Backend tiếp tục dò lịch sử tối đa 7 ngày để đưa các khoản chuyển muộn vào danh sách cần đối soát. Chuyển khoản thiếu/thừa hoặc sai nội dung không được tự xác nhận.

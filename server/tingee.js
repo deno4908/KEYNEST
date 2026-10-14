@@ -18,23 +18,46 @@ const bill = z.object({
   totalAmountPaid: z.number().int().nonnegative(),
   status: text,
 });
+const historyText = z.preprocess(
+  (value) => typeof value === "number" && Number.isSafeInteger(value) ? String(value) : value,
+  z.string().max(200).catch(""),
+);
+const historyItem = z.object({
+  transactionId: historyText,
+  accountNumber: historyText,
+  bankBin: historyText,
+  amount: z.preprocess(
+    (value) => typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value,
+    z.number().int().positive().safe().catch(0),
+  ),
+  type: z.enum(["CREDIT", "DEBIT"]).catch(""),
+  transactionTime: z.string().datetime({offset:true}).catch(""),
+  // Some history rows may omit/null the memo. Such rows cannot match a KN
+  // payment code, but must not invalidate otherwise usable pages.
+  description: z.string().max(5000).nullish().transform((value) => value ?? "").catch(""),
+}).catch({
+  transactionId: "",
+  accountNumber: "",
+  bankBin: "",
+  amount: 0,
+  type: "",
+  transactionTime: "",
+  description: "",
+});
 const historyPage = z.object({
   totalCount: z.number().int().nonnegative().safe(),
-  items: z.array(z.object({
-    transactionId: text,
-    accountNumber: text,
-    bankBin: text,
-    amount: z.number().int().positive().safe(),
-    type: z.enum(['CREDIT','DEBIT']),
-    transactionTime: z.string().datetime({offset:true}),
-    description: z.string().max(5000),
-  })).max(100),
+  items: z.array(z.unknown()).max(100),
 });
 export const STATIC_MONITOR_MS = 7 * 24 * 3600000;
 export function staticPaymentCode(description) {
   // Reject partial codes and transfers mentioning multiple different orders.
   const codes = [...new Set((description.toUpperCase().match(/\bKN[A-F0-9]{16}\b/g) || []))];
   return codes.length === 1 ? codes[0] : null;
+}
+function isReceivingVa(accountNumber, vaAccount) {
+  // Tingee may report a linked account as "bank account: VA". Match only an
+  // exact colon-delimited component; never use substring matching for money.
+  return accountNumber.split(":").some((part) => part.trim() === vaAccount);
 }
 export const tingeeReady = (c) =>
   !!(
@@ -182,11 +205,12 @@ export function createTingeeClient(config, fetcher = fetch) {
           vaAccountNumbers:[route.va_account],bankBin:route.bank_bin,
           startTime:tingeeTimestamp(start).slice(0,14),endTime:tingeeTimestamp(end).slice(0,14),
         }));
-        items.push(...page.items);
+        const rows=page.items.map(item=>historyItem.parse(item));
+        items.push(...rows);
         if (skip+page.items.length>=page.totalCount) return items.filter(t=>
-          t.type==='CREDIT' && t.accountNumber===route.account && t.bankBin===route.bank_bin &&
+          t.transactionId && t.type==='CREDIT' && isReceivingVa(t.accountNumber,route.va_account) && t.bankBin===route.bank_bin &&
           Date.parse(t.transactionTime)>=Math.floor(start/1000)*1000 && Date.parse(t.transactionTime)<=end &&
-          staticPaymentCode(t.description)===route.payment.code);
+          staticPaymentCode(t.description)===route.payment.code).map(t=>({...t,accountNumber:route.account}));
         if (page.items.length<100) throw new Error('tingee_invalid_response');
       }
       // Do not declare a scan complete or close a route when pages were omitted.
