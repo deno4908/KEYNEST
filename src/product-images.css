@@ -11,16 +11,11 @@
   object-fit: contain;
   background: #191b24;
 }
-.detail-art-portrait {
-  width: 100%;
-  max-width: 360px;
-  aspect-ratio: 2 / 3;
-  margin-inline: auto;
-  background: #090b2d;
-}
-.detail-art-portrait > img.product-image {
-  object-fit: cover;
+.card-art > img.product-image,
+.detail-art > img.product-image {
+  object-fit: contain;
   object-position: center;
+  background: #090b2d;
 }
 .product-card:hover .product-image-complete {
   transform: none;

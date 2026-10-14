@@ -810,9 +810,7 @@ function ProductPage() {
       </div>
       <div className="detail-grid">
         <div>
-          <div
-            className={`detail-art${p.image && p.image !== productImages[p.slug] ? " detail-art-portrait" : ""}`}
-          >
+          <div className="detail-art">
             <Art product={p} />
           </div>
           <div className="detail-assurance">
