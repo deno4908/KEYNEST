@@ -1404,10 +1404,10 @@ export function PaymentModal({
         }
       } catch { /* Retry transient failures without overlapping requests. */ }
       finally {
-        if (!controller.signal.aborted && !terminal) timer = setTimeout(check, 4000);
+        if (!controller.signal.aborted && !terminal) timer = setTimeout(check, 2000);
       }
     };
-    timer = setTimeout(check, 4000);
+    timer = setTimeout(check, 2000);
     return () => { controller.abort(); clearTimeout(timer); };
   }, [payment.id, payment.order_id, status]);
   async function simulate() {
