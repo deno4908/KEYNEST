@@ -16,7 +16,7 @@ Tái hiện local: kiểm thử gửi mã rồi tráo tên cookie nhận HTTP 20
 - Đổi miền dẫn xuất khóa sang v2, từ chối cả challenge và proof cũ. Không chấp nhận cơ chế v1 để tương thích ngược.
 - Kiểm thử tráo cookie hai chiều, proof v1, sai phiên, sửa ciphertext, hết hạn, sai OTP và luồng xác minh hợp lệ.
 
-Triển khai: cập nhật và khởi động lại **tất cả** instance Node. Admin cần gửi và xác minh OTP mới. Không cần migration SQL hay thay khóa mã hóa kho hàng. Không để instance cũ tiếp tục nhận lưu lượng; không rollback về phiên bản có lỗi. `ADMIN_OTP_ENABLED=false` chủ động tắt lớp OTP, không được xem là đang được lớp này bảo vệ.
+Triển khai: cập nhật và khởi động lại **tất cả** instance Node. Admin cần gửi và xác minh OTP mới. Không cần migration SQL hay thay khóa mã hóa kho hàng. Không để instance cũ tiếp tục nhận lưu lượng; không rollback về phiên bản có lỗi. Cập nhật tiếp theo đã bỏ cờ `ADMIN_OTP_ENABLED`: OTP email admin luôn bắt buộc trong chế độ Supabase.
 
 ## Kết quả đối chiếu các nhận định khác
 

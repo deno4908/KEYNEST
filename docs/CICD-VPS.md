@@ -144,10 +144,9 @@ KAFKA_ENABLED=false
 REDIS_ENABLED=false
 AUTH_GOOGLE_ENABLED=true
 AUTH_DISCORD_ENABLED=true
-ADMIN_OTP_ENABLED=false
 ```
 
-Chỉ bật OAuth đã cấu hình. OTP email admin vẫn tắt theo lựa chọn hiện tại. Production yêu cầu thông tin ngân hàng và token webhook đầy đủ; không dùng placeholder để nhận thanh toán. Giữ nguyên khóa mã hóa khi dùng database đã có key sản phẩm. File `.env` ở VPS không đi qua GitHub và không bị thay khi deploy.
+Chỉ bật OAuth đã cấu hình. OTP email admin bắt buộc; cấu hình SMTP và mẫu Magic Link theo `docs/ADMIN-OTP.md` trước khi deploy. Cờ cũ `ADMIN_OTP_ENABLED=false` không còn tắt được OTP. Production yêu cầu thông tin ngân hàng và token webhook đầy đủ; không dùng placeholder để nhận thanh toán. Giữ nguyên khóa mã hóa khi dùng database đã có key sản phẩm. File `.env` ở VPS không đi qua GitHub và không bị thay khi deploy.
 
 Chạy các migration Supabase còn thiếu, theo thứ tự đến 016. Không chạy lại toàn bộ trên database đã có schema. Pipeline **không tự chạy migration hosted**: cập nhật schema tương thích trước khi deploy code cần nó. Rollback code không rollback database.
 

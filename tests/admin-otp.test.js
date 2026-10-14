@@ -12,7 +12,8 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
     signedOut = false;
   const uid = "11111111-1111-4111-8111-111111111111";
   const service = createAdminOtp({
-    config: { mode: "supabase", production: false, encryption: "a".repeat(64) },
+    // A stale deployment flag must not disable mandatory admin verification.
+    config: { mode: "supabase", production: false, adminOtpEnabled: false, encryption: "a".repeat(64) },
     clock: () => time,
     makeAuthClient: () => ({
       auth: {
@@ -72,6 +73,8 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
   assert.equal((await req("/private")).status, 403);
+  assert.equal((await req('/private', null, '', { 'x-role': 'customer' })).status, 200);
+  assert.equal((await (await req('/auth/admin-otp/status')).json()).verified, false);
   assert.equal(
     (await req("/auth/admin-otp/status", null, "", { "x-role": "customer" }))
       .status,

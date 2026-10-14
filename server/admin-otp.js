@@ -65,7 +65,6 @@ export function createAdminOtp({
   function guard(req, res, next) {
     if (
       config.mode !== "supabase" ||
-      config.adminOtpEnabled === false ||
       req.user.role !== "admin" ||
       verified(req)
     )
@@ -94,17 +93,6 @@ export function createAdminOtp({
         return next(new AppError("OTP email admin cần Supabase Auth.", 400));
       if (req.user.role !== "admin")
         return next(new AppError("Không có quyền quản trị.", 403));
-      if (config.adminOtpEnabled === false) {
-        if (req.method === "GET" && req.path === "/status")
-          return res.json({
-            verified: true,
-            enabled: false,
-            email: "",
-            sent: false,
-            retry_after: 0,
-          });
-        return next(new AppError("OTP email admin đang tạm tắt.", 403));
-      }
       next();
     });
     r.get("/status", (req, res) => {

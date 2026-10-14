@@ -527,7 +527,7 @@ app.post("/api/auth/login", async (req, res) => {
     user = await store.profile(data.user.id);
     if (needsMfa(data.user, data.session.access_token))
       return res.json({ mfa_required: true });
-    if (user.role === "admin" && config.adminOtpEnabled)
+    if (user.role === "admin")
       return res.json({ admin_otp_required: true });
   }
   res.json(user);

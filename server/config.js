@@ -5,7 +5,6 @@ export const config = {
   captcha: captchaConfig(),
   mode: process.env.APP_MODE || "demo",
   production: process.env.NODE_ENV === "production",
-  adminOtpEnabled: process.env.ADMIN_OTP_ENABLED !== "false",
   port: Number(process.env.PORT || 3001),
   origin: process.env.APP_ORIGIN || "http://127.0.0.1:5173",
   url: process.env.SUPABASE_URL,

@@ -1,6 +1,6 @@
 # OTP email bắt buộc cho admin
 
-Tạm tắt bằng `ADMIN_OTP_ENABLED=false` trong `.env`, sau đó khởi động lại backend. Bật lại bằng `true`. Cờ này chỉ điều khiển OTP email admin, không tắt Authenticator 2FA. Khi tắt, các API gửi/xác minh OTP email không hoạt động.
+OTP email admin luôn bắt buộc trong chế độ Supabase. Cờ cũ `ADMIN_OTP_ENABLED` không còn tác dụng, kể cả khi VPS vẫn đặt `false`. Khi gửi email lỗi, quyền admin tiếp tục bị chặn cho đến khi xác minh thành công. Cập nhật tất cả instance backend và frontend; không cần migration SQL cho thay đổi này.
 
 Trong chế độ Supabase, mỗi phiên admin mới phải xác minh OTP email, kể cả đăng nhập Google/Discord. Nếu đã bật TOTP, xác minh Authenticator trước rồi OTP email. Khách hàng và đăng ký không thêm bước nhập OTP.
 
