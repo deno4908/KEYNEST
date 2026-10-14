@@ -246,7 +246,7 @@ git commit -m "Describe the change"
 git push origin main
 ```
 
-GitHub tự test/build/deploy. `.env` ở VPS được giữ nguyên. Deploy restart một tiến trình nên có gián đoạn ngắn; chưa phải zero downtime. Script giữ các release cũ để khôi phục; theo dõi `df -h` và dọn bản cũ khi cần, giữ bản hiện tại và bản dự phòng. Không có tác vụ tự xóa release.
+GitHub tự test/build/deploy. `.env` ở VPS được giữ nguyên. Deploy restart một tiến trình nên có gián đoạn ngắn; chưa phải zero downtime. Trước khi cài package, script dọn release cũ và bản upload dư, giữ release đang chạy làm rollback; sau khi deploy khỏe, giữ bản mới cùng rollback. Nếu `npm ci` lỗi, thư mục staging dở dang được xóa. Theo dõi `df -h`; mỗi release chiếm khoảng 135 MB.
 
 Nếu GitHub báo lỗi:
 
