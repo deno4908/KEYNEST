@@ -450,6 +450,24 @@ test("a database-ignored Tingee settlement remains pollable and records a diagno
   assert.ok(logs.some((message) => message.includes("tingee_settlement_ignored")));
 });
 
+test("active dynamic QR bills are scheduled for a ten-second reconciliation retry", async () => {
+  const db = memoryStore(route);
+  const router = createPaymentRouting({
+    store: db.store,
+    config,
+    logger,
+    client: {
+      status: async () => ({ ...bill, status: "active", totalAmountPaid: 0 }),
+    },
+  });
+  const startedAt = Date.now();
+
+  await router.tick();
+
+  const delay = Date.parse(db.read().next_poll_at) - startedAt;
+  assert.ok(delay >= 9000 && delay <= 11000, `expected about 10s, got ${delay}ms`);
+});
+
 test("a provider-paid bill that needs review is not reported as a successful settlement", async () => {
   const db = memoryStore(route, { review: true });
   const router = createPaymentRouting({
