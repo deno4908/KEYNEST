@@ -205,10 +205,9 @@ export function createTingeeClient(config, fetcher = fetch) {
       for (let skip=0;skip<300;skip+=100) {
         const page=historyPage.parse(await call('transaction/get-paging', {
           // Tingee's text filter can omit a credited transfer even when it is
-          // visible in the merchant portal. Pending static payments have a
-          // short creation-to-expiry window, so fetch that VA's bounded history
-          // and perform the exact payment-code match locally below.
-          ...(route.payment.status === 'pending' ? {} : {filter:route.payment.code}),
+          // visible in the merchant portal. Fetch this VA's bounded history
+          // for pending and expired routes, then match the exact payment code
+          // locally so pre-expiry credits can still be reconciled afterward.
           skipCount:skip,maxResultCount:100,
           vaAccountNumbers:[route.va_account],bankBin:route.bank_bin,
           startTime:tingeeTimestamp(start).slice(0,14),endTime:tingeeTimestamp(end).slice(0,14),

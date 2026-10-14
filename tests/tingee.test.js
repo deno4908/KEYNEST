@@ -220,6 +220,20 @@ test("Tingee static history tolerates incomplete unrelated rows but only returns
   assert.equal(Object.hasOwn(requestedBodies[0], "filter"), false);
   assert.deepEqual(requestedBodies[0].vaAccountNumbers, [linkedVa]);
   assert.equal(requestedBodies[0].bankBin, cfg.bankBin);
+  const expiredMatches = await client.transactions({
+    ...route,
+    qr_kind: "static",
+    bank_bin: cfg.bankBin,
+    va_account: linkedVa,
+    account: linkedVa,
+    payment: {
+      ...staticPayment,
+      status: "expired",
+      expires_at: new Date(receivedAt.getTime() - 1_000).toISOString(),
+    },
+  });
+  assert.deepEqual(expiredMatches.map((row) => row.transactionId), ["tx-matching"]);
+  assert.equal(Object.hasOwn(requestedBodies[1], "filter"), false);
 });
 
 function memoryStore(

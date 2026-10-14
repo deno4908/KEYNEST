@@ -1713,13 +1713,36 @@ try {
   await db.query("update payments set expires_at=now()-interval '1 second' where id=$1",[lateId]);
   assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','late-paid',lateCode,35000,'LATE-BILL'])).review,true);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),67000);
+  const staticLateId=await scalar('select id from create_wallet_topup($1,36000)',[routeUser]);
+  const staticLateCode=await scalar('select code from payments where id=$1',[staticLateId]);
+  const staticClaim=randomUUID();
+  await claim(staticLateId,staticClaim);
+  const staticRoute={...routeData,qr_kind:'static',bill_id:null,bank:'MBBank',bank_bin:'970422',
+    qr_account:'STATIC-VA',va_account:'STATIC-VA',account:'STATIC-VA',
+    expires_at:new Date(Date.now()+10*60000).toISOString()};
+  assert.equal(await scalar('select finish_payment_route($1,$2,$3)',[staticLateId,staticClaim,JSON.stringify(staticRoute)]),true);
+  await db.query("update payments set created_at=now()-interval '20 minutes',expires_at=now()-interval '5 minutes' where id=$1",[staticLateId]);
+  const staticTx='tingee-static:'+'a'.repeat(64);
+  await db.query("insert into payment_events(transaction_id,code,amount,outcome) values($1,$2,36000,'needs_review')",[staticTx,staticLateCode]);
+  const staticPaid=await scalar('select settle_tingee_static($1,$2,$3,$4,$5,$6)',[
+    staticTx,staticLateCode,36000,'STATIC-VA','970422',
+    await scalar('select expires_at-interval \'1 minute\' from payments where id=$1',[staticLateId]),
+  ]);
+  assert.equal(staticPaid.paid,true);
+  assert.equal((await scalar('select settle_tingee_static($1,$2,$3,$4,$5,$6)',[
+    staticTx,staticLateCode,36000,'STATIC-VA','970422',
+    await scalar('select expires_at-interval \'1 minute\' from payments where id=$1',[staticLateId]),
+  ])).duplicate,true);
+  assert.equal(await scalar('select status from payments where id=$1',[staticLateId]),'paid');
+  assert.equal(await scalar('select outcome from payment_events where transaction_id=$1',[staticTx]),'paid');
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),103000);
   await db.exec('set role authenticated');
   await fails('select * from payment_routes');
   await fails('select * from claim_payment_route($1,$2)',[lateId,claimA]);
   await fails('select * from claim_tingee_polls()');
   await fails('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','forged-paid',lateCode,35000,'LATE-BILL']);
   await db.exec('reset role');
-  pass('stale generation cannot overwrite fallback, late payment is reviewed without credit and browser roles cannot create or settle QR bills');
+  pass('payment route pinning, late-order review, pre-expiry static wallet credit, idempotency and browser access denial');
   }
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
