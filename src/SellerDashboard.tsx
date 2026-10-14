@@ -1,4 +1,5 @@
 import { OrderChatButton } from "./OrderChat";
+import { PreorderNote } from './PreorderNote';
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -599,7 +600,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                           <span>
                             {v.name} · {money(v.price)} ·{" "}
                             <b className={v.stock <= 5 ? "orange" : ""}>
-                              Tồn {v.stock}
+                              {v.is_preorder ? 'Còn lượt đặt' : 'Tồn'} {v.stock}
                             </b>
                           </span>
                           {v.delivery === "key" && (
@@ -706,6 +707,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                         {s.name} · {s.variant_name} ×{s.quantity}
                       </p>
                       <small>{date(s.order.created_at)}</small>
+                      <PreorderNote item={s} />
                     </td>
                     <td>
                       {statuses[s.order.status] || s.order.status}
@@ -1114,6 +1116,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
               {statuses[selectedSale.order.status]}
             </p>
             <p>Đặt lúc {date(selectedSale.order.created_at)}</p>
+            <PreorderNote item={selectedSale} />
             <p>
               Giao hàng:{" "}
               {selectedSale.delivered_at

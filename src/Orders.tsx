@@ -1,4 +1,5 @@
 import { OrderChatButton } from './OrderChat';
+import { PreorderNote } from './PreorderNote';
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
@@ -76,8 +77,9 @@ function OrderProduct({ item }: { item: OrderItem }) {
         <span>{item.variant_name}</span>
         <small>
           Số lượng: {item.quantity} <span>·</span>{" "}
-          {item.delivery === "key" ? "Giao mã tự động" : "Giao dịch vụ"}
+          {item.is_preorder ? 'Đặt trước' : item.delivery === "key" ? "Giao mã tự động" : "Giao dịch vụ"}
         </small>
+        <PreorderNote item={item} />
       </div>
       <strong className="purchase-line-price">
         {money(item.price * item.quantity)}
@@ -695,7 +697,7 @@ function OrderDetails({ id }: { id: string }) {
             <div className="order-section-title">
               <h2 id="delivery-title">
                 <KeyRound size={20} />
-                {order.items.every((i) => i.delivery === "manual")
+                {order.items.every((i) => i.delivery === "manual" && !i.is_preorder)
                   ? "Kết quả xử lý dịch vụ"
                   : "Sản phẩm đã mua"}
               </h2>
@@ -716,18 +718,19 @@ function OrderDetails({ id }: { id: string }) {
                     <p>
                       <strong>
                         {item.delivered_at
-                          ? "Đã hoàn tất dịch vụ"
+                          ? (item.is_preorder ? 'Đã giao sản phẩm đặt trước' : "Đã hoàn tất dịch vụ")
                           : order.status === "pending"
                             ? "Chờ thanh toán"
                             : order.status === "processing"
-                              ? "Đang xử lý dịch vụ"
+                              ? (item.is_preorder ? 'Đã thanh toán · Chờ giao hàng đặt trước' : "Đang xử lý dịch vụ")
                               : "Trạng thái: " + statuses[order.status]}
                       </strong>
                     </p>
-                    <p className="muted">
+                    <PreorderNote item={item} />
+                    {!item.is_preorder && <p className="muted">
                       Sản phẩm nạp/dịch vụ được xử lý theo thông tin đặt hàng,
                       không có mã kích hoạt.
-                    </p>
+                    </p>}
                     {order.customer_note && (
                       <p className="pre-wrap">
                         <strong>Thông tin đã cung cấp: </strong>

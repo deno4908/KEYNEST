@@ -657,7 +657,9 @@ export function ProductEditor({
         name: f.get("name"),
         price: Number(f.get("price")),
         original_price: Number(f.get("original_price")),
-        delivery: f.get("delivery"),
+        delivery: f.get("delivery") === 'preorder' ? 'manual' : f.get("delivery"),
+        is_preorder: f.get('delivery') === 'preorder',
+        expected_delivery: f.get('delivery') === 'preorder' ? f.get('expected_delivery') : null,
         stock: Number(f.get("stock")),
         region: f.get("region"),
         warranty_days: Number(f.get("warranty_days")),
@@ -848,7 +850,7 @@ export function ProductEditor({
                 <strong>{v.name}</strong>
                 <small>
                   {money(v.price)} ·{" "}
-                  {v.delivery === "key" ? "Kho mã" : "Dịch vụ"} · Tồn {v.stock}
+                  {v.is_preorder ? "Đặt trước · Còn lượt đặt" : v.delivery === "key" ? "Kho mã · Tồn" : "Dịch vụ · Tồn"} {v.stock}
                   {" · "}
                   {v.warranty_days
                     ? `Bảo hành ${v.warranty_days} ngày`
@@ -940,11 +942,13 @@ export function ProductEditor({
                 </label>
                 <label>
                   Cách giao
-                  <select name="delivery" defaultValue={variant.delivery}>
+                  <select name="delivery" value={variant.is_preorder ? 'preorder' : variant.delivery} onChange={e => setVariant(current => ({ ...current, delivery: e.target.value === 'key' ? 'key' : 'manual', is_preorder: e.target.value === 'preorder', stock: e.target.value === 'preorder' && !current?.stock ? 100 : current?.stock }))}>
                     <option value="key">Giao mã tự động</option>
                     <option value="manual">Giao dịch vụ thủ công</option>
+                    <option value="preorder">Đặt trước · Giao khi có hàng</option>
                   </select>
                 </label>
+                {variant.is_preorder && <label>Ngày giao dự kiến<input name="expected_delivery" type="date" defaultValue={variant.expected_delivery || ''} required /><small>Ngày dự kiến được lưu riêng cho mỗi đơn; đổi ngày ở đây chỉ áp dụng cho đơn mới.</small></label>}
                 <label>
                   Khu vực
                   <input
@@ -955,16 +959,17 @@ export function ProductEditor({
                   />
                 </label>
                 <label>
-                  Số lượng dịch vụ có thể bán
+                  {variant.is_preorder ? 'Số lượt đặt trước còn nhận' : 'Số lượng dịch vụ có thể bán'}
                   <input
                     name="stock"
                     type="number"
-                    defaultValue={variant.stock}
+                    value={variant.stock ?? 0}
+                    onChange={e => setVariant(current => ({ ...current, stock: Number(e.target.value) }))}
                     min={0}
                     max={100000}
                     required
                   />
-                  <small>Gói giao mã: tồn kho chỉ tăng khi nhập mã.</small>
+                  <small>{variant.is_preorder ? 'Không cần nhập kho mã. Mỗi sản phẩm đặt mua sẽ trừ một lượt; đặt 0 để ngừng nhận đơn.' : 'Gói giao mã: tồn kho chỉ tăng khi nhập mã.'}</small>
                 </label>
               </div>
               <div className="button-row">

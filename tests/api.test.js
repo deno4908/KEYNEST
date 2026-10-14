@@ -408,6 +408,42 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
       );
     },
   );
+  await t.test("preorders accept payment without inventory or service details and preserve the promised date", async () => {
+    const created = await request('/admin/products', { method: 'POST', cookie: admin, body: {
+      slug: 'test-preorder', name: 'Future release', category: 'game', platform: 'Steam',
+      image: '', featured: false, active: true,
+    }});
+    assert.equal(created.status, 200);
+    const expected = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const data = { name: 'Preorder edition', price: 10000, original_price: 10000,
+      delivery: 'manual', is_preorder: true, expected_delivery: expected, stock: 1, region: 'Global' };
+    const path = `/admin/products/${created.body.id}/variants`;
+    assert.equal((await request(path, {method:'POST',cookie:admin,body:{...data,expected_delivery:null}})).status, 400);
+    assert.equal((await request(path, {method:'POST',cookie:customer,body:data})).status, 403);
+    assert.equal((await request(path, {method:'POST',cookie:admin,body:data})).status, 200);
+    const v = store.db.products.find(p => p.id === created.body.id).variants[0];
+    const before = (await request('/me', {cookie:customer})).body.balance;
+    const body = {items:[{variant_id:v.id,quantity:1}],method:'wallet'};
+    const key = randomUUID();
+    const result = await request('/orders',{method:'POST',cookie:customer,key,body});
+    assert.equal(result.status,201);
+    assert.equal(result.body.status,'processing');
+    assert.equal(result.body.items[0].is_preorder,true);
+    assert.equal(result.body.items[0].expected_delivery,expected);
+    assert.equal(result.body.items[0].keys.length,0);
+    assert.equal((await request('/me',{cookie:customer})).body.balance,before-10000);
+    assert.equal((await request('/orders',{method:'POST',cookie:customer,key,body})).body.id,result.body.id);
+    assert.equal((await request('/orders',{method:'POST',cookie:customer,key:randomUUID(),body})).status,409);
+    const nextDate = new Date(Date.now()+14*86400000).toISOString().slice(0,10);
+    assert.equal((await request(path,{method:'POST',cookie:admin,body:{...data,id:v.id,stock:0,expected_delivery:nextDate}})).status,200);
+    const snapshot = await request(`/orders/${result.body.id}`,{cookie:customer});
+    assert.equal(snapshot.body.items[0].expected_delivery,expected);
+    assert.equal((await request(`/admin/orders/${result.body.id}/fulfill`,{method:'POST',cookie:customer,body:{secrets:['PREORDER-DELIVERY']}})).status,403);
+    assert.equal((await request(`/admin/orders/${result.body.id}/fulfill`,{method:'POST',cookie:admin,body:{secrets:['PREORDER-DELIVERY']}})).status,200);
+    const delivered = await request(`/orders/${result.body.id}`,{cookie:customer});
+    assert.equal(delivered.body.status,'completed');
+    assert.deepEqual(delivered.body.items[0].keys,['PREORDER-DELIVERY']);
+  });
   await t.test(
     "refund is exactly once; delivered keys do not return to sale inventory",
     async () => {

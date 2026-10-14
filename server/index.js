@@ -11,6 +11,7 @@ import { config } from "./config.js";
 import { createOAuthRouter } from "./oauth.js";
 import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
+import { createReceiptWorker } from './order-receipts.js';
 import { sellersRouter } from './sellers.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
@@ -390,11 +391,14 @@ const variantSchema = z
     price: money,
     original_price: money,
     delivery: z.enum(["key", "manual"]),
+    is_preorder: z.boolean().default(false),
+    expected_delivery: z.iso.date().nullable().default(null),
     stock: z.number().int().min(0).max(100000),
     region: z.string().min(1).max(60),
     warranty_days: z.number().int().min(0).max(3650).optional(),
   })
-  .strict();
+  .strict().refine(v => !v.is_preorder || (v.delivery === 'manual' && !!v.expected_delivery),
+    'Đặt trước cần giao thủ công và ngày giao dự kiến.');
 app.use('/api', sellersRouter({ store, auth, admin, limiter, categoryStore, productSchema, variantSchema, secretsSchema }));
 function paymentInfo(p) {
   if (!p) return null;
@@ -1146,11 +1150,16 @@ if (process.env.NODE_ENV !== "test") {
     60000,
   );
   timer.unref();
+  const receiptWorker = createReceiptWorker({ store, config });
+  const receiptTimer = setInterval(() => void receiptWorker.tick(), 15000);
+  receiptTimer.unref();
+  void receiptWorker.tick();
   let shuttingDown = false;
   const shutdown = async () => {
     if (shuttingDown) return;
     shuttingDown = true;
     clearInterval(timer);
+    clearInterval(receiptTimer);
     const force = setTimeout(() => process.exit(1), 30000);
     force.unref();
     await new Promise((done) => server.close(done));

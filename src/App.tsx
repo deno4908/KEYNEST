@@ -2,6 +2,7 @@ import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
 import { AdminVerification } from "./AdminVerification";
+import { PreorderNote } from './PreorderNote';
 import { HomeAnnouncements } from "./Announcements";
 import { LegalPage, SocialLinks } from "./LegalPages";
 import {
@@ -279,7 +280,11 @@ export function Art({
       )}
       <strong>{product.name}</strong>
       <span>
-        {product.category === "mmo"
+        {product.variants.some(v => v.is_preorder)
+          ? "Đặt trước · Giao khi có hàng"
+          : product.category === "game"
+            ? "Game bản quyền · Kích hoạt trên nền tảng"
+          : product.category === "mmo"
           ? "Thông tin truy cập giao trong đơn hàng"
           : product.category === "gift"
             ? "Mã kích hoạt · Chọn đúng khu vực"
@@ -731,7 +736,7 @@ export function ProductCard({ product }: { product: Product }) {
           }
         >
           <i />
-          {product.variants.some((v) => v.stock > 0) ? "Còn hàng" : "Hết hàng"}
+          {product.variants.some(v => v.stock > 0 && !v.is_preorder) ? 'Còn hàng' : product.variants.some(v => v.stock > 0 && v.is_preorder) ? 'Nhận đặt trước' : 'Hết hàng'}
         </span>
       </div>
       <Link className="card-name" to={`/products/${product.slug}`}>
@@ -866,7 +871,7 @@ function ProductPage() {
                       {x.name}
                       <small>
                         {x.region} ·{" "}
-                        {x.delivery === "key"
+                        {x.is_preorder ? 'Đặt trước' : x.delivery === "key"
                           ? "Giao mã tự động"
                           : "Giao sau khi xử lý"}
                       </small>
@@ -879,7 +884,7 @@ function ProductPage() {
               <div className="detail-stock">
                 <span className={v.stock ? "available" : "muted"}>
                   <i />
-                  {v.stock ? "Có sẵn" : "Hết hàng"}
+                  {v.is_preorder ? (v.stock ? 'Nhận đặt trước' : 'Đã đủ lượt đặt') : v.stock ? "Có sẵn" : "Hết hàng"}
                 </span>
                 <span>
                   <Globe2 size={14} />
@@ -892,6 +897,7 @@ function ProductPage() {
                   ? `Bảo hành ${v.warranty_days} ngày kể từ khi giao sản phẩm`
                   : "Gói này không áp dụng bảo hành theo ngày"}
               </p>
+              <PreorderNote item={v} />
               <div className="buy-actions">
                 <div className="quantity">
                   <button
@@ -927,9 +933,9 @@ function ProductPage() {
                   navigate("/cart");
                 }}
               >
-                Mua ngay <ArrowRight size={17} />
+                {v.is_preorder ? 'Đặt trước ngay' : 'Mua ngay'} <ArrowRight size={17} />
               </button>
-              {v.delivery === "manual" && (
+              {v.delivery === "manual" && !v.is_preorder && (
                 <p className="info-note">
                   Điền UID, máy chủ hoặc thông tin dịch vụ ở bước thanh toán.
                   Gói này được xử lý theo yêu cầu, không giao key. Không gửi mật
@@ -1167,6 +1173,7 @@ function CartPage() {
                       {i.product?.name || "Sản phẩm không còn bán"}
                     </strong>
                     <span>{i.variant?.name}</span>
+                    {i.variant && <PreorderNote item={i.variant} />}
                     <small>
                       {i.variant?.region}
                       {i.variant?.stock === 0 ? " · Hết hàng" : ""}
@@ -1221,10 +1228,10 @@ function CartPage() {
               ))}
             </div>
             <div className="panel">
-              <h3>Thông tin giao dịch vụ</h3>
+              <h3>Ghi chú đơn hàng / thông tin dịch vụ</h3>
               <p className="muted">
                 Với nạp game: nhập UID / Riot ID và máy chủ. Với proxy: nhập
-                quốc gia hoặc yêu cầu cấu hình.
+                quốc gia hoặc yêu cầu cấu hình. Sản phẩm đặt trước không yêu cầu UID; bạn có thể để trống ghi chú.
               </p>
               <textarea
                 value={note}

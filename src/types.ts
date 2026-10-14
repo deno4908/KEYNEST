@@ -7,6 +7,8 @@ export type Variant = {
   stock: number;
   region: string;
   delivery: "key" | "manual";
+  is_preorder?: boolean;
+  expected_delivery?: string | null;
   warranty_days: number;
 };
 export type Product = {
@@ -69,6 +71,8 @@ export type OrderItem = {
   price: number;
   quantity: number;
   delivery: string;
+  is_preorder?: boolean;
+  expected_delivery?: string | null;
   keys: string[];
   key_ids: string[];
   product_image: string;

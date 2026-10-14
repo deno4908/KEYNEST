@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PreorderNote } from './PreorderNote';
 import type { FormEvent } from "react";
 import {
   ArrowRight,
@@ -214,11 +215,12 @@ export function AdminOrderDialog({
                         {i.variant_name} · Số lượng {i.quantity}
                       </small>
                       <small>
-                        {i.delivery === "key"
+                        {i.is_preorder ? 'Đặt trước' : i.delivery === "key"
                           ? "Giao mã tự động"
                           : "Giao dịch vụ"}
                         {i.delivered_at ? ` · ${date(i.delivered_at)}` : ""}
                       </small>
+                      <PreorderNote item={i} />
                     </div>
                     <strong>{money(i.price * i.quantity)}</strong>
                   </div>
@@ -272,10 +274,10 @@ export function AdminOrderDialog({
             <section className="admin-detail-section">
               <h3>
                 <KeyRound size={17} />
-                Giao dịch vụ
+                Giao sản phẩm / dịch vụ
               </h3>
               <p>
-                Sau khi thực hiện nạp/dịch vụ, nhập {count} kết quả xác nhận,
+                Khi đã có hàng hoặc hoàn tất dịch vụ, nhập {count} thông tin giao hàng,
                 mỗi dòng cho một đơn vị theo thứ tự dưới đây.
               </p>
               <ol className="manual-delivery-order">
@@ -287,16 +289,16 @@ export function AdminOrderDialog({
               </ol>
               <form className="form" onSubmit={fulfill}>
                 <label>
-                  Kết quả xử lý (không phải key)
+                  Mã sản phẩm / thông tin giao hàng / kết quả dịch vụ
                   <textarea
                     name="secrets"
                     rows={4}
                     required
-                    placeholder="Ví dụ: Đã nạp thành công vào UID …, máy chủ …"
+                    placeholder="Mỗi dòng là mã sản phẩm, thông tin nhận hàng hoặc xác nhận dịch vụ của một đơn vị."
                   />
                 </label>
                 <button className="button button-small" disabled={busy}>
-                  Xác nhận hoàn tất {count} lượt dịch vụ
+                  Xác nhận đã giao {count} sản phẩm / dịch vụ
                 </button>
               </form>
             </section>

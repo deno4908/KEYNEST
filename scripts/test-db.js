@@ -1607,6 +1607,67 @@ try {
   assert.equal((await authorizeSession(finalAuth)).status, 'revoked');
   assert.equal((await authorizeSession(randomUUID())).status, 'revoked');
   pass('session cutoff rejects unregistered/old sessions, preserves current, allows new login, blocks cross-owner and suspension revival');
+  // Preorders reserve capacity, collect payment now and preserve the promise
+  // made at checkout; no inventory secret or service UID is required.
+  await db.exec('reset role');
+  const preorderUser = randomUUID(), preorderProduct = randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'preorder@example.test')", [preorderUser]);
+  await db.query('update profiles set balance=1000000 where id=$1', [preorderUser]);
+  await db.query("insert into products(id,slug,name,category,platform) values($1,'preorder-fixture','Upcoming game','game','Steam')", [preorderProduct]);
+  const expectedDelivery = await scalar("select ((now() at time zone 'Asia/Ho_Chi_Minh')::date+7)::text");
+  const preorderVariant = await scalar('select save_variant($1,$2)', [preorderProduct, JSON.stringify({ name:'Preorder',price:10000,original_price:10000,delivery:'manual',stock:3,region:'Global',is_preorder:true,expected_delivery:expectedDelivery })]);
+  await fails('select save_variant($1,$2)', [preorderProduct, JSON.stringify({name:'Bad',price:10000,original_price:10000,delivery:'key',stock:0,region:'Global',is_preorder:true,expected_delivery:expectedDelivery})]);
+  const preorderPayload = { items:[{variant_id:preorderVariant,quantity:1}],method:'wallet',coupon:'',customer_note:'' };
+  const preorderRequest = randomUUID();
+  const preorderOrder = await scalar('select create_order($1,$2,$3)', [preorderUser,JSON.stringify(preorderPayload),preorderRequest]);
+  assert.equal(await scalar('select status from orders where id=$1',[preorderOrder]),'processing');
+  assert.equal(await scalar('select delivered_at from order_items where order_id=$1',[preorderOrder]),null);
+  assert.equal(Number(await scalar('select count(*) from inventory where order_id=$1',[preorderOrder])),0);
+  assert.equal(Number(await scalar('select stock from variants where id=$1',[preorderVariant])),2);
+  assert.equal(await scalar('select create_order($1,$2,$3)',[preorderUser,JSON.stringify(preorderPayload),preorderRequest]),preorderOrder);
+  await db.query("update variants set expected_delivery=expected_delivery+1 where id=$1",[preorderVariant]);
+  assert.equal(await scalar('select expected_delivery::text from order_items where order_id=$1',[preorderOrder]),expectedDelivery);
+  const receipt = (await db.query('select * from order_receipts where order_id=$1',[preorderOrder])).rows[0];
+  assert.equal(receipt.payload.items.length,1);
+  assert.equal(receipt.payload.items[0].is_preorder,true);
+  assert.equal(receipt.payload.items[0].expected_delivery,expectedDelivery);
+  assert.equal(receipt.payload.email,'preorder@example.test');
+  assert.equal(receipt.payload.total,10000);
+  assert.equal('keys' in receipt.payload.items[0],false);
+  await scalar('select fulfill_order($1,$2)',[preorderOrder,JSON.stringify([{secret:'encrypted-preorder-result',hash:randomUUID()}])]);
+  assert.equal(await scalar('select status from orders where id=$1',[preorderOrder]),'completed');
+  assert.equal(Number(await scalar('select count(*) from order_receipts where order_id=$1',[preorderOrder])),1);
+  const bankPreorder = await scalar('select create_order($1,$2,$3)', [preorderUser,JSON.stringify({...preorderPayload,method:'sepay'}),randomUUID()]);
+  assert.equal(Number(await scalar('select count(*) from order_receipts where order_id=$1',[bankPreorder])),0);
+  const bankReceiptPayment = (await db.query('select * from payments where order_id=$1',[bankPreorder])).rows[0];
+  await scalar('select settle_payment($1,$2,$3)',['preorder-bank-payment',bankReceiptPayment.code,10000]);
+  await scalar('select settle_payment($1,$2,$3)',['preorder-bank-payment',bankReceiptPayment.code,10000]);
+  assert.equal(Number(await scalar('select count(*) from order_receipts where order_id=$1',[bankPreorder])),1);
+  await db.query('update variants set stock=0 where id=$1',[preorderVariant]);
+  await fails('select create_order($1,$2,$3)',[preorderUser,JSON.stringify(preorderPayload),randomUUID()]);
+  await db.query("update variants set stock=1,expected_delivery=current_date-1 where id=$1",[preorderVariant]);
+  await fails('select create_order($1,$2,$3)',[preorderUser,JSON.stringify(preorderPayload),randomUUID()]);
+  pass('preorders accept wallet/bank payment without keys, retain delivery date, enforce capacity and fulfillment; receipts queue once only after payment');
+  // Isolate one job; simulated crash, lease reclaim and stale acknowledgements.
+  await db.query("update order_receipts set status='sent' where id<>$1",[receipt.id]);
+  const claimedReceipt = (await db.query('select * from claim_order_receipt()')).rows[0];
+  assert.equal(claimedReceipt.id,receipt.id);
+  assert.equal((await db.query('select * from claim_order_receipt()')).rows.length,0);
+  await db.query("update order_receipts set lease_until=now()-interval '1 second' where id=$1",[receipt.id]);
+  const reclaimedReceipt = (await db.query('select * from claim_order_receipt()')).rows[0];
+  assert.notEqual(reclaimedReceipt.claim_token,claimedReceipt.claim_token);
+  assert.equal(await scalar('select finish_order_receipt($1,$2,true)',[receipt.id,claimedReceipt.claim_token]),false);
+  assert.equal(await scalar('select finish_order_receipt($1,$2,false,$3)',[receipt.id,reclaimedReceipt.claim_token,'provider_http_503']),true);
+  assert.equal((await db.query('select * from claim_order_receipt()')).rows.length,0);
+  await db.query("update order_receipts set available_at=now() where id=$1",[receipt.id]);
+  const retryReceipt = (await db.query('select * from claim_order_receipt()')).rows[0];
+  assert.equal(await scalar('select finish_order_receipt($1,$2,true)',[receipt.id,retryReceipt.claim_token]),true);
+  await db.exec('set role authenticated');
+  await fails('select * from order_receipts');
+  await fails('select * from claim_order_receipt()');
+  await fails('select finish_order_receipt($1,$2,true)',[receipt.id,retryReceipt.claim_token]);
+  await db.exec('reset role');
+  pass('receipt queue leases, crash retry, backoff, stale acknowledgement protection and browser access denial');
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

@@ -2,6 +2,11 @@ import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { captchaConfig } from './captcha.js';
 export const config = {
+  receipts: {
+    enabled: process.env.ORDER_RECEIPTS_ENABLED === 'true',
+    apiKey: process.env.BREVO_API_KEY || '',
+    sender: process.env.ORDER_RECEIPTS_FROM || '',
+  },
   captcha: captchaConfig(),
   mode: process.env.APP_MODE || "demo",
   production: process.env.NODE_ENV === "production",
@@ -30,6 +35,8 @@ export const config = {
 };
 if (!["sepay", "pay2s"].includes(config.paymentProvider))
   throw new Error("BANK_PAYMENT_PROVIDER phải là pay2s hoặc sepay.");
+if (config.receipts.enabled && (!config.receipts.apiKey || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(config.receipts.sender)))
+  throw new Error('Email biên nhận cần BREVO_API_KEY và ORDER_RECEIPTS_FROM hợp lệ.');
 if (!["demo", "supabase"].includes(config.mode))
   throw new Error("APP_MODE phải là demo hoặc supabase.");
 if (config.production && config.mode === "demo")

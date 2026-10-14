@@ -250,7 +250,9 @@ export class DemoStore {
       const v = p?.variants.find((v) => v.id === line.variant_id);
       if (!v || v.stock < line.quantity)
         throw new AppError("Sản phẩm không đủ tồn kho.", 409);
-      if (v.delivery === "manual" && !payload.customer_note.trim())
+      if (v.is_preorder && v.expected_delivery < new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()))
+        throw new AppError('Đợt đặt trước đã hết hạn. Vui lòng chờ cửa hàng cập nhật ngày giao.');
+      if (v.delivery === "manual" && !v.is_preorder && !payload.customer_note.trim())
         throw new AppError("Vui lòng nhập UID / thông tin dịch vụ.");
       if (
         v.delivery === "key" &&
@@ -267,6 +269,8 @@ export class DemoStore {
         price: v.price,
         quantity: line.quantity,
         delivery: v.delivery,
+        is_preorder: !!v.is_preorder,
+        expected_delivery: v.expected_delivery || null,
         warranty_days: v.warranty_days,
         product_image: p.image || productImages[p.slug] || "",
         product_slug: p.slug,
