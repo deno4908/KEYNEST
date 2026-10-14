@@ -20,10 +20,10 @@ export const config = {
   webhook: process.env.SEPAY_WEBHOOK_KEY,
   paymentProvider: process.env.BANK_PAYMENT_PROVIDER || "tingee",
   tingee: {
-    qrMode: process.env.TINGEE_QR_MODE || 'static',
+    qrMode: process.env.TINGEE_QR_MODE || 'dynamic',
     clientId: process.env.TINGEE_CLIENT_ID || '', secret: process.env.TINGEE_SECRET_TOKEN || '',
     baseUrl: process.env.TINGEE_BASE_URL || 'https://open-api.tingee.vn',
-    bankBin: process.env.TINGEE_BANK_BIN || '',
+    bankBin: process.env.TINGEE_BANK_BIN || '970422',
     vaAccount: process.env.TINGEE_VA_ACCOUNT || '',
     accountName: process.env.TINGEE_ACCOUNT_NAME || '', merchantId: Number(process.env.TINGEE_MERCHANT_ID || 0),
   },

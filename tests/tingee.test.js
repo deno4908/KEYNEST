@@ -89,6 +89,30 @@ test("Tingee signs the exact transmitted body with UTC+7 milliseconds and render
   assert.match(qr.qr_image, /^data:image\/png;base64,/);
   assert.ok(Date.parse(qr.expires_at) <= Date.parse(payment.expires_at));
 });
+test("Tingee dynamic MBBank QR uses the MB BIN and displays the bank name", async () => {
+  const mbConfig = { ...cfg, bankBin: "970422", vaAccount: "MB-LINKED-VA" };
+  const client = createTingeeClient(mbConfig, async (_url, options) => {
+    const body = JSON.parse(options.body);
+    assert.equal(body.bankBin, "970422");
+    assert.equal(body.vaAccountNumber, mbConfig.vaAccount);
+    return {
+      ok: true,
+      json: async () => ({
+        code: "00",
+        data: {
+          billId: "mb-bill-test",
+          qrAccount: "MB-QR-ACCOUNT",
+          qrCode: "00020101021238540010A00000072701240006970422",
+        },
+      }),
+    };
+  });
+  const qr = await client.generate(payment);
+  assert.equal(qr.bank, "MBBank");
+  assert.equal(qr.bank_bin, "970422");
+  assert.equal(qr.qr_kind, "dynamic");
+  assert.equal(qr.bill_id, "mb-bill-test");
+});
 test("Tingee rejects bill identity, receiving account, type and amount mismatches", async () => {
   for (const change of [
     { billId: "other" },

@@ -67,7 +67,10 @@ export const tingeeReady = (c) =>
     c.vaAccount &&
     c.accountName
   );
-const tingeeBankName = (bin) => bin === '970436' ? 'VCB' : bin;
+const tingeeBankName = (bin) => ({
+  '970422': 'MBBank',
+  '970436': 'VCB',
+}[bin] || bin);
 export function tingeeTimestamp(now = Date.now()) {
   return new Date(now + 7 * 3600000).toISOString().replace(/[-:TZ.]/g, "");
 }
