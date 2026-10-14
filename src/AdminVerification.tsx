@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Mail,
   ArrowRight,
@@ -26,6 +26,18 @@ export function AdminVerification() {
     "" | "sending" | "verifying" | "success"
   >("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState<number>();
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    const measure = () =>
+      setContentHeight(content.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
   const stage = status?.verified
     ? "success"
     : action || (status?.sent ? "sent" : "ready");
@@ -126,128 +138,157 @@ export function AdminVerification() {
               <Check size={26} />
             </div>
           </div>
-          <h1 id="admin-otp-title">
-            {stage === "success" ? "Đã xác minh email" : "Xác minh email admin"}
-          </h1>
-          <p className="mfa-login-description">
-            Mỗi phiên đăng nhập quản trị cần xác minh bằng mã gửi tới email của
-            tài khoản.
-            {status && (
-              <>
-                {" "}
-                Email nhận mã: <strong>{status.email}</strong>.
-              </>
-            )}
-          </p>
-          {!status && !error && <p role="status">Đang kiểm tra phiên…</p>}
-          {stage === "success" ? (
-            <div className="admin-otp-success" role="status">
-              <p>Phiên quản trị đã sẵn sàng.</p>
-              <a className="button" href="/admin">
-                Vào trang quản trị
-                <ArrowRight size={16} />
-              </a>
-            </div>
-          ) : (
-            status && (
-              <>
-                {status.sent && (
-                  <form
-                    className="mfa-login-form"
-                    onSubmit={async (e) => {
-                      e.preventDefault();
-                      if (busy || !/^\d{6,10}$/.test(code)) return;
-                      setBusy(true);
-                      setAction("verifying");
-                      setError("");
-                      try {
-                        await post("/auth/admin-otp/verify", { code });
-                        setCode("");
-                        setAction("success");
-                      } catch (err) {
-                        setError((err as Error).message);
-                        setBusy(false);
-                        setAction("");
-                      }
-                    }}
-                  >
-                    <label htmlFor="admin-email-code">Mã OTP trong email</label>
-                    <input
-                      id="admin-email-code"
-                      ref={inputRef}
-                      className="mfa-login-code"
-                      autoComplete="one-time-code"
-                      inputMode="numeric"
-                      pattern="[0-9]{6,10}"
-                      maxLength={10}
-                      required
-                      value={code}
-                      disabled={busy}
-                      aria-invalid={!!error}
-                      aria-describedby="admin-otp-help"
-                      onChange={(e) => {
-                        setCode(clean(e.target.value));
-                        setError("");
-                      }}
-                      onPaste={(e) => {
-                        e.preventDefault();
-                        setCode(clean(e.clipboardData.getData("text")));
-                        setError("");
-                      }}
-                    />
-                    <p id="admin-otp-help" className="mfa-login-hint">
-                      Dùng mã email, không dùng mã từ ứng dụng Authenticator.
-                      Kiểm tra cả thư rác nếu chưa thấy email.
-                    </p>
+          <div className="admin-otp-stage" style={{ height: contentHeight }}>
+            <div ref={contentRef} className="admin-otp-stage-content">
+              <h1
+                id="admin-otp-title"
+                key={stage === "success" ? "verified-title" : "challenge-title"}
+              >
+                {stage === "success"
+                  ? "Đã xác minh email"
+                  : "Xác minh email admin"}
+              </h1>
+              <p className="mfa-login-description">
+                Mỗi phiên đăng nhập quản trị cần xác minh bằng mã gửi tới email
+                của tài khoản.
+                {status && (
+                  <>
+                    {" "}
+                    Email nhận mã: <strong>{status.email}</strong>.
+                  </>
+                )}
+              </p>
+              {!status && !error && <p role="status">Đang kiểm tra phiên…</p>}
+              {stage === "success" ? (
+                <div className="admin-otp-success" role="status">
+                  <p>Phiên quản trị đã sẵn sàng.</p>
+                  <a className="button" href="/admin">
+                    Vào trang quản trị
+                    <ArrowRight size={16} />
+                  </a>
+                </div>
+              ) : (
+                status && (
+                  <>
+                    {status.sent && (
+                      <form
+                        className="mfa-login-form"
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (busy || !/^\d{6,10}$/.test(code)) return;
+                          setBusy(true);
+                          setAction("verifying");
+                          setError("");
+                          try {
+                            await post("/auth/admin-otp/verify", { code });
+                            setCode("");
+                            setAction("success");
+                          } catch (err) {
+                            setError((err as Error).message);
+                            setBusy(false);
+                            setAction("");
+                          }
+                        }}
+                      >
+                        <label htmlFor="admin-email-code">
+                          Mã OTP trong email
+                        </label>
+                        <div
+                          className="admin-otp-field"
+                          data-invalid={!!error}
+                          data-filled={code.length > 0}
+                        >
+                          <input
+                            id="admin-email-code"
+                            ref={inputRef}
+                            className="mfa-login-code"
+                            autoComplete="one-time-code"
+                            inputMode="numeric"
+                            pattern="[0-9]{6,10}"
+                            maxLength={10}
+                            required
+                            value={code}
+                            disabled={busy}
+                            aria-invalid={!!error}
+                            aria-describedby="admin-otp-help"
+                            onChange={(e) => {
+                              setCode(clean(e.target.value));
+                              setError("");
+                            }}
+                            onPaste={(e) => {
+                              e.preventDefault();
+                              setCode(clean(e.clipboardData.getData("text")));
+                              setError("");
+                            }}
+                          />
+                          <span
+                            className="admin-otp-field-line"
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <p id="admin-otp-help" className="mfa-login-hint">
+                          Dùng mã email, không dùng mã từ ứng dụng
+                          Authenticator. Kiểm tra cả thư rác nếu chưa thấy
+                          email.
+                        </p>
+                        <button
+                          className="button"
+                          disabled={busy || code.length < 6}
+                        >
+                          <span
+                            className="admin-otp-button-label"
+                            key={
+                              action === "verifying" ? "verifying" : "verify"
+                            }
+                          >
+                            {action === "verifying"
+                              ? "Đang xác minh…"
+                              : "Xác minh và vào quản trị"}
+                          </span>
+                          {action === "verifying" ? (
+                            <LoaderCircle
+                              className="admin-otp-spinner"
+                              size={16}
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <ArrowRight size={16} />
+                          )}
+                        </button>
+                      </form>
+                    )}
                     <button
-                      className="button"
-                      disabled={busy || code.length < 6}
+                      type="button"
+                      className={`button admin-otp-send ${status.sent ? "button-outline" : ""}`}
+                      style={{ marginTop: status.sent ? 12 : 0 }}
+                      disabled={busy || remaining > 0}
+                      onClick={() => void send()}
                     >
-                      {action === "verifying"
-                        ? "Đang xác minh…"
-                        : "Xác minh và vào quản trị"}
-                      {action === "verifying" ? (
+                      {action === "sending"
+                        ? "Đang gửi mã…"
+                        : remaining
+                          ? `Gửi lại sau ${remaining}s`
+                          : status.sent
+                            ? "Gửi lại mã"
+                            : "Gửi mã xác thực"}
+                      {action === "sending" && (
                         <LoaderCircle
                           className="admin-otp-spinner"
                           size={16}
                           aria-hidden="true"
                         />
-                      ) : (
-                        <ArrowRight size={16} />
                       )}
                     </button>
-                  </form>
-                )}
-                <button
-                  type="button"
-                  className={`button ${status.sent ? "button-outline" : ""}`}
-                  style={{ marginTop: status.sent ? 12 : 0 }}
-                  disabled={busy || remaining > 0}
-                  onClick={() => void send()}
-                >
-                  {action === "sending"
-                    ? "Đang gửi mã…"
-                    : remaining
-                      ? `Gửi lại sau ${remaining}s`
-                      : status.sent
-                        ? "Gửi lại mã"
-                        : "Gửi mã xác thực"}
-                  {action === "sending" && (
-                    <LoaderCircle
-                      className="admin-otp-spinner"
-                      size={16}
-                      aria-hidden="true"
-                    />
-                  )}
-                </button>
-              </>
-            )
-          )}
-          {error && (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+                  </>
+                )
+              )}
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+            </div>
+          </div>
           <div className="mfa-login-footer">
             <button
               disabled={busy}
