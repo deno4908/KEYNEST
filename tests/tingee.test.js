@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { createTingeeClient, tingeeTimestamp } from "../server/tingee.js";
+import {
+  createTingeeClient,
+  tingeeTimestamp,
+  tingeeFailureCode,
+} from "../server/tingee.js";
 import { createBankPayments } from "../server/bank-payments.js";
 import { createPaymentRouting } from "../server/payment-routing.js";
 const cfg = {
@@ -335,4 +339,82 @@ test("Pay2S remains authenticated-provider eligible with Tingee primary and uses
     bank.accept("pay2s", { ...transaction, account: "OTHER" }),
   );
   assert.equal(calls.length, 1);
+});
+
+test("Tingee fallback persists safe HTTP/provider diagnostics without response secrets", async () => {
+  for (const [ok, status, body, expected] of [
+    [
+      true,
+      200,
+      { code: "97", message: "SECRET-VA-CLIENT" },
+      "tingee_rejected_97",
+    ],
+    [
+      false,
+      401,
+      { code: "12", message: "SECRET-VA-CLIENT" },
+      "tingee_http_401_code_12",
+    ],
+    [
+      true,
+      200,
+      { code: "SECRET-VA-CLIENT", message: "SECRET" },
+      "tingee_rejected",
+    ],
+  ]) {
+    const db = memoryStore();
+    const logs = [];
+    const client = createTingeeClient(cfg, async () => ({
+      ok,
+      status,
+      json: async () => body,
+    }));
+    const router = createPaymentRouting({
+      store: db.store,
+      config,
+      client,
+      logger: { error: (msg) => logs.push(msg) },
+    });
+    await router.prepare(payment);
+    assert.equal(db.read().provider, "pay2s");
+    assert.equal(db.read().error, expected);
+    assert.ok(logs[0].includes(expected));
+    assert.ok(!JSON.stringify(logs).includes("SECRET"));
+  }
+  assert.equal(
+    tingeeFailureCode(new Error("secret credential")),
+    "tingee_unexpected_error",
+  );
+});
+test("Tingee distinguishes timeout, network and invalid JSON without recording raw errors", async () => {
+  for (const [fetcher, expected] of [
+    [
+      async () => {
+        throw new DOMException("SECRET", "TimeoutError");
+      },
+      "tingee_timeout",
+    ],
+    [
+      async () => {
+        throw new TypeError("SECRET");
+      },
+      "tingee_network_error",
+    ],
+    [
+      async () => ({
+        ok: true,
+        json: async () => {
+          throw new Error("SECRET");
+        },
+      }),
+      "tingee_invalid_response",
+    ],
+  ]) {
+    try {
+      await createTingeeClient(cfg, fetcher).generate(payment);
+      assert.fail("must fail");
+    } catch (error) {
+      assert.equal(tingeeFailureCode(error), expected);
+    }
+  }
 });

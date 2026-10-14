@@ -1,5 +1,9 @@
 import { randomUUID, createHash } from "node:crypto";
-import { createTingeeClient, tingeeReady } from "./tingee.js";
+import {
+  createTingeeClient,
+  tingeeReady,
+  tingeeFailureCode,
+} from "./tingee.js";
 export const pay2sReady = (c) =>
   !!(c.pay2sWebhook && c.account && c.accountName);
 export const bankSourceEnabled = (c, source) =>
@@ -38,6 +42,7 @@ export function createPaymentRouting({
     });
     if (!route || route.claim_token !== token) return route || null;
     let result;
+    let failure;
     if (
       config.paymentProvider === "tingee" &&
       route.attempts === 1 &&
@@ -45,9 +50,10 @@ export function createPaymentRouting({
     ) {
       try {
         result = await client.generate(payment);
-      } catch {
+      } catch (error) {
+        failure = tingeeFailureCode(error);
         logger.error(
-          "Tingee QR creation failed; attempting configured fallback.",
+          `Tingee QR creation failed (${failure}); attempting configured fallback.`,
         );
       }
     }
@@ -63,6 +69,7 @@ export function createPaymentRouting({
             bank: config.bank,
             account: config.account,
             account_name: config.accountName,
+            ...(failure ? { error: failure } : {}),
           }
         : { error: "payment_provider_unavailable" };
     }

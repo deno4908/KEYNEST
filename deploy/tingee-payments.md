@@ -79,4 +79,13 @@ order by created_at desc limit 30;
 
 `creating` quá 45 giây sẽ được phục hồi khi tải lại giao dịch. `failed` thường cần kiểm tra cả Tingee và Pay2S. `tingee_status_unavailable` cho biết tra cứu lỗi hoặc dữ liệu bill không khớp; không tự ghi có khi chưa xác minh được. Xem nhật ký Tingee để xác định nguyên nhân.
 
+Nếu vẫn thấy QR MB/Pay2S, kiểm tra log `Tingee QR creation failed (...)`. Mã trong ngoặc và cột `last_error` của route Pay2S cho biết nguyên nhân tạo QR Tingee thất bại:
+
+- `tingee_rejected_XX`: Tingee trả mã lỗi `XX`; đối chiếu danh sách mã lỗi hoặc gửi mã này cho hỗ trợ Tingee.
+- `tingee_http_401` / `tingee_http_403` (có thể kèm `_code_XX`): kiểm tra API Credentials, quyền QR, môi trường production/UAT và đồng hồ VPS.
+- `tingee_timeout` / `tingee_network_error`: kiểm tra kết nối từ VPS tới Tingee.
+- `tingee_invalid_response`: phản hồi không đúng định dạng API mong đợi.
+
+Nhật ký không chứa Secret Token, chữ ký, VA hoặc nguyên văn response. Sau khi sửa cấu hình/triển khai, kiểm tra bằng một yêu cầu thanh toán mới; yêu cầu cũ đã chuyển Pay2S sẽ giữ nguyên cổng. Nạp cùng số tiền có thể trả lại yêu cầu đang chờ, nên có thể dùng số tiền khác để kiểm tra tạo QR mới, không cần thực hiện chuyển tiền.
+
 Sau triển khai, thử một khoản nhỏ: tạo QR, kiểm tra bill trong Tingee, thanh toán và xác nhận số dư/đơn cập nhật đúng một lần. Thử dự phòng bằng môi trường thử nghiệm có API Tingee giả lập lỗi; không sửa Secret Token production khi còn bill đang chờ. Kiểm thử trong repo dùng API giả lập và PostgreSQL cục bộ; chưa chứng minh cấu hình tài khoản Tingee thật của bạn đã hoạt động.

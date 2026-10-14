@@ -29,6 +29,18 @@ export const tingeeReady = (c) =>
 export function tingeeTimestamp(now = Date.now()) {
   return new Date(now + 7 * 3600000).toISOString().replace(/[-:TZ.]/g, "");
 }
+// Log only known labels / short numeric provider codes, never response bodies,
+// request headers, validation input or arbitrary exception messages.
+export function tingeeFailureCode(error) {
+  if (error instanceof z.ZodError) return "tingee_invalid_response";
+  const message = error?.message;
+  return typeof message === "string" &&
+    /^(?:tingee_(?:timeout|network_error|invalid_response|bill_mismatch|rejected(?:_\d{1,6})?|http_[1-5]\d{2}(?:_code_\d{1,6})?)|payment_expiring)$/.test(
+      message,
+    )
+    ? message
+    : "tingee_unexpected_error";
+}
 export function createTingeeClient(config, fetcher = fetch) {
   async function call(path, data) {
     const body = JSON.stringify({
@@ -49,10 +61,33 @@ export function createTingeeClient(config, fetcher = fetch) {
           .digest("hex"),
       },
       body,
+    }).catch((error) => {
+      throw new Error(
+        error?.name === "TimeoutError" || error?.name === "AbortError"
+          ? "tingee_timeout"
+          : "tingee_network_error",
+      );
     });
-    if (!response.ok) throw new Error(`tingee_http_${response.status}`);
-    const result = await response.json();
-    if (result.code !== "00") throw new Error("tingee_rejected");
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error(
+        response.ok
+          ? "tingee_invalid_response"
+          : `tingee_http_${response.status}`,
+      );
+    }
+    const code =
+      typeof result?.code === "string" && /^\d{1,6}$/.test(result.code)
+        ? result.code
+        : null;
+    if (!response.ok)
+      throw new Error(
+        `tingee_http_${response.status}${code ? "_code_" + code : ""}`,
+      );
+    if (result?.code !== "00")
+      throw new Error(`tingee_rejected${code ? "_" + code : ""}`);
     return result.data;
   }
   return {
