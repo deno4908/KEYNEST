@@ -142,44 +142,48 @@ test("Tingee static history tolerates incomplete unrelated rows but only returns
     created_at: new Date(receivedAt.getTime() - 60_000).toISOString(),
   };
   const linkedVa = "TGE61014104613VCB";
-  const client = createTingeeClient(cfg, async () => ({
+  const requestedBodies = [];
+  const client = createTingeeClient(cfg, async (_url, init) => ({
     ok: true,
-    json: async () => ({
-      code: "00",
-      data: {
-        totalCount: 4,
-        items: [
-          {
-            transactionId: "tx-matching",
-            accountNumber: `1072631208VA: ${linkedVa}`,
-            bankBin: cfg.bankBin,
-            amount: "10000",
-            type: "CREDIT",
-            transactionTime: receivedAt.toISOString(),
-            description: `Thanh toan ${staticPayment.code}`,
-          },
-          {
-            transactionId: "tx-no-memo",
-            accountNumber: linkedVa,
-            bankBin: cfg.bankBin,
-            amount: 10000,
-            type: "CREDIT",
-            transactionTime: receivedAt.toISOString(),
-            description: null,
-          },
-          {
-            transactionId: "tx-substring-only",
-            accountNumber: `PREFIX${linkedVa}SUFFIX`,
-            bankBin: cfg.bankBin,
-            amount: 10000,
-            type: "CREDIT",
-            transactionTime: receivedAt.toISOString(),
-            description: `Thanh toan ${staticPayment.code}`,
-          },
-          null,
-        ],
-      },
-    }),
+    json: async () => {
+      requestedBodies.push(JSON.parse(init.body));
+      return {
+        code: "00",
+        data: {
+          totalCount: 4,
+          items: [
+            {
+              transactionId: "tx-matching",
+              accountNumber: `1072631208VA: ${linkedVa}`,
+              bankBin: cfg.bankBin,
+              amount: "10000",
+              type: "CREDIT",
+              transactionTime: receivedAt.toISOString(),
+              description: `Thanh toan ${staticPayment.code}`,
+            },
+            {
+              transactionId: "tx-no-memo",
+              accountNumber: linkedVa,
+              bankBin: cfg.bankBin,
+              amount: 10000,
+              type: "CREDIT",
+              transactionTime: receivedAt.toISOString(),
+              description: null,
+            },
+            {
+              transactionId: "tx-substring-only",
+              accountNumber: `PREFIX${linkedVa}SUFFIX`,
+              bankBin: cfg.bankBin,
+              amount: 10000,
+              type: "CREDIT",
+              transactionTime: receivedAt.toISOString(),
+              description: `Thanh toan ${staticPayment.code}`,
+            },
+            null,
+          ],
+        },
+      };
+    },
   }));
   const matches = await client.transactions({
     ...route,
@@ -189,6 +193,9 @@ test("Tingee static history tolerates incomplete unrelated rows but only returns
     payment: staticPayment,
   });
   assert.deepEqual(matches.map((row) => row.transactionId), ["tx-matching"]);
+  assert.equal(Object.hasOwn(requestedBodies[0], "filter"), false);
+  assert.deepEqual(requestedBodies[0].vaAccountNumbers, [linkedVa]);
+  assert.equal(requestedBodies[0].bankBin, cfg.bankBin);
 });
 
 function memoryStore(
