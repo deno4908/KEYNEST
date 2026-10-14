@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import express from "express";
 import cookieParser from "cookie-parser";
+import { createHash } from 'node:crypto';
+import { encrypt } from '../server/security.js';
 import { createAdminOtp } from "../server/admin-otp.js";
 
 test("admin email OTP binds proof to a session and rejects wrong codes, reuse and other users", async (t) => {
@@ -83,6 +85,16 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
   assert.equal(sent.status, 200);
   const challenge = sent.headers.getSetCookie()[0].split(";")[0];
   assert.match(sent.headers.getSetCookie()[0], /HttpOnly/);
+  // An attacker controls request cookies even when browsers mark them HttpOnly.
+  // A send receipt must never be accepted as proof that the OTP was verified.
+  const renamedChallenge = challenge.replace('kn_admin_challenge=', 'kn_admin_verified=');
+  assert.equal((await req('/private', null, renamedChallenge)).status, 403);
+  assert.equal((await (await req('/auth/admin-otp/status', null, renamedChallenge)).json()).verified, false);
+  const legacyKey = createHash('sha256').update('a'.repeat(64)).update('admin-email-otp-v1').digest('hex');
+  const legacyProof = 'kn_admin_verified=' + encrypt(JSON.stringify({
+    uid, sid: 'original', email: 'admin@example.test', expires: time + 12 * 3600000,
+  }), legacyKey);
+  assert.equal((await req('/private', null, legacyProof)).status, 403);
   assert.equal((await req("/auth/admin-otp/send", {}, challenge)).status, 429);
   assert.equal(
     (await req("/auth/admin-otp/verify", { code: "000000" }, challenge)).status,
@@ -108,6 +120,9 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
     .find((c) => c.startsWith("kn_admin_verified="))
     .split(";")[0];
   assert.equal((await req("/private", null, proof)).status, 200);
+  const renamedProof = proof.replace('kn_admin_verified=', 'kn_admin_challenge=');
+  assert.equal((await (await req('/auth/admin-otp/status', null, renamedProof)).json()).sent, false);
+  assert.equal((await req('/auth/admin-otp/verify', { code: '123456' }, renamedProof)).status, 400);
   assert.equal(
     (await req("/private", null, proof, { "x-session": "different" })).status,
     403,

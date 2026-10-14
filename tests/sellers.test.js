@@ -123,7 +123,16 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   const product = store.db.products.find((p) => p.id === created.body.id);
   assert.equal(product.seller_id, seller.id);
   assert.equal(product.featured, false);
+  for (const image of ['https://tracking.example.test/pixel.png', 'https://shared.fastly.steamstatic.com.attacker.test/pixel.png']) {
+    assert.equal((await req('/seller/products', { ...payload, id: product.id, image }, login.cookie)).status, 400);
+    assert.equal(product.image, '');
+  }
   const foreign = store.db.products.find((p) => !p.seller_id);
+  const inventoryCount = store.db.inventory.length;
+  assert.equal((await req(`/seller/inventory/${foreign.variants[0].id}`, {
+    secrets: ['Unauthorized stock insertion'],
+  }, login.cookie)).status, 403);
+  assert.equal(store.db.inventory.length, inventoryCount);
   assert.equal(
     (
       await req(
@@ -449,6 +458,18 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   );
   const buyerUser = store.db.users.find((u) => u.id === escrowOrder.user_id),
     beforeRefund = buyerUser.balance;
+  // Hiding admin controls in the UI is not authorization: call every privileged
+  // action directly with both conversation participants' valid sessions.
+  for (const cookie of [buyer.cookie, login.cookie]) {
+    for (const action of ['refund', 'reject']) {
+      assert.equal((await req(`/order-chat/${escrowItem.id}`, {
+        action, body: 'Participant attempts to resolve their own dispute',
+      }, cookie)).status, 403);
+      assert.equal(buyerUser.balance, beforeRefund);
+      assert.equal(owner.balance, beforeHold);
+      assert.equal(store.db.seller_disputes.find(d => d.order_id === escrowOrder.id).status, 'agreed');
+    }
+  }
   assert.equal(
     (
       await req(

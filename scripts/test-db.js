@@ -1462,6 +1462,14 @@ try {
   assert.equal((await chat(user,escrowItem)).dispute.status,'agreed');
   await fails('select seller_conversation($1,$2,$3,$4)',[sid,escrowItem,'reject','Cannot self resolve this dispute']);
   const buyerBalance = Number(await scalar('select balance from profiles where id=$1',[user]));
+  for (const participant of [user, sid]) {
+    for (const action of ['refund', 'reject']) {
+      await fails('select seller_conversation($1,$2,$3,$4)', [participant, escrowItem, action, 'Participant cannot resolve their own dispute']);
+      assert.equal(Number(await scalar('select balance from profiles where id=$1', [user])), buyerBalance);
+      assert.equal(Number(await scalar('select balance from profiles where id=$1', [sid])), balance);
+      assert.equal((await chat(user, escrowItem)).dispute.status, 'agreed');
+    }
+  }
   await chat(other,escrowItem,'refund','Confirmed failure after checking evidence');
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),buyerBalance+100000);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);

@@ -16,10 +16,13 @@ export function createAdminOtp({
     sameSite: "strict",
     path: "/api",
   };
-  const key = () =>
+  // Bind ciphertext to its purpose: a send receipt is not verification proof.
+  // v2 also invalidates old cookies that did not make this distinction.
+  const key = (name) =>
     createHash("sha256")
       .update(config.encryption)
-      .update("admin-email-otp-v1")
+      .update("admin-email-otp-v2:")
+      .update(name)
       .digest("hex");
   // req.authToken has already passed Supabase getUser verification.
   function identity(req) {
@@ -42,7 +45,7 @@ export function createAdminOtp({
         )
       )
         return null;
-      const value = JSON.parse(decrypt(req.cookies[name], key()));
+      const value = JSON.parse(decrypt(req.cookies[name], key(name)));
       const own = identity(req);
       return value.uid === own.uid &&
         value.sid === own.sid &&
@@ -142,7 +145,7 @@ export function createAdminOtp({
               sent: clock(),
               expires: clock() + 10 * 60000,
             }),
-            key(),
+            key(challengeName),
           ),
           { ...options, maxAge: 10 * 60000 },
         );
@@ -183,7 +186,7 @@ export function createAdminOtp({
           proofName,
           encrypt(
             JSON.stringify({ ...own, expires: clock() + 12 * 3600000 }),
-            key(),
+            key(proofName),
           ),
           { ...options, maxAge: 12 * 3600000 },
         );
