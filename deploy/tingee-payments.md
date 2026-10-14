@@ -21,12 +21,10 @@ TINGEE_QR_MODE=static
 TINGEE_CLIENT_ID=YOUR_CLIENT_ID
 TINGEE_SECRET_TOKEN=YOUR_SECRET_TOKEN
 TINGEE_BANK_BIN=970436
-TINGEE_ACCOUNT_NUMBER=YOUR_LINKED_VCB_ACCOUNT_NUMBER
+TINGEE_VA_ACCOUNT=YOUR_TINGEE_VA_ACCOUNT
 TINGEE_ACCOUNT_NAME=YOUR_VCB_ACCOUNT_NAME
 TINGEE_BASE_URL=https://open-api.tingee.vn
 
-# Chỉ dùng với QR động/VA; để trống khi dùng VCB cá nhân và QR tĩnh.
-TINGEE_VA_ACCOUNT=
 # Chỉ credentials Master Merchant mới cần giá trị này.
 TINGEE_MERCHANT_ID=
 
@@ -37,11 +35,11 @@ BANK_ACCOUNT_NAME=YOUR_PAY2S_ACCOUNT_NAME
 PAY2S_WEBHOOK_TOKEN=YOUR_EXISTING_PAY2S_TOKEN
 ```
 
-`TINGEE_ACCOUNT_NUMBER` là **số tài khoản VCB nhận tiền đã liên kết với Tingee**, không phải số VA. `TINGEE_VA_ACCOUNT` chỉ dành cho QR động. `TINGEE_BANK_BIN=970436` là BIN VCB; tên chủ tài khoản phải khớp tài khoản ngân hàng. Không điền `TINGEE_ACCOUNT_NUMBER` bằng số tài khoản Pay2S.
+`TINGEE_VA_ACCOUNT` là **số VA Tingee đã liên kết với tài khoản VCB** và là số nhận tiền trong QR. Không dùng số tài khoản VCB gốc ở đây. Theo hướng dẫn Tingee, VCB cá nhân cần nhận chuyển khoản vào VA để Tingee nhìn thấy biến động; chuyển vào STK gốc có thể không xuất hiện trong dữ liệu đối soát. `TINGEE_BANK_BIN=970436` là BIN VCB; tên chủ tài khoản phải khớp tài khoản ngân hàng. [Điều kiện tạo/liên kết VA VCB](https://developers.tingee.vn/docs/banking/create-va/) · [Lưu ý về STK gốc và VA](https://developers.tingee.vn/docs/luu-y-quan-trong/).
 
 Trong Tingee BaaS Portal → **API Credentials**, dùng Client ID/Secret Token có quyền tạo VietQR và truy vấn lịch sử giao dịch. Tài khoản VCB cần được liên kết/cấp quyền nhận biến động cho merchant. Secrets chỉ lưu ở backend. [Hướng dẫn API Credentials](https://developers.tingee.vn/docs/config-info/).
 
-Nếu `TINGEE_QR_MODE=dynamic`, cấu hình `TINGEE_VA_ACCOUNT` thay cho `TINGEE_ACCOUNT_NUMBER`; tài khoản/ngân hàng phải hỗ trợ QR động. Để dùng VCB cá nhân, giữ chế độ `static`.
+Nếu `TINGEE_QR_MODE=dynamic`, giữ `TINGEE_VA_ACCOUNT` và chỉ dùng với ngân hàng/tài khoản hỗ trợ QR động. VCB cá nhân phải để `static`; QR tĩnh của KEYNEST vẫn được điền sẵn số tiền và mã đơn nhưng chuyển tiền vào VA.
 
 ## Đối soát QR tĩnh
 
@@ -77,6 +75,6 @@ from public.payment_events where outcome = 'needs_review'
 order by created_at desc limit 30;
 ```
 
-Với QR VCB tĩnh, route mới phải có `provider='tingee'`, `qr_kind='static'` và `state='ready'`. Nếu vẫn thấy MB/Pay2S, đó có thể là giao dịch cũ hoặc Tingee đã lỗi và route mới dùng fallback. Xem log `Tingee QR creation failed (...)` và cột `last_error`; các mã lỗi đã được rút gọn, không log Secret Token hoặc nội dung response thô. Sửa cấu hình xong hãy tạo giao dịch mới.
+Với QR VCB tĩnh, route mới phải có `provider='tingee'`, `qr_kind='static'` và `state='ready'`. Nếu vẫn thấy MB/Pay2S, đó có thể là giao dịch cũ hoặc Tingee đã lỗi và route mới dùng fallback. Xem log `Tingee QR creation failed (...)` và cột `last_error`; các mã lỗi đã được rút gọn, không log Secret Token hoặc nội dung response thô. Sửa cấu hình xong hãy tạo giao dịch mới. Nếu tiền đã được chuyển vào STK VCB gốc thay vì VA, Tingee có thể không cung cấp giao dịch đó cho hệ thống; cần kiểm tra lịch sử trong app Tingee/ngân hàng và xử lý đơn thủ công.
 
-`creating` quá 45 giây được phép thử lại khi tải giao dịch. Nếu giao dịch không xuất hiện trong Tingee, kiểm tra BIN, số tài khoản VCB đã liên kết, quyền API tạo QR/lịch sử giao dịch, môi trường production/UAT và đồng hồ VPS. Không đổi merchant/credentials khi còn giao dịch đang chờ thanh toán.
+`creating` quá 45 giây được phép thử lại khi tải giao dịch. Nếu giao dịch không xuất hiện trong Tingee, kiểm tra BIN, số VA đã liên kết với VCB, quyền API tạo QR/lịch sử giao dịch, môi trường production/UAT và đồng hồ VPS. Không đổi merchant/credentials khi còn giao dịch đang chờ thanh toán.

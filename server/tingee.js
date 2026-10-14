@@ -41,7 +41,7 @@ export const tingeeReady = (c) =>
     c?.clientId &&
     c.secret &&
     /^\d{6}$/.test(c.bankBin || "") &&
-    (c.qrMode === 'static' ? /^\d{6,20}$/.test(c.accountNumber || '') : c.vaAccount) &&
+    c.vaAccount &&
     c.accountName
   );
 const tingeeBankName = (bin) => bin === '970436' ? 'VCB' : bin;
@@ -115,18 +115,18 @@ export function createTingeeClient(config, fetcher = fetch) {
         // Check history permission before showing a QR that we cannot reconcile.
         historyPage.parse(await call('transaction/get-paging', {
           filter:payment.code,skipCount:0,maxResultCount:1,
-          bankBin:config.bankBin,
+          vaAccountNumbers:[config.vaAccount],bankBin:config.bankBin,
           startTime:tingeeTimestamp(Date.parse(payment.created_at)).slice(0,14),
           endTime:tingeeTimestamp().slice(0,14),
         }));
         const data=z.object({qrCode:z.string().min(20).max(4096)}).parse(await call('generate-viet-qr', {
-          bankBin:config.bankBin,accountNumber:config.accountNumber,amount:payment.amount,content:payment.code,
+          bankBin:config.bankBin,accountNumber:config.vaAccount,amount:payment.amount,content:payment.code,
         }));
         return {
-          provider:'tingee',qr_kind:'static',bill_id:null,qr_account:config.accountNumber,
+          provider:'tingee',qr_kind:'static',bill_id:null,qr_account:config.vaAccount,
           qr_image:await QRCode.toDataURL(data.qrCode,{errorCorrectionLevel:'M',margin:4,width:400}),
           expires_at:payment.expires_at,bank:tingeeBankName(config.bankBin),bank_bin:config.bankBin,
-          va_account:null,account:config.accountNumber,account_name:config.accountName,
+          va_account:config.vaAccount,account:config.vaAccount,account_name:config.accountName,
         };
       }
       const started = Date.now();
@@ -172,7 +172,7 @@ export function createTingeeClient(config, fetcher = fetch) {
       for (let skip=0;skip<300;skip+=100) {
         const page=historyPage.parse(await call('transaction/get-paging', {
           filter:route.payment.code,skipCount:skip,maxResultCount:100,
-          bankBin:route.bank_bin,
+          vaAccountNumbers:[route.va_account],bankBin:route.bank_bin,
           startTime:tingeeTimestamp(start).slice(0,14),endTime:tingeeTimestamp(end).slice(0,14),
         }));
         items.push(...page.items);

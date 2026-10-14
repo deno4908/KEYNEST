@@ -21,7 +21,7 @@ const reasons: Record<string, string> = {
   demo: "Đang chạy mô phỏng, không nhận tiền thật.",
   bank_details_missing: "Chưa cấu hình đủ thông tin tài khoản ngân hàng.",
   webhook_key_missing: "Chưa cấu hình token webhook ở server.",
-  tingee_credentials_missing: "Thiếu cấu hình Tingee. Kiểm tra API Credentials, BIN và số tài khoản theo chế độ QR.",
+  tingee_credentials_missing: "Thiếu cấu hình Tingee. Kiểm tra API Credentials, BIN và tài khoản VA đã liên kết.",
 };
 export function BankPaymentStatus() {
   const [status, setStatus] = useState<BankStatus | null>(null);

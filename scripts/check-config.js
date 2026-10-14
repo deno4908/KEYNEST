@@ -9,8 +9,7 @@ const required = [
   "BANK_ACCOUNT_NUMBER",
   "BANK_ACCOUNT_NAME",
   ...(provider==='sepay' ? ['SEPAY_WEBHOOK_KEY'] : ['PAY2S_WEBHOOK_TOKEN']),
-  ...(provider==='tingee' ? ['TINGEE_CLIENT_ID','TINGEE_SECRET_TOKEN','TINGEE_BANK_BIN','TINGEE_ACCOUNT_NAME',
-    ...(tingeeMode==='static' ? ['TINGEE_ACCOUNT_NUMBER'] : ['TINGEE_VA_ACCOUNT'])] : []),
+  ...(provider==='tingee' ? ['TINGEE_CLIENT_ID','TINGEE_SECRET_TOKEN','TINGEE_BANK_BIN','TINGEE_VA_ACCOUNT','TINGEE_ACCOUNT_NAME'] : []),
 ];
 let missing = false;
 for (const name of required) {
@@ -25,7 +24,6 @@ const valid = (name, result) => {
 valid("APP_MODE=supabase", process.env.APP_MODE === "supabase");
 if (provider === 'tingee') valid('TINGEE_QR_MODE (static/dynamic)', ['static','dynamic'].includes(tingeeMode));
 if (provider === 'tingee') valid('TINGEE_BANK_BIN (6 chu so)', /^\d{6}$/.test(process.env.TINGEE_BANK_BIN || ''));
-if (provider === 'tingee' && tingeeMode === 'static') valid('TINGEE_ACCOUNT_NUMBER (6-20 chu so)', /^\d{6,20}$/.test(process.env.TINGEE_ACCOUNT_NUMBER || ''));
 valid(
   "BANK_PAYMENT_PROVIDER (tingee/pay2s/sepay)",
   ['tingee','pay2s','sepay'].includes(provider),

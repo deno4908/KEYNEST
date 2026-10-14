@@ -112,7 +112,8 @@ export function createPaymentRouting({
                 // expired orders for seven days to flag extra or late transfers.
                 await store.query(store.client.from('payment_routes').update({
                   remote_closed:Date.now()>=Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS,
-                  last_error:null,
+                  last_error:transactions.length===0 && route.payment.status==='pending'
+                    ? 'tingee_no_matching_credit' : null,
                 }).eq('payment_id',route.payment_id));
                 return;
               }
