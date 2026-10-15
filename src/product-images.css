@@ -12,6 +12,7 @@
   background: #191b24;
 }
 .card-art > img.product-image,
+.cart-art > img.product-image,
 .detail-art > img.product-image {
   object-fit: contain;
   object-position: center;
