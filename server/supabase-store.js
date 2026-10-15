@@ -358,8 +358,9 @@ export class SupabaseStore {
     );
   }
   async saveVariant(product_id, data) {
+    const { shared_key, ...fields } = data;
     return this.query(
-      this.client.rpc("save_variant", { p_product: product_id, p_data: data }),
+      this.client.rpc("save_variant", { p_product: product_id, p_data: { ...fields, ...(shared_key ? { shared_key: this.encrypted([shared_key])[0] } : {}) } }),
     );
   }
   async deleteProduct(id, actor) {

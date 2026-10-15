@@ -653,6 +653,23 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
     assert.equal((await request(path, { method: 'POST', cookie: admin, body: { secrets: ['REUSABLE'] } })).status, 200);
     assert.equal(variant.stock, stock + 3);
   });
+  await t.test('unlimited shared key is private and delivered to each paid order without reducing stock', async () => {
+    const product = store.db.products.find(p => p.active);
+    const data = { name: 'Shared library', price: 1000, original_price: 1000, delivery: 'key', stock: 0, region: 'Global', unlimited: true, shared_key: 'PRIVATE-SHARED-LIBRARY' };
+    const saved = await request(`/admin/products/${product.id}/variants`, { method: 'POST', cookie: admin, body: data });
+    assert.equal(saved.status,200);
+    assert.ok(!JSON.stringify(saved.body).includes(data.shared_key));
+    const v=product.variants.find(v => v.name===data.name);
+    for (let n=0;n<2;n++) {
+      const order=await request('/orders',{method:'POST',cookie:customer,key:randomUUID(),body:{items:[{variant_id:v.id,quantity:2}],method:'wallet'}});
+      assert.equal(order.status,201);
+      const delivered=await request(`/orders/${order.body.id}`,{cookie:customer});
+      assert.deepEqual(delivered.body.items[0].keys,[data.shared_key,data.shared_key]);
+      assert.equal(v.stock,100000);
+    }
+    const catalog=await request('/products');
+    assert.ok(!JSON.stringify(catalog.body).includes(data.shared_key));
+  });
   await t.test("logout invalidates opaque server session", async () => {
     assert.equal(
       (await request("/auth/logout", { method: "POST", cookie: customer }))

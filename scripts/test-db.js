@@ -1613,6 +1613,36 @@ try {
   // Preorders reserve capacity, collect payment now and preserve the promise
   // made at checkout; no inventory secret or service UID is required.
   await db.exec('reset role');
+  await db.exec('begin');
+  const sharedUser=randomUUID(), sharedProduct=randomUUID();
+  await db.query("insert into auth.users(id,email) values($1,'shared@example.test')",[sharedUser]);
+  await db.query('update profiles set balance=1000000 where id=$1',[sharedUser]);
+  await db.query("insert into products(id,slug,name,category,platform) values($1,'shared-fixture','Shared library','game','PC')",[sharedProduct]);
+  const sharedData={name:'Unlimited',price:10000,original_price:10000,delivery:'key',stock:0,region:'Global',unlimited:true,shared_key:{secret:'cipher-one',hash:'shared-one'}};
+  const sharedVariant=await scalar('select save_variant($1,$2)',[sharedProduct,JSON.stringify(sharedData)]);
+  const sharedPayload={items:[{variant_id:sharedVariant,quantity:2}],method:'wallet',coupon:'',customer_note:''};
+  const sharedRequest=randomUUID();
+  const sharedOrder=await scalar('select create_order($1,$2,$3)',[sharedUser,JSON.stringify(sharedPayload),sharedRequest]);
+  assert.equal(await scalar('select create_order($1,$2,$3)',[sharedUser,JSON.stringify(sharedPayload),sharedRequest]),sharedOrder);
+  assert.equal(Number(await scalar('select count(*) from inventory where order_id=$1',[sharedOrder])),2);
+  assert.equal(Number(await scalar('select stock from variants where id=$1',[sharedVariant])),100000);
+  await db.exec('set constraints all immediate; set constraints all deferred');
+  const sharedReceipt=await scalar('select payload from order_receipts where order_id=$1',[sharedOrder]);
+  assert.deepEqual(sharedReceipt.items[0].encrypted_keys,['cipher-one','cipher-one']);
+  await scalar('select save_variant($1,$2)',[sharedProduct,JSON.stringify({...sharedData,id:sharedVariant,shared_key:{secret:'cipher-two',hash:'shared-two'}})]);
+  assert.equal(await scalar('select secret from inventory where order_id=$1 limit 1',[sharedOrder]),'cipher-one');
+  const sharedPending=await scalar('select create_order($1,$2,$3)',[sharedUser,JSON.stringify({...sharedPayload,method:'sepay'}),randomUUID()]);
+  assert.equal(await scalar('select secret from inventory where order_id=$1 limit 1',[sharedPending]),'cipher-two');
+  await scalar('select cancel_order($1,$2)',[sharedUser,sharedPending]);
+  assert.equal(Number(await scalar('select count(*) from inventory where order_id=$1',[sharedPending])),0);
+  assert.equal(Number(await scalar('select stock from variants where id=$1',[sharedVariant])),100000);
+  await db.exec('savepoint shared_reject');
+  await fails('select import_keys($1,$2)',[sharedVariant,JSON.stringify([{secret:'wrong',hash:'wrong'}])]);
+  await db.exec('rollback to shared_reject');
+  await db.exec('set local role authenticated');
+  await fails('select * from variant_shared_keys');
+  await db.exec('rollback');
+  pass('unlimited key stock, encrypted receipt snapshots, key rotation, cancellation and access protection');
   const preorderUser = randomUUID(), preorderProduct = randomUUID();
   await db.query("insert into auth.users(id,email) values($1,'preorder@example.test')", [preorderUser]);
   await db.query('update profiles set balance=1000000 where id=$1', [preorderUser]);

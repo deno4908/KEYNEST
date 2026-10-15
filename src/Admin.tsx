@@ -310,8 +310,7 @@ export function Admin() {
                             <td>{categories[p.category]}</td>
                             <td>
                               {p.variants.length} gói ·{" "}
-                              {p.variants.reduce((n, v) => n + v.stock, 0)} đơn
-                              vị
+                              {p.variants.some(v => v.unlimited) ? 'Không giới hạn' : `${p.variants.reduce((n, v) => n + v.stock, 0)} đơn vị`}
                             </td>
                             <td>
                               <Badge status={p.active ? "Đang bán" : "Đã ẩn"} />
@@ -658,7 +657,9 @@ export function ProductEditor({
         name: f.get("name"),
         price: Number(f.get("price")),
         original_price: Number(f.get("original_price")),
-        delivery: f.get("delivery") === 'preorder' ? 'manual' : f.get("delivery"),
+        delivery: f.get("delivery") === 'unlimited' ? 'key' : f.get("delivery") === 'preorder' ? 'manual' : f.get("delivery"),
+        unlimited: f.get('delivery') === 'unlimited',
+        ...(f.get('delivery') === 'unlimited' && f.get('shared_key') ? { shared_key: String(f.get('shared_key')) } : {}),
         is_preorder: f.get('delivery') === 'preorder',
         expected_delivery: f.get('delivery') === 'preorder' ? f.get('expected_delivery') : null,
         stock: Number(f.get("stock")),
@@ -863,7 +864,7 @@ export function ProductEditor({
                 <small>
                   {v.is_preorder && <>Dự kiến giao {v.expected_delivery?.split("-").reverse().join("/") || "chưa cập nhật"} · </>}
                   {money(v.price)} ·{" "}
-                  {v.is_preorder ? "Đặt trước · Còn lượt đặt" : v.delivery === "key" ? "Kho mã · Tồn" : "Dịch vụ · Tồn"} {v.stock}
+                  {v.unlimited ? 'Key dùng chung · Không giới hạn' : <>{v.is_preorder ? "Đặt trước · Còn lượt đặt" : v.delivery === "key" ? "Kho mã · Tồn" : "Dịch vụ · Tồn"} {v.stock}</>}
                   {" · "}
                   {v.warranty_days
                     ? `Bảo hành ${v.warranty_days} ngày`
@@ -894,7 +895,7 @@ export function ProductEditor({
               >
                 <Trash2 size={16} />
               </button>
-              {v.delivery === "key" && (
+              {v.delivery === "key" && !v.unlimited && (
                 <button
                   className="button button-outline button-small"
                   onClick={() => importKeys(v)}
@@ -963,13 +964,15 @@ export function ProductEditor({
                 </label>
                 <label>
                   Cách giao
-                  <select name="delivery" value={variant.is_preorder ? 'preorder' : variant.delivery} onChange={e => setVariant(current => ({ ...current, delivery: e.target.value === 'key' ? 'key' : 'manual', is_preorder: e.target.value === 'preorder', stock: e.target.value === 'preorder' && !current?.stock ? 100 : current?.stock }))}>
+                  <select name="delivery" value={variant.unlimited ? 'unlimited' : variant.is_preorder ? 'preorder' : variant.delivery} onChange={e => setVariant(current => ({ ...current, delivery: ['key','unlimited'].includes(e.target.value) ? 'key' : 'manual', unlimited: e.target.value === 'unlimited', is_preorder: e.target.value === 'preorder', stock: e.target.value === 'preorder' && !current?.stock ? 100 : current?.stock }))}>
                     <option value="key">Giao mã tự động</option>
+                    <option value="unlimited">Giao cùng một key · Không giới hạn</option>
                     <option value="manual">Giao dịch vụ thủ công</option>
                     <option value="preorder">Đặt trước · Giao khi có hàng</option>
                   </select>
                 </label>
                 {variant.is_preorder && <label>Ngày giao dự kiến<input name="expected_delivery" type="date" defaultValue={variant.expected_delivery || ''} required /><small>Ngày dự kiến được lưu riêng cho mỗi đơn; đổi ngày ở đây chỉ áp dụng cho đơn mới.</small></label>}
+                {variant.unlimited && <label>Key / dữ liệu dùng chung<textarea name="shared_key" rows={4} maxLength={2000} required={!variant.id} placeholder={variant.id ? 'Để trống để giữ key hiện tại' : 'Nhập dữ liệu sẽ giao cho mọi lượt mua'} /><small>Thay key chỉ áp dụng cho đơn mới. Dữ liệu của đơn đã tạo được giữ nguyên.</small></label>}
                 <label>
                   Khu vực
                   <input
@@ -980,9 +983,10 @@ export function ProductEditor({
                   />
                 </label>
                 <label>
-                  {variant.is_preorder ? 'Số lượt đặt trước còn nhận' : 'Số lượng dịch vụ có thể bán'}
+                  {variant.unlimited ? 'Không giới hạn số lượng' : variant.is_preorder ? 'Số lượt đặt trước còn nhận' : 'Số lượng dịch vụ có thể bán'}
                   <input
                     name="stock"
+                    disabled={variant.unlimited}
                     type="number"
                     value={variant.stock ?? 0}
                     onChange={e => setVariant(current => ({ ...current, stock: Number(e.target.value) }))}
@@ -990,7 +994,7 @@ export function ProductEditor({
                     max={100000}
                     required
                   />
-                  <small>{variant.is_preorder ? 'Không cần nhập kho mã. Mỗi sản phẩm đặt mua sẽ trừ một lượt; đặt 0 để ngừng nhận đơn.' : 'Gói giao mã: tồn kho chỉ tăng khi nhập mã.'}</small>
+                  <small>{variant.unlimited ? 'Mỗi lượt mua nhận cùng dữ liệu; không trừ tồn kho.' : variant.is_preorder ? 'Không cần nhập kho mã. Mỗi sản phẩm đặt mua sẽ trừ một lượt; đặt 0 để ngừng nhận đơn.' : 'Gói giao mã: tồn kho chỉ tăng khi nhập mã.'}</small>
                 </label>
               </div>
               <div className="button-row">

@@ -255,6 +255,10 @@ export function createSellers(store) {
     },
     async command(actor, action, data) {
       if (demo) return demoCommand(actor, action, data);
+      if (action === 'variant') {
+        const { shared_key, ...variant } = data.variant;
+        data = { ...data, variant: { ...variant, ...(shared_key ? { shared_key: store.encrypted([shared_key])[0] } : {}) } };
+      }
       if (data.secrets) {
         const { secrets, ...rest } = data;
         data = { ...rest, keys: store.encrypted(secrets) };

@@ -399,6 +399,8 @@ const variantSchema = z
     original_price: money,
     delivery: z.enum(["key", "manual"]),
     active: z.boolean().optional(),
+    unlimited: z.boolean().optional(),
+    shared_key: z.string().trim().max(2000).optional(),
     is_preorder: z.boolean().default(false),
     expected_delivery: z.iso.date().nullable().default(null),
     stock: z.number().int().min(0).max(100000),
@@ -406,7 +408,8 @@ const variantSchema = z
     warranty_days: z.number().int().min(0).max(3650).optional(),
   })
   .strict().refine(v => !v.is_preorder || (v.delivery === 'manual' && !!v.expected_delivery),
-    'Đặt trước cần giao thủ công và ngày giao dự kiến.');
+    'Đặt trước cần giao thủ công và ngày giao dự kiến.')
+  .refine(v => !v.unlimited || (v.delivery === 'key' && !v.is_preorder && (!!v.id || !!v.shared_key)), 'Gói vô hạn cần giao mã và một key dùng chung.');
 app.use('/api', sellersRouter({ store, auth, admin, limiter, categoryStore, productSchema, variantSchema, secretsSchema }));
 async function paymentInfo(p) {
   if (!p) return null;

@@ -212,8 +212,9 @@ export class DemoStore {
       const v = this.db.products
         .flatMap((p) => p.variants)
         .find((v) => v.id === item.variant_id);
-      v.stock += item.quantity;
+      if (!v.unlimited) v.stock += item.quantity;
     }
+    this.db.inventory = this.db.inventory.filter(inv => inv.order_id !== order.id || !order.items.some(item => item.variant_id === inv.variant_id && this.db.products.flatMap(p => p.variants).find(v => v.id === item.variant_id)?.unlimited));
     for (const inv of this.db.inventory)
       if (inv.order_id === order.id) inv.order_id = null;
   }
@@ -256,7 +257,7 @@ export class DemoStore {
       if (v.delivery === "manual" && !v.is_preorder && !payload.customer_note.trim())
         throw new AppError("Vui lòng nhập UID / thông tin dịch vụ.");
       if (
-        v.delivery === "key" &&
+        v.delivery === "key" && !v.unlimited &&
         this.db.inventory.filter((i) => i.variant_id === v.id && !i.order_id)
           .length < line.quantity
       )
@@ -321,6 +322,12 @@ export class DemoStore {
       const v = this.db.products
         .flatMap((p) => p.variants)
         .find((v) => v.id === item.variant_id);
+      if (v.unlimited) {
+        const secret = this.db.sharedKeys?.[v.id];
+        if (!secret) throw new AppError('Chưa cấu hình key dùng chung.');
+        for (let n = 0; n < item.quantity; n++) this.db.inventory.push({ id: randomUUID(), variant_id: v.id, order_id: o.id, item_id: item.id, secret });
+        continue;
+      }
       v.stock -= item.quantity;
       for (const inv of this.db.inventory
         .filter((i) => i.variant_id === v.id && !i.order_id)
@@ -706,24 +713,31 @@ export class DemoStore {
     return existing || this.db.products.at(-1);
   }
   saveVariant(product_id, data) {
+    const { shared_key, ...fields } = data;
+    data = fields;
     const p = this.db.products.find((x) => x.id === product_id);
     if (!p) throw new AppError("Không tìm thấy sản phẩm.", 404);
     const old = data.id ? p.variants.find((v) => v.id === data.id) : null;
     if (data.id && !old) throw new AppError("Không tìm thấy gói.", 404);
+    if (old && data.unlimited !== undefined && !!old.unlimited !== data.unlimited) throw new AppError('Hãy tạo gói mới để đổi chế độ kho.');
+    const unlimited = data.unlimited ?? old?.unlimited ?? false;
+    if (unlimited && (data.delivery !== 'key' || data.is_preorder || (!old && !shared_key))) throw new AppError('Cần key dùng chung cho gói vô hạn.');
+    const variantId = old?.id || randomUUID();
     if (old && old.delivery !== data.delivery)
       throw new AppError("Không đổi kiểu giao của gói đang tồn tại.");
     if (old)
       Object.assign(old, {
         ...data,
-        stock: old.delivery === "key" ? old.stock : data.stock,
+        stock: unlimited ? 100000 : old.delivery === "key" ? old.stock : data.stock,
       });
     else
       p.variants.push({
         ...data,
-        id: randomUUID(),
-        stock: data.delivery === "key" ? 0 : data.stock,
+        id: variantId,
+        stock: unlimited ? 100000 : data.delivery === "key" ? 0 : data.stock,
         warranty_days: data.warranty_days ?? 30,
       });
+    if (unlimited && shared_key) { this.db.sharedKeys ||= {}; this.db.sharedKeys[variantId] = encrypt(shared_key, this.key); }
     this.save();
     return p;
   }
@@ -823,7 +837,7 @@ export class DemoStore {
     const v = this.db.products
       .flatMap((p) => p.variants)
       .find((v) => v.id === variant_id);
-    if (!v || v.delivery !== "key")
+    if (!v || v.delivery !== "key" || v.unlimited)
       throw new AppError("Gói phải giao mã tự động.");
     for (const s of secrets)
       this.db.inventory.push({
