@@ -633,6 +633,7 @@ export function ProductEditor({
         subtitle: f.get("subtitle"),
         description: f.get("description"),
         usage_notes: f.get("usage_notes"),
+        product_kind: f.get("product_kind"),
         image: f.get("image"),
         featured: f.get("featured") === "on",
         active: f.get("active") === "on",
@@ -799,6 +800,17 @@ export function ProductEditor({
             defaultValue={product.subtitle}
             maxLength={200}
           />
+        </label>
+        <label>
+          Loại sản phẩm giao cho khách
+          <select name="product_kind" defaultValue={product.product_kind || "key"}>
+            <option value="key">Key / Mã kích hoạt</option>
+            <option value="account">Tài khoản</option>
+            <option value="source">Source code</option>
+            <option value="product">Sản phẩm / Dữ liệu khác</option>
+            <option value="service">Dịch vụ</option>
+          </select>
+          <small className="muted">Dùng để hiển thị nút xem hàng sau mua. Cách giao hàng được chọn riêng trong từng gói.</small>
         </label>
         <ImageUpload
           endpoint={`/${scope}/media`}

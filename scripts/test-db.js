@@ -1619,12 +1619,21 @@ try {
   await db.query('update profiles set balance=1000000 where id=$1',[sharedUser]);
   await db.query("insert into products(id,slug,name,category,platform) values($1,'shared-fixture','Shared library','game','PC')",[sharedProduct]);
   const sharedData={name:'Unlimited',price:10000,original_price:10000,delivery:'key',stock:0,region:'Global',unlimited:true,shared_key:{secret:'cipher-one',hash:'shared-one'}};
+  await db.query("update products set product_kind='source' where id=$1",[sharedProduct]);
   const sharedVariant=await scalar('select save_variant($1,$2)',[sharedProduct,JSON.stringify(sharedData)]);
   const sharedPayload={items:[{variant_id:sharedVariant,quantity:2}],method:'wallet',coupon:'',customer_note:''};
   const sharedRequest=randomUUID();
   const sharedOrder=await scalar('select create_order($1,$2,$3)',[sharedUser,JSON.stringify(sharedPayload),sharedRequest]);
   assert.equal(await scalar('select create_order($1,$2,$3)',[sharedUser,JSON.stringify(sharedPayload),sharedRequest]),sharedOrder);
   assert.equal(Number(await scalar('select count(*) from inventory where order_id=$1',[sharedOrder])),2);
+  assert.equal(await scalar('select product_kind from order_items where order_id=$1 limit 1',[sharedOrder]),'source');
+  await db.query("update products set product_kind='account' where id=$1",[sharedProduct]);
+  assert.equal(await scalar('select product_kind from order_items where order_id=$1 limit 1',[sharedOrder]),'source');
+  await db.exec('savepoint invalid_product_kind');
+  await fails("update products set product_kind='invalid' where id=$1",[sharedProduct]);
+  await db.exec('rollback to savepoint invalid_product_kind');
+  pass('product classification is snapshotted into orders and rejects unsupported types');
+
   assert.equal(Number(await scalar('select stock from variants where id=$1',[sharedVariant])),100000);
   await db.exec('set constraints all immediate; set constraints all deferred');
   const sharedReceipt=await scalar('select payload from order_receipts where order_id=$1',[sharedOrder]);

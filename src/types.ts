@@ -13,7 +13,9 @@ export type Variant = {
   expected_delivery?: string | null;
   warranty_days: number;
 };
+export type ProductKind = "key" | "account" | "source" | "product" | "service";
 export type Product = {
+  product_kind?: ProductKind;
   seller_id?: string;
   seller?: { id: string; name: string } | null;
   id: string;
@@ -65,6 +67,7 @@ export type Payment = {
   demo: boolean;
 };
 export type OrderItem = {
+  product_kind?: ProductKind;
   seller_id?: string;
   seller_name?: string;
   seller_settled_at?: string;

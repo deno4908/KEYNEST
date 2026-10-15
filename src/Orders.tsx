@@ -25,6 +25,18 @@ import { Art, Badge, Empty, Loading, PaymentModal, useStore } from "./App";
 import { api, date, money, post } from "./api";
 import type { Order, OrderItem, Payment, Ticket } from "./types";
 
+function deliveryLabel(items: OrderItem[]) {
+  const kinds = new Set(items.map(i => i.product_kind || "key"));
+  if (kinds.size !== 1) return "Xem sản phẩm";
+  switch ([...kinds][0]) {
+    case "key": return "Xem key";
+    case "account": return "Xem tài khoản";
+    case "source": return "Xem source code";
+    case "service": return "Xem dịch vụ";
+    default: return "Xem sản phẩm";
+  }
+}
+
 function useOrderData<T>(path: string) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState("");
@@ -247,11 +259,11 @@ export function OrdersPage() {
                     to={`/orders/${o.id}`}
                   >
                     {o.items.some(
-                      (i) => (i.delivery === "key" || i.is_preorder) && i.keys.length,
+                      (i) => i.keys.length > 0,
                     ) ? (
                       <>
-                        <KeyRound size={15} />
-                        Xem key
+                        {o.items.every(i => !i.product_kind || i.product_kind === "key") ? <KeyRound size={15} /> : <Package size={15} />}
+                        {deliveryLabel(o.items)}
                       </>
                     ) : (
                       "Chi tiết đơn"

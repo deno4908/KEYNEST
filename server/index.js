@@ -374,6 +374,7 @@ const productSchema = z
     subcategory: z.string().trim().max(60).default(""),
     subtitle: z.string().max(200).default(""),
     description: z.string().max(5000).default(""),
+    product_kind: z.enum(["key", "account", "source", "product", "service"]).optional(),
     usage_notes: z.string().trim().max(10000).optional(),
     image: z
       .string()

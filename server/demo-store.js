@@ -268,6 +268,7 @@ export class DemoStore {
         product_id: p.id,
         name: p.name,
         variant_name: v.name,
+        product_kind: p.product_kind || "key",
         price: v.price,
         quantity: line.quantity,
         delivery: v.delivery,
