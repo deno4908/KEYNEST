@@ -210,7 +210,7 @@ Cùng trang Actions settings → **Variables → New repository variable**:
 VPS_DEPLOY_ENABLED = true
 ```
 
-Nếu dùng liên kết mạng xã hội, thêm Variables `VITE_DISCORD_URL` và `VITE_FACEBOOK_URL`; chúng được đưa vào frontend khi build, không phải secret.
+Liên kết mạng xã hội mặc định trong workflow là Discord `https://discord.gg/4mejnftPBY` và Facebook `https://www.facebook.com/accngunghoatdongreal0/`. Để thay đổi, thêm Repository Variables `VITE_DISCORD_URL` và `VITE_FACEBOOK_URL` trong Settings → Secrets and variables → Actions → Variables, rồi chạy lại workflow để build/deploy. Chúng được đưa vào frontend khi build, không phải secret; sửa `.env` trên VPS hoặc restart Node không thay đổi frontend đã build.
 
 Vào **Actions → Test and deploy KEYNEST → Run workflow → main → Run workflow**.
 

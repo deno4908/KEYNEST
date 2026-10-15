@@ -34,8 +34,8 @@ jobs:
       - run: npm run test:db
       - run: npm run build
         env:
-          VITE_DISCORD_URL: ${{ vars.VITE_DISCORD_URL }}
-          VITE_FACEBOOK_URL: ${{ vars.VITE_FACEBOOK_URL }}
+          VITE_DISCORD_URL: ${{ vars.VITE_DISCORD_URL || 'https://discord.gg/4mejnftPBY' }}
+          VITE_FACEBOOK_URL: ${{ vars.VITE_FACEBOOK_URL || 'https://www.facebook.com/accngunghoatdongreal0/' }}
       - name: Validate deployment script
         run: |
           bash -n deploy/release.sh
