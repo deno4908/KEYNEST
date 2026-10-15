@@ -357,8 +357,7 @@ const secretsSchema = z
     secrets: z
       .array(z.string().trim().min(1).max(2000))
       .min(1)
-      .max(100)
-      .refine((a) => new Set(a).size === a.length, "Có mã trùng."),
+      .max(100),
   })
   .strict();
 const productSchema = z

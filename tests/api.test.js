@@ -644,6 +644,15 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
       assert.equal(store.profile(uid).balance, before + 75000);
     },
   );
+  await t.test("inventory accepts equal contents as distinct units across imports", async () => {
+    const variant = store.db.products.flatMap(p => p.variants).find(v => v.delivery === 'key');
+    const stock = variant.stock;
+    const path = `/admin/inventory/${variant.id}`;
+    assert.equal((await request(path, { method: 'POST', cookie: customer, body: { secrets: ['REUSABLE', 'REUSABLE'] } })).status, 403);
+    assert.equal((await request(path, { method: 'POST', cookie: admin, body: { secrets: ['REUSABLE', 'REUSABLE'] } })).status, 200);
+    assert.equal((await request(path, { method: 'POST', cookie: admin, body: { secrets: ['REUSABLE'] } })).status, 200);
+    assert.equal(variant.stock, stock + 3);
+  });
   await t.test("logout invalidates opaque server session", async () => {
     assert.equal(
       (await request("/auth/logout", { method: "POST", cookie: customer }))

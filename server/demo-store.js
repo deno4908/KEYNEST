@@ -825,17 +825,6 @@ export class DemoStore {
       .find((v) => v.id === variant_id);
     if (!v || v.delivery !== "key")
       throw new AppError("Gói phải giao mã tự động.");
-    const distinct = [...new Set(secrets)];
-    if (distinct.length !== secrets.length)
-      throw new AppError("Danh sách có mã trùng.");
-    for (const s of secrets)
-      if (
-        this.db.inventory.some(
-          (i) =>
-            i.variant_id === variant_id && decrypt(i.secret, this.key) === s,
-        )
-      )
-        throw new AppError("Mã đã có trong kho.");
     for (const s of secrets)
       this.db.inventory.push({
         id: randomUUID(),

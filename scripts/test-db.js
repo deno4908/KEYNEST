@@ -242,15 +242,18 @@ try {
   pass(
     "catalog SQL handles Vietnamese search, same-variant filters, pagination, hidden products and RPC grants",
   );
-  await fails("select import_keys($1,$2)", [
+  await db.exec('begin');
+  await scalar("select import_keys($1,$2)", [
     variant,
-    JSON.stringify([{ secret: "duplicate", hash: "hash-0" }]),
+    JSON.stringify([{ secret: "duplicate", hash: "hash-0" }, { secret: "duplicate", hash: "hash-0" }]),
   ]);
   assert.equal(
     await scalar("select stock from variants where id=$1", [variant]),
-    5,
+    7,
   );
-  pass("duplicate inventory rolls back stock mutation");
+  assert.equal(Number(await scalar("select count(*) from inventory where variant_id=$1 and secret_hash='hash-0'", [variant])),3);
+  await db.exec('rollback');
+  pass("repeated inventory contents create distinct stock units, including existing hashes");
   const key = randomUUID();
   const payload = {
     items: [{ variant_id: variant, quantity: 1 }],
@@ -1655,6 +1658,14 @@ try {
   await scalar('select settle_payment($1,$2,$3)',['preorder-bank-payment',bankReceiptPayment.code,10000]);
   await scalar('select settle_payment($1,$2,$3)',['preorder-bank-payment',bankReceiptPayment.code,10000]);
   assert.equal(Number(await scalar('select count(*) from order_receipts where order_id=$1',[bankPreorder])),1);
+  await db.exec('begin');
+  await db.query('update variants set stock=2 where id=$1',[preorderVariant]);
+  const repeatedOrder = await scalar('select create_order($1,$2,$3)', [preorderUser,JSON.stringify({...preorderPayload,items:[{variant_id:preorderVariant,quantity:2}]}),randomUUID()]);
+  const repeatedData = JSON.stringify([{secret:'same-data',hash:'same-hash'},{secret:'same-data',hash:'same-hash'}]);
+  await scalar('select fulfill_order($1,$2)',[repeatedOrder,repeatedData]);
+  assert.equal(Number(await scalar('select count(distinct id) from inventory where order_id=$1',[repeatedOrder])),2);
+  await fails('select fulfill_order($1,$2)',[repeatedOrder,repeatedData]);
+  await db.exec('rollback');
   await db.query('update variants set stock=0 where id=$1',[preorderVariant]);
   await fails('select create_order($1,$2,$3)',[preorderUser,JSON.stringify(preorderPayload),randomUUID()]);
   await db.query("update variants set stock=1,expected_delivery=current_date-1 where id=$1",[preorderVariant]);

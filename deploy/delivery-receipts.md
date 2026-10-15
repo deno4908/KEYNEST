@@ -1,5 +1,7 @@
 # Avatar, ẩn gói và biên nhận giao hàng
 
+Để cho phép key/dữ liệu giống nhau, chạy thêm `041_allow_repeated_inventory_data.sql` sau 040 và cập nhật backend. Mỗi dòng vẫn là một đơn vị hàng riêng có ID riêng; hai dòng giống nhau tăng tồn kho hai đơn vị. Áp dụng cả nhập kho và giao dữ liệu thủ công/đặt trước. Đơn đã giao vẫn không thể giao lại.
+
 Chạy `supabase/migrations/040_variant_visibility_delivery_receipts.sql` một lần trong Supabase trước khi triển khai backend/frontend mới. Migration yêu cầu các migration 001–039 đã được áp dụng.
 
 - Danh sách khách hàng hiển thị avatar; ảnh lỗi sẽ trở lại chữ viết tắt.
