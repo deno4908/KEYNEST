@@ -7,33 +7,22 @@ function request(path = '/', country, method = 'GET') {
   if (country) Object.defineProperty(req, 'cf', { value: { country } });
   return req;
 }
-test('social previews expose only public metadata and images without credentials', async t => {
-  const origin = t.mock.method(globalThis, 'fetch', async req => {
+test('public storefront is globally readable without credentials, private routes stay blocked', async t => {
+  t.mock.method(globalThis, 'fetch', async req => {
     assert.equal(req.headers.get('Cookie'), null);
     assert.equal(req.headers.get('Authorization'), null);
-    assert.equal(new URL(req.url).search, '');
-    return new Response(req.url);
+    return new Response('public');
   });
-  for (const bot of ['Discordbot', 'facebookexternalhit', 'Twitterbot', 'TelegramBot', 'WhatsApp', 'Zalo']) {
-    for (const path of ['/', '/products/steam/']) {
-      const req = request(path + '?private=value', 'US');
-      req.headers.set('User-Agent', bot);
-      req.headers.set('Cookie', 'session=secret');
-      req.headers.set('Authorization', 'Bearer secret');
-      const res = await worker.fetch(req);
-      assert.equal(res.status, 200);
-      assert.equal(await res.text(), 'https://keynest.store/share-preview' + (path === '/' ? '' : '/products/steam'));
-    }
-  }
-  for (const path of ['/api/media/image.webp', '/images/share/keynest-v2.jpg', '/images/products/game.png']) {
-    assert.equal((await worker.fetch(request(path, 'US'))).status, 200);
+  for (const path of ['/', '/catalog', '/products/steam', '/robots.txt', '/sitemap.xml', '/assets/index.js', '/api/products']) {
+    const req = request(path, 'US');
+    req.headers.set('Cookie', 'session=secret');
+    req.headers.set('Authorization', 'Bearer secret');
+    assert.equal((await worker.fetch(req)).status, 200);
     assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
   }
-  assert.equal(origin.mock.callCount(), 15);
-  assert.equal((await worker.fetch(request('/products/steam', 'US'))).status, 403);
-  assert.equal((await worker.fetch(request('/api/media/private.json', 'US'))).status, 403);
-  assert.equal((await worker.fetch(request('/robots.txt', 'US'))).status, 200);
+  assert.equal((await worker.fetch(request('/api/me', 'US'))).status, 403);
 });
+
 test('foreign and unknown countries receive standalone 403; spoofed country header is ignored', async () => {
   for (const country of ['US','SG','XX',undefined]) {
     const res = await worker.fetch(request('/account', country));
@@ -46,15 +35,8 @@ test('foreign and unknown countries receive standalone 403; spoofed country head
   assert.equal(await (await worker.fetch(request('/account', 'US', 'HEAD'))).text(), '');
 });
 
-test('foreign visitors see the region UI at home; legal pages remain public', async t => {
+test('legal pages remain public while private endpoints stay restricted', async t => {
   const origin = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected origin request'); });
-  const home = await worker.fetch(request('/', 'US'));
-  assert.equal(home.status, 403);
-  assert.match(await home.text(), /Khu vực chưa được hỗ trợ/);
-  assert.match(home.headers.get('X-Robots-Tag'), /noindex, nofollow/);
-  const head = await worker.fetch(request('/', 'US', 'HEAD'));
-  assert.equal(head.status, 403);
-  assert.equal(await head.text(), '');
   for (const path of ['/privacy', '/privacy/', '/terms', '/terms/']) {
     const res = await worker.fetch(request(path, 'US'));
     assert.equal(res.status, 200);
@@ -65,7 +47,7 @@ test('foreign visitors see the region UI at home; legal pages remain public', as
     assert.equal(await (await worker.fetch(request(path, 'US', 'HEAD'))).text(), '');
     assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
   }
-  const blocked = ['/api', '/api/config', '/api/products', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements', '/api/me', '/api/auth/refresh', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/assets/index.js', '/share-preview'];
+  const blocked = ['/api', '/api/me', '/api/auth/refresh', '/api/admin/products', '/api/orders', '/api/wallet', '/account', '/share-preview'];
   for (const path of blocked) {
     for (const method of ['GET', 'HEAD', 'POST', 'OPTIONS']) {
       const req = request(path, 'US', method);

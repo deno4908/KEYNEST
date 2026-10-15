@@ -459,6 +459,7 @@ async function orderInfo(o) {
     })),
   };
 }
+app.use('/api', (req, res, next) => { res.setHeader('X-Robots-Tag', 'noindex'); next(); });
 app.get("/api/health", (req, res) => res.json({ ok: true, mode: config.mode }));
 const steamArt = createSteamArt();
 app.get('/api/steam-art', async (req, res) => res.json({ items: await steamArt() }));
@@ -1117,6 +1118,15 @@ app.use("/api", (req, res) =>
 );
 if (existsSync(resolve("dist/index.html"))) {
   const pageTemplate = readFileSync(resolve('dist/index.html'), 'utf8');
+  app.get('/robots.txt', (req, res) => res.type('text').send(
+    'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /orders\nDisallow: /wallet\nDisallow: /seller\nDisallow: /checkout\nDisallow: /share-preview\nSitemap: ' + new URL('/sitemap.xml', config.origin).href + '\n',
+  ));
+  app.get('/sitemap.xml', async (req, res) => {
+    const products = await store.products();
+    const paths = ['/', '/catalog', '/privacy', '/terms', '/guide', ...products.filter(p => p.active !== false).map(p => '/products/' + encodeURIComponent(p.slug))];
+    const xml = value => value.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));
+    res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + paths.map(path => '<url><loc>' + xml(new URL(path, config.origin).href) + '</loc></url>').join('') + '</urlset>');
+  });
   app.get(['/share-preview', '/share-preview/products/:slug'], async (req, res) => {
     const path = req.params.slug ? `/products/${req.params.slug}` : '/';
     if (req.params.slug && !/^[a-z0-9-]{1,120}$/.test(req.params.slug)) return res.sendStatus(404);

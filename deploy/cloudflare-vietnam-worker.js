@@ -9,21 +9,18 @@ export default {
     // These POST endpoints still authenticate provider signatures/tokens in Node.
     const webhook = request.method === 'POST' && ['/api/webhooks/pay2s', '/api/webhooks/sepay'].includes(url.pathname);
     if (webhook || request.cf?.country === 'VN') return fetch(request);
-    if (read && url.pathname === '/robots.txt') {
-      return new Response(request.method === 'HEAD' ? null : 'User-agent: *\nAllow: /\nDisallow: /api/\nAllow: /api/media/\nDisallow: /account\nDisallow: /admin\nDisallow: /wallet\nDisallow: /orders\n', {
-        headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-Keynest-Region-Worker': 'vietnam-region-v5' },
-      });
-    }
-    // User-Agent grants only public metadata, never access to the application.
-    const previewBot = /facebookexternalhit|Facebot|Twitterbot|LinkedInBot|Discordbot|TelegramBot|WhatsApp|Zalo/i.test(request.headers.get('User-Agent') || '');
-    if (read && previewBot && (url.pathname === '/' || /^\/products\/[a-z0-9-]{1,120}\/?$/.test(url.pathname))) {
-      url.pathname = url.pathname === '/' ? '/share-preview' : '/share-preview' + url.pathname.replace(/\/$/, '');
-      url.search = '';
-      const response = await fetch(new Request(url, { method: request.method, headers: { Accept: 'text/html' } }));
-      const preview = new Response(request.method === 'HEAD' ? null : response.body, response);
-      preview.headers.set('Cache-Control', 'private, no-store');
-      preview.headers.set('X-Keynest-Region-Worker', 'vietnam-region-v5');
-      return preview;
+    // Public browsing is global; account and transaction routes remain restricted.
+    // Do not grant access based on a spoofable Googlebot User-Agent.
+    const publicPage = ['/', '/catalog', '/guide', '/sitemap.xml', '/robots.txt'].includes(url.pathname.replace(/\/$/, '') || '/')
+      || /^\/products\/[a-z0-9-]{1,120}\/?$/.test(url.pathname);
+    const publicData = ['/api/config', '/api/products', '/api/catalog', '/api/categories', '/api/banners', '/api/promotions', '/api/announcements'].includes(url.pathname)
+      || /^\/api\/products\/[a-zA-Z0-9-]+(?:\/(?:reviews|comments))?$/.test(url.pathname);
+    const publicAsset = /^\/assets\/[a-zA-Z0-9_.-]+$/.test(url.pathname);
+    if (read && (publicPage || publicData || publicAsset)) {
+      const headers = new Headers(request.headers);
+      headers.delete('Cookie');
+      headers.delete('Authorization');
+      return fetch(new Request(request, { headers }));
     }
     const publicImage = /^\/images\/(share|products)\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/.test(url.pathname)
       || /^\/api\/media\/[a-zA-Z0-9_-]+\.webp$/.test(url.pathname);

@@ -4,7 +4,10 @@ export async function socialMetadata(path, origin, store) {
   let title = 'KEYNEST — Game key, gift card & MMO';
   let description = 'Khám phá game key, gift card, nạp game và dịch vụ MMO tại KEYNEST.';
   let image = '/images/share/keynest-v2.jpg';
-  let canonical = '/';
+  let canonical = path.replace(/\/$/, '') || '/';
+  let structuredData;
+  const noindex = !['/', '/catalog', '/privacy', '/terms', '/guide'].includes(canonical) && !/^\/products\/[a-z0-9-]{1,120}$/.test(canonical);
+  if (canonical === '/catalog') title = 'Danh mục sản phẩm | KEYNEST';
   if (['/privacy', '/privacy/', '/terms', '/terms/'].includes(path)) {
     canonical = path.replace(/\/$/, '');
     title = `${canonical === '/privacy' ? 'Chính sách bảo mật' : 'Điều khoản dịch vụ'} | KEYNEST`;
@@ -22,8 +25,21 @@ export async function socialMetadata(path, origin, store) {
       if (['https:', 'http:'].includes(candidate.protocol) && !candidate.username && !candidate.password) image = candidate.href;
       if (/^\/images\/products\/[a-z0-9-]+\.svg$/.test(product.image)) image = product.image.replace('/products/', '/share/').replace('.svg', '.png');
     }
+    const variants = (product.variants || []).filter(v => v.active !== false);
+    structuredData = {
+      '@context': 'https://schema.org', '@type': 'Product',
+      name: product.name, description, image: new URL(image, base).href,
+      url: base + canonical, sku: product.id || product.slug,
+      ...(variants.length ? { offers: variants.map(v => ({
+        '@type': 'Offer', name: v.name, price: v.price, priceCurrency: 'VND',
+        url: base + canonical,
+        availability: 'https://schema.org/' + (v.unlimited || v.stock > 0 ? (v.is_preorder ? 'PreOrder' : 'InStock') : 'OutOfStock'),
+        seller: { '@type': 'Organization', name: product.seller?.name || 'KEYNEST' },
+      })) } : {}),
+    };
   }
   return { title, description, image: new URL(image, base).href, url: base + canonical,
+    noindex, structuredData,
     ...(image === '/images/share/keynest-v2.jpg' ? { imageWidth: 1200, imageHeight: 630 } : {}) };
 }
 export function metadataHead(meta) {
@@ -38,6 +54,8 @@ export function metadataHead(meta) {
     tag('twitter:card', 'summary_large_image', 'name'), tag('twitter:title', meta.title, 'name'),
     tag('twitter:description', meta.description, 'name'), tag('twitter:image', meta.image, 'name'),
     `<link rel="canonical" href="${escape(meta.url)}">`,
+    tag('robots', meta.noindex ? 'noindex,follow' : 'index,follow,max-image-preview:large', 'name'),
+    ...(meta.structuredData ? [`<script type="application/ld+json">${JSON.stringify(meta.structuredData).replace(/</g, '\\u003c')}</script>`] : []),
   ].join('\n');
 }
 export function injectMetadata(html, meta) {

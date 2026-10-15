@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { socialMetadata, injectMetadata } from '../server/social-preview.js';
+test('canonical paths and product offers are safe and reflect available variants', async () => {
+  const origin = 'https://keynest.store';
+  const store = { product: async () => ({ name: '</script><script>bad</script>', slug: 'test', active: true,
+    variants: [{ name: 'Shared', price: 50000, stock: 0, unlimited: true }, { name: 'Hidden', price: 1, active: false }] }) };
+  assert.equal((await socialMetadata('/catalog/', origin, store)).url, origin + '/catalog');
+  assert.equal((await socialMetadata('/orders/123', origin, store)).noindex, true);
+  const meta = await socialMetadata('/products/test/', origin, store);
+  assert.equal(meta.structuredData.offers.length, 1);
+  assert.equal(meta.structuredData.offers[0].availability, 'https://schema.org/InStock');
+  assert.equal(meta.structuredData.offers[0].priceCurrency, 'VND');
+  assert.doesNotMatch(injectMetadata('<head></head>', meta), /<script>bad/);
+});
 test('sharing uses absolute homepage and individual public product metadata', async () => {
   const store = { product: async () => ({ name: 'Steam <Gift>', slug: 'steam', active: true, image: '/images/products/steam-wallet.png', description: 'Steam wallet' }) };
   const home = await socialMetadata('/', 'https://keynest.store', store);
