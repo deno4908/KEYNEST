@@ -1,5 +1,6 @@
 export type Category = string;
 export type Variant = {
+  active?: boolean;
   id: string;
   name: string;
   price: number;

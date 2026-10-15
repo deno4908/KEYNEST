@@ -122,6 +122,7 @@ export class DemoStore {
         const reviews = this.db.reviews.filter((r) => r.product_id === p.id);
         return {
           ...p,
+          variants: p.variants.filter(v => admin || v.active !== false),
           seller: sellerPublic(this.db.users.find(user => user.id === p.seller_id)),
           image: p.image || productImages[p.slug] || "",
           review_count: reviews.length,
@@ -248,7 +249,7 @@ export class DemoStore {
         (p) => p.active && p.variants.some((v) => v.id === line.variant_id),
       );
       const v = p?.variants.find((v) => v.id === line.variant_id);
-      if (!v || v.stock < line.quantity)
+      if (!v || v.active === false || v.stock < line.quantity)
         throw new AppError("Sản phẩm không đủ tồn kho.", 409);
       if (v.is_preorder && v.expected_delivery < new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()))
         throw new AppError('Đợt đặt trước đã hết hạn. Vui lòng chờ cửa hàng cập nhật ngày giao.');

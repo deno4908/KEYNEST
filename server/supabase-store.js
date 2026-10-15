@@ -55,6 +55,7 @@ export class SupabaseStore {
       const s = byProduct.get(p.id);
       return {
         ...p,
+        variants: p.variants.filter(v => admin || v.active !== false),
         image: p.image || productImages[p.slug] || "",
         review_count: s?.review_count || 0,
         rating_average: Number(s?.rating_average || 0),
@@ -68,6 +69,7 @@ export class SupabaseStore {
     );
     result.items = (await this.attachSellers(result.items)).map((p) => ({
       ...p,
+      variants: p.variants.filter(v => v.active !== false),
       image: p.image || productImages[p.slug] || "",
     }));
     return result;

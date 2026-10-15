@@ -1,9 +1,9 @@
 export function PreorderNote({
   item,
 }: {
-  item: { is_preorder?: boolean; expected_delivery?: string | null };
+  item: { is_preorder?: boolean; expected_delivery?: string | null; delivered_at?: string | null };
 }) {
-  if (!item.is_preorder) return null;
+  if (!item.is_preorder || item.delivered_at) return null;
   const date = item.expected_delivery?.split("-").reverse().join("/");
   return (
     <p className="info-note">

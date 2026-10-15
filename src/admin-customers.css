@@ -371,3 +371,6 @@
     font-size: 11px;
   }
 }
+
+.customer-avatar { position: relative; overflow: hidden; }
+.customer-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

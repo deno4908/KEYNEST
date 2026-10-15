@@ -247,7 +247,7 @@ export function OrdersPage() {
                     to={`/orders/${o.id}`}
                   >
                     {o.items.some(
-                      (i) => i.delivery === "key" && i.keys.length,
+                      (i) => (i.delivery === "key" || i.is_preorder) && i.keys.length,
                     ) ? (
                       <>
                         <KeyRound size={15} />
@@ -713,7 +713,7 @@ function OrderDetails({ id }: { id: string }) {
                   <strong>{item.name}</strong>
                   <span>{item.variant_name}</span>
                 </div>
-                {item.delivery === "manual" ? (
+                {item.delivery === "manual" && !(item.is_preorder && item.delivered_at) ? (
                   <div className="service-delivery-result">
                     <p>
                       <strong>
@@ -778,7 +778,7 @@ function OrderDetails({ id }: { id: string }) {
                 )}
               </div>
             ))}
-            {order.items.some((i) => i.delivery === "key" && i.keys.length) && (
+            {order.items.some((i) => (i.delivery === "key" || i.is_preorder) && i.keys.length) && (
               <p className="order-key-note">
                 <ShieldCheck size={14} />
                 Giữ riêng mã và thông tin tài khoản. Nhấn biểu tượng để sao

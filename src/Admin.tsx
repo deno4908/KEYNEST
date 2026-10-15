@@ -654,6 +654,7 @@ export function ProductEditor({
     try {
       await post(`/${scope}/products/${product.id}/variants`, {
         ...(variant!.id ? { id: variant!.id } : {}),
+        active: variant?.active !== false,
         name: f.get("name"),
         price: Number(f.get("price")),
         original_price: Number(f.get("original_price")),
@@ -676,6 +677,17 @@ export function ProductEditor({
     } finally {
       setBusy(false);
     }
+  }
+  async function toggleVariant(v: Variant) {
+    setBusy(true);
+    try {
+      const { id, name, price, original_price, delivery, stock, region, warranty_days, is_preorder, expected_delivery } = v;
+      await post(`/${scope}/products/${product.id}/variants`, { id, name, price, original_price, delivery, stock, region, warranty_days, is_preorder: !!is_preorder, expected_delivery: expected_delivery || null, active: v.active === false });
+      setProduct(p => ({ ...p, variants: p.variants?.map(x => x.id === v.id ? { ...x, active: v.active === false } : x) }));
+      await changed();
+      notify(v.active === false ? "Đã hiện gói." : "Đã ẩn gói.");
+    } catch (e) { notify((e as Error).message, true); }
+    finally { setBusy(false); }
   }
   async function deleteProduct() {
     if (!product.id) return;
@@ -847,8 +859,9 @@ export function ProductEditor({
           {product.variants?.map((v) => (
             <div className="admin-variant" key={v.id}>
               <span>
-                <strong>{v.name}</strong>
+                <strong>{v.name}{v.active === false ? " · Đã ẩn" : ""}</strong>
                 <small>
+                  {v.is_preorder && <>Dự kiến giao {v.expected_delivery?.split("-").reverse().join("/") || "chưa cập nhật"} · </>}
                   {money(v.price)} ·{" "}
                   {v.is_preorder ? "Đặt trước · Còn lượt đặt" : v.delivery === "key" ? "Kho mã · Tồn" : "Dịch vụ · Tồn"} {v.stock}
                   {" · "}
@@ -857,6 +870,14 @@ export function ProductEditor({
                     : "Không bảo hành theo ngày"}
                 </small>
               </span>
+              <button
+                className="icon-button"
+                aria-label={v.active === false ? "Hiện gói" : "Ẩn gói"}
+                disabled={busy}
+                onClick={() => void toggleVariant(v)}
+              >
+                {v.active === false ? "Hiện" : "Ẩn"}
+              </button>
               <button
                 className="icon-button"
                 aria-label="Sửa gói"

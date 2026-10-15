@@ -1,5 +1,7 @@
 # Sản phẩm đặt trước và email biên nhận
 
+**Cập nhật:** Sau migration 040, biên nhận có dữ liệu đã giao và đơn đặt trước có thêm email khi giao đủ hàng. Xem [hướng dẫn cập nhật](delivery-receipts.md); các mô tả bên dưới về một thư/đơn và không chứa key áp dụng cho bản 036 cũ.
+
 ## Cập nhật VPS và Supabase
 
 Triển khai cả frontend và backend của bản cập nhật này. Trong Supabase SQL Editor, chạy một lần theo thứ tự sau (sau migration 034):

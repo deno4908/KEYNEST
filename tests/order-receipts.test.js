@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { encrypt } from '../server/security.js';
 import {
   createReceiptWorker,
   renderReceipt,
@@ -35,6 +36,17 @@ const config = {
     sender: "store@example.test",
   },
 };
+test('delivery receipt decrypts encrypted snapshot, escapes data and omits estimated delivery', () => {
+  const key = 'ab'.repeat(32);
+  const secret = '<script>secret</script>\naccount|password';
+  const result = renderReceipt({ ...payload, kind: 'delivery', items: payload.items.map(i => ({ ...i, delivered_at: '2026-10-15T00:00:00Z', encrypted_keys: [encrypt(secret, key)] })) }, config.origin, key);
+  assert.ok(result.textContent.includes(secret));
+  assert.ok(result.htmlContent.includes('&lt;script&gt;secret&lt;/script&gt;'));
+  assert.ok(!result.htmlContent.includes('<script>'));
+  assert.ok(!result.textContent.includes('01/11/2026'));
+  assert.ok(!result.htmlContent.includes('01/11/2026'));
+  assert.match(result.subject, /Đã giao hàng/);
+});
 test("receipt escapes product text and includes exact totals and preorder date without secrets", () => {
   const result = renderReceipt(payload, config.origin);
   assert.ok(result.htmlContent.includes("&lt;img"));

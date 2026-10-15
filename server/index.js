@@ -399,6 +399,7 @@ const variantSchema = z
     price: money,
     original_price: money,
     delivery: z.enum(["key", "manual"]),
+    active: z.boolean().optional(),
     is_preorder: z.boolean().default(false),
     expected_delivery: z.iso.date().nullable().default(null),
     stock: z.number().int().min(0).max(100000),

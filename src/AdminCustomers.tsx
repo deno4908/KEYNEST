@@ -19,6 +19,7 @@ type Customer = {
   id: string;
   name: string;
   email: string;
+  avatar_url?: string | null;
   balance: number;
   access: { suspended: boolean; reason: string } | null;
 };
@@ -181,6 +182,7 @@ export function AdminCustomers() {
                           className={`customer-avatar ${u.role === "seller" ? "is-seller" : ""}`}
                           aria-hidden="true"
                         >
+                          {u.avatar_url && <img src={u.avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = "none"; }} />}
                           {(u.name || u.email)
                             .trim()
                             .split(/\s+/)

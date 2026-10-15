@@ -25,7 +25,7 @@ const listConfig = {
   customers: {
     table: "profiles",
     fields:
-      "id,email,name,role,balance,access:account_controls(suspended,reason)",
+      "id,email,name,avatar_url,role,balance,access:account_controls(suspended,reason)",
     search: "email",
     sort: "id",
   },

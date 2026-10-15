@@ -797,6 +797,7 @@ function ProductPage() {
       </Empty>
     );
   const v = p.variants.find((v) => v.id === variantId) || p.variants[0];
+  if (!v) return <Empty title="Sản phẩm tạm ngừng bán" description="Cửa hàng chưa mở bán gói nào cho sản phẩm này."><Link className="button" to="/catalog">Về cửa hàng</Link></Empty>;
   return (
     <div className="container page">
       <div className="breadcrumb">
