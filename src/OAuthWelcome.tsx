@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeftRight, CheckCircle2 } from 'lucide-react';
+import { ArrowLeftRight, CheckCircle2, Mail, UserPlus } from 'lucide-react';
 import { Modal, useStore } from './App';
 import { Avatar } from './Avatar';
 import { GoogleIcon, DiscordIcon } from './AuthProviders';
 import './oauth-welcome.css';
 
 const storageKey = 'kn-oauth-welcome';
+type WelcomeProvider = 'google' | 'discord' | 'email' | 'register';
+export function showEmailWelcome(registered = false) {
+  window.dispatchEvent(new CustomEvent('keynest:auth-welcome', { detail: registered ? 'register' : 'email' }));
+}
 const fallbackArt = { name: 'ELDEN RING', src: '/images/products/elden-ring-welcome.jpg' };
 type GameArt = typeof fallbackArt;
 // Cosmetic marker only. The authenticated /me response controls the greeting.
-function pendingWelcome(): 'google' | 'discord' | null {
+function pendingWelcome(): WelcomeProvider | null {
   const provider = new URLSearchParams(window.location.search).get('welcome');
   try {
     if (window.location.pathname === '/auth/error') {
@@ -22,7 +26,7 @@ function pendingWelcome(): 'google' | 'discord' | null {
       return provider;
     }
     const saved = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-    if (saved?.expires > Date.now() && ['google', 'discord'].includes(saved.provider)) return saved.provider;
+    if (saved?.expires > Date.now() && ['google', 'discord', 'email', 'register'].includes(saved.provider)) return saved.provider;
     sessionStorage.removeItem(storageKey);
   } catch { /* Storage may be disabled; the callback URL can still show the greeting. */ }
   return window.location.pathname === '/account' && (provider === 'google' || provider === 'discord') ? provider : null;
@@ -33,6 +37,17 @@ export function OAuthWelcome() {
   const [provider, setProvider] = useState(pendingWelcome);
   const [remaining, setRemaining] = useState(10);
   const [closing, setClosing] = useState(false);
+  useEffect(() => {
+    const show = (event: Event) => {
+      const next = (event as CustomEvent).detail;
+      if (next !== 'email' && next !== 'register') return;
+      setClosing(false);
+      setRemaining(10);
+      setProvider(next);
+    };
+    window.addEventListener('keynest:auth-welcome', show);
+    return () => window.removeEventListener('keynest:auth-welcome', show);
+  }, []);
   // Pick once; countdown updates must not replace the background mid-animation.
   const [art, setArt] = useState(fallbackArt);
   useEffect(() => {
@@ -97,30 +112,32 @@ export function OAuthWelcome() {
     return () => window.clearTimeout(timer);
   }, [closing]);
   if (!visible || !user) return null;
-  return <Modal title="Đăng nhập thành công" className={`oauth-welcome ${closing ? 'is-leaving' : ''}`} close={() => setClosing(true)}>
+  const registered = provider === 'register';
+  const successTitle = registered ? 'Đăng ký thành công' : 'Đăng nhập thành công';
+  return <Modal title={successTitle} className={`oauth-welcome ${closing ? 'is-leaving' : ''}`} close={() => setClosing(true)}>
     <div className="oauth-welcome-layout">
     <aside className="oauth-welcome-brand">
       <img className="oauth-welcome-game" src={art.src} alt="" aria-hidden="true" referrerPolicy="no-referrer"
         onError={() => { if (art.src !== fallbackArt.src) setArt(fallbackArt); }} />
       <span className="oauth-welcome-wordmark"><b>//</b> KEYNEST</span>
-      <div><span className="oauth-welcome-kicker">CHÀO MỪNG TRỞ LẠI</span>
+      <div><span className="oauth-welcome-kicker">{registered ? 'CHÀO MỪNG THÀNH VIÊN MỚI' : 'CHÀO MỪNG TRỞ LẠI'}</span>
       <h3>Game mới.<br />Trải nghiệm mới.</h3>
       <p>Khám phá game yêu thích, theo dõi đơn hàng và quản lý ví trong tài khoản của bạn.</p></div>
       <small>{art.name} · PC / STEAM</small>
     </aside>
     <div className="oauth-welcome-body">
     <div className="oauth-welcome-connection" aria-hidden="true">
-      <span className={`oauth-welcome-provider ${provider}`}>{provider === 'google' ? <GoogleIcon /> : <DiscordIcon />}</span>
+      <span className={`oauth-welcome-provider ${provider}`}>{provider === 'google' ? <GoogleIcon /> : provider === 'discord' ? <DiscordIcon /> : registered ? <UserPlus /> : <Mail />}</span>
       <ArrowLeftRight className="oauth-welcome-arrows" size={28} />
       <Avatar className="oauth-welcome-avatar" name={user.name} url={user.avatar_url} />
     </div>
     <div className="oauth-welcome-copy" role="status" tabIndex={-1} data-initial-focus>
-      <span className="oauth-welcome-confirmed"><CheckCircle2 size={17} /> Đăng nhập thành công</span>
+      <span className="oauth-welcome-confirmed"><CheckCircle2 size={17} /> {successTitle}</span>
       <h2>Xin chào, <strong>{user.name}</strong></h2>
-      <p>Chào mừng bạn đến với KEYNEST.</p>
+      <p>{registered ? 'Tài khoản của bạn đã sẵn sàng. Cùng khám phá KEYNEST nhé.' : 'Chào mừng bạn đến với KEYNEST.'}</p>
     </div>
     <div className="oauth-welcome-account">
-      <span>Đã đăng nhập bằng {provider === 'google' ? 'Google' : 'Discord'}</span>
+      <span>{registered ? 'Email đăng ký của bạn' : `Đã đăng nhập bằng ${provider === 'google' ? 'Google' : provider === 'discord' ? 'Discord' : 'email'}`}</span>
       <strong>{user.email}</strong>
     </div>
     <button className="button oauth-welcome-continue" disabled={closing} onClick={() => setClosing(true)}>Tiếp tục vào cửa hàng <span className="oauth-welcome-countdown">{remaining}s</span></button>

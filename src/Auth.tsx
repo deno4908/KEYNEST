@@ -17,9 +17,10 @@ import { api, post } from "./api";
 import type { User } from "./types";
 import { GoogleIcon, DiscordIcon } from "./AuthProviders";
 import { Recaptcha } from './Recaptcha';
+import { showEmailWelcome } from './OAuthWelcome';
 
 export function AuthModal({ close }: { close: () => void }) {
-  const { mode, setUser, notify } = useStore();
+  const { mode, setUser } = useStore();
   const [tab, setTab] = useState<"login" | "register" | "forgot">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -153,16 +154,16 @@ export function AuthModal({ close }: { close: () => void }) {
         );
         if (result.user) {
           setUser(result.user);
-          notify("Tài khoản đã sẵn sàng.");
           close();
+          showEmailWelcome(true);
         } else
           setMessage(result.message || "Đã tạo tài khoản. Hãy đăng nhập bằng email và mật khẩu.");
       } else {
         setUser(
           await post<User>("/auth/login", { email: email.trim(), password }, captchaToken ? { 'X-Captcha-Token': captchaToken } : {}),
         );
-        notify("Chào mừng bạn trở lại.");
         close();
+        showEmailWelcome();
       }
     } catch (e) {
       setError((e as Error).message);
@@ -335,7 +336,7 @@ export function AuthModal({ close }: { close: () => void }) {
                 </>
               )}
               {message ? (
-                <div className="auth-confirmation" role="status">
+                <div className={`auth-confirmation ${tab === 'register' ? 'auth-registration-confirmation' : ''}`} role="status">
                   <Mail size={32} />
                   <h3>
                     {tab === "register"

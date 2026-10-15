@@ -61,6 +61,10 @@ export async function api<T>(
   }
   receiveToken(res);
   if (path === '/auth/logout' && res.ok) accessToken = null;
+  if (path === '/auth/login' && (body.code === 'ADMIN_OTP_REQUIRED' || body.admin_otp_required || body.code === 'MFA_REQUIRED' || body.mfa_required)) {
+    // Cosmetic only: the welcome still requires an authenticated /me response.
+    try { sessionStorage.setItem('kn-oauth-welcome', JSON.stringify({ provider: 'email', expires: Date.now() + 600000 })); } catch { /* Optional storage. */ }
+  }
   if (body.code === "ADMIN_OTP_REQUIRED" || body.admin_otp_required) {
     if (
       typeof window !== 'undefined' &&

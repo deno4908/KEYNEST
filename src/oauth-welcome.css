@@ -12,6 +12,7 @@
 .oauth-welcome-provider, .oauth-welcome-avatar { width: 68px; height: 68px; flex: 0 0 68px; border-radius: 18px; display: grid; place-items: center; }
 .oauth-welcome-provider { background: var(--oauth-icon-surface); border: 1px solid var(--oauth-icon-border); box-shadow: 0 12px 32px #0003; animation: welcome-provider 1600ms var(--oauth-easing) both; }
 .oauth-welcome-provider svg { width: 34px; height: 34px; }
+.oauth-welcome-provider.email, .oauth-welcome-provider.register { color: #f3a078; }
 .oauth-welcome-avatar { border: 1px solid var(--oauth-icon-border); background: var(--oauth-icon-surface); color: #e5e1e8; font-size: 22px; overflow: hidden; animation: welcome-avatar .9s .9s var(--oauth-easing) both; }
 .oauth-welcome-arrows { color: #a5acae; animation: welcome-reveal .7s .7s ease both; }
 .oauth-welcome-copy { animation: welcome-reveal .75s 1.2s ease both; }
@@ -69,4 +70,9 @@
   .oauth-welcome-hint { max-width: 280px; }
 }
 .oauth-welcome-copy:focus { outline: none; }
+.auth-registration-confirmation > svg { animation: welcome-avatar .7s ease both; }
+.auth-registration-confirmation > h3,
+.auth-registration-confirmation > p,
+.auth-registration-confirmation > button { animation: welcome-reveal .65s .2s ease both; }
+@media (prefers-reduced-motion: reduce) { .auth-registration-confirmation > * { animation: none !important; } }
 @media (prefers-reduced-motion: reduce) { .modal-backdrop:has(.oauth-welcome), .modal.oauth-welcome, .oauth-welcome * { animation: none !important; transition: none !important; } }
