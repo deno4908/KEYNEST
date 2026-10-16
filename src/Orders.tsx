@@ -582,7 +582,7 @@ function OrderDetails({ id }: { id: string }) {
       )}
       <div className="order-detail-layout">
         <aside className="order-summary-column">
-          <section className="order-section order-summary">
+          <section className="order-section order-detail-summary">
             <div className="order-reference">
               <span>MÃ ĐƠN HÀNG</span>
               <strong>{order.number}</strong>

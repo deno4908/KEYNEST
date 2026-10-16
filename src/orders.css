@@ -322,7 +322,7 @@
   gap: 18px;
   min-width: 0;
 }
-.order-detail-page .order-summary {
+.order-detail-page .order-detail-summary {
   position: static;
   top: auto;
 }
@@ -350,43 +350,43 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.order-summary .purchase-items {
+.order-detail-summary .purchase-items {
   padding: 0;
 }
-.order-summary .purchase-product {
+.order-detail-summary .purchase-product {
   gap: 13px;
   flex-wrap: wrap;
   position: relative;
 }
-.order-summary .purchase-cover {
+.order-detail-summary .purchase-cover {
   width: 52px;
   height: 70px;
   flex-basis: 52px;
 }
-.order-summary .purchase-product-copy {
+.order-detail-summary .purchase-product-copy {
   flex: 1;
 }
-.order-summary .purchase-product-copy > a,
-.order-summary .purchase-product-copy > strong {
+.order-detail-summary .purchase-product-copy > a,
+.order-detail-summary .purchase-product-copy > strong {
   font-size: 12px;
   line-height: 1.6;
 }
-.order-summary .purchase-product-copy > span {
+.order-detail-summary .purchase-product-copy > span {
   font-size: 11px;
 }
-.order-summary .purchase-product-copy small {
+.order-detail-summary .purchase-product-copy small {
   font-size: 10px;
   line-height: 1.6;
 }
-.order-summary .purchase-line-price {
+.order-detail-summary .purchase-line-price {
   display: none;
 }
-.order-summary dl {
+.order-detail-summary dl {
   margin: 0;
   padding-top: 16px;
   border-top: 1px solid #303139;
 }
-.order-summary dl > div {
+.order-detail-summary dl > div {
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -394,16 +394,16 @@
   margin-bottom: 17px;
   font-size: 11px;
 }
-.order-summary dt {
+.order-detail-summary dt {
   color: #9297a3;
   flex-shrink: 0;
 }
-.order-summary dd {
+.order-detail-summary dd {
   margin: 0;
   text-align: right;
   overflow-wrap: anywhere;
 }
-.order-summary .order-grand-total {
+.order-detail-summary .order-grand-total {
   margin: 5px 0 0;
   padding-top: 19px;
   border-top: 1px solid #303139;
@@ -420,7 +420,7 @@
 .purchase-discount {
   color: #91bfaa;
 }
-.order-summary > .button {
+.order-detail-summary > .button {
   margin-top: 20px;
 }
 .order-customer-note {
@@ -927,16 +927,16 @@
   .order-section {
     padding: 18px;
   }
-  .order-summary .purchase-cover {
+  .order-detail-summary .purchase-cover {
     width: 58px;
     height: 75px;
     flex-basis: 58px;
   }
-  .order-summary .purchase-product-copy > a,
-  .order-summary .purchase-product-copy > strong {
+  .order-detail-summary .purchase-product-copy > a,
+  .order-detail-summary .purchase-product-copy > strong {
     font-size: 13px;
   }
-  .order-summary .purchase-product-copy small {
+  .order-detail-summary .purchase-product-copy small {
     font-size: 11px;
   }
   .order-help {
