@@ -1,3 +1,4 @@
+import { useAccountCart } from "./useAccountCart";
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
@@ -87,6 +88,9 @@ type Context = {
   ready: boolean;
   mode: string;
   cart: CartItem[];
+  cartReady: boolean;
+  cartError: string;
+  retryCart: () => void;
   add: (id: string, quantity?: number) => void;
   setCart: (items: CartItem[]) => void;
   refresh: () => Promise<void>;
@@ -305,32 +309,11 @@ export function App() {
     ),
     [mobile, setMobile] = useState(false),
     [loadError, setLoadError] = useState("");
-  const [cart, setCartState] = useState<CartItem[]>(() => {
-    try {
-      const value = JSON.parse(localStorage.getItem("kn-cart") || "[]");
-      return Array.isArray(value)
-        ? value
-            .filter(
-              (x: CartItem) =>
-                typeof x.variant_id === "string" &&
-                Number.isInteger(x.quantity) &&
-                x.quantity > 0 &&
-                x.quantity <= 10,
-            )
-            .slice(0, 20)
-        : [];
-    } catch {
-      return [];
-    }
-  });
   const location = useLocation();
   const navigate = useNavigate();
   const notify = (message: string, error = false) =>
     setToast({ message, error });
-  const setCart = (items: CartItem[]) => {
-    setCartState(items);
-    localStorage.setItem("kn-cart", JSON.stringify(items));
-  };
+  const { cart, setCart, cartReady, cartError, retryCart, flushCart } = useAccountCart(user?.id, ready, notify);
   const refreshVersion = useRef(0);
   const refresh = async () => {
     const version = ++refreshVersion.current;
@@ -372,6 +355,9 @@ export function App() {
     setMobile(false);
   }, [location.pathname]);
   const add = (id: string, quantity = 1) => {
+    if (!cartReady) return notify('Giỏ hàng chưa tải xong. Vui lòng thử lại.', true);
+    if (cart.length >= 20 && !cart.some(item => item.variant_id === id))
+      return notify('Giỏ hàng tối đa 20 gói sản phẩm.', true);
     const p = products.find((p) => p.variants.some((v) => v.id === id));
     const v = p?.variants.find((v) => v.id === id);
     if (!v?.stock) return notify("Sản phẩm đã hết hàng.", true);
@@ -389,6 +375,7 @@ export function App() {
   };
   const logout = async () => {
     try {
+      await flushCart();
       await post("/auth/logout");
       setUser(null);
       navigate("/");
@@ -405,6 +392,9 @@ export function App() {
         ready,
         mode,
         cart,
+        cartReady,
+        cartError,
+        retryCart,
         add,
         setCart,
         refresh,
@@ -1034,7 +1024,7 @@ function ProductPage() {
   );
 }
 function CartPage() {
-  const { products, cart, setCart, user, login, refresh, notify } = useStore();
+  const { products, cart, setCart, cartReady, cartError, retryCart, user, login, refresh, notify } = useStore();
   const navigate = useNavigate();
   const [method, setMethod] = useState("wallet"),
     [coupon, setCoupon] = useState(""),
@@ -1103,6 +1093,7 @@ function CartPage() {
     (i) => !i.variant || i.variant.stock < i.quantity,
   );
   async function checkout() {
+    if (!cartReady) return;
     if (!user) return login();
     if (unavailable)
       return notify("Vui lòng cập nhật sản phẩm không đủ tồn kho.", true);
@@ -1127,6 +1118,9 @@ function CartPage() {
       setBusy(false);
     }
   }
+  if (!cartReady) return <div className="container page" role="status">
+    {cartError ? <><p className="form-error">{cartError}</p><button className="button" onClick={retryCart}>Tải lại giỏ hàng</button></> : <p>Đang tải giỏ hàng…</p>}
+  </div>;
   return (
     <div className="container page">
       <div className="breadcrumb">

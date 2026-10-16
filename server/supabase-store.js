@@ -357,6 +357,14 @@ export class SupabaseStore {
         : this.client.from("products").insert(fields).select().single(),
     );
   }
+  async cart(uid) {
+    const row = await this.query(this.client.from('account_carts').select('items').eq('user_id', uid).maybeSingle());
+    return row?.items || [];
+  }
+  async saveCart(uid, items) {
+    await this.query(this.client.from('account_carts').upsert({ user_id: uid, items, updated_at: new Date().toISOString() }));
+    return items;
+  }
   async saveVariant(product_id, data) {
     const { shared_key, ...fields } = data;
     return this.query(

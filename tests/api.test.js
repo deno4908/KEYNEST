@@ -65,6 +65,25 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
     body: { email: "admin@keynest.local", password: "Admin123!" },
   });
   const admin = adminLogin.cookie;
+  await t.test('account carts persist across sessions and remain isolated', async () => {
+    const uid = (await request('/me', { cookie: customer })).body.id;
+    const aid = (await request('/me', { cookie: admin })).body.id;
+    const items = [{ variant_id: randomUUID(), quantity: 2 }];
+    assert.equal((await request('/cart')).status, 401);
+    const write = (cookie, user_id, rows) => request('/cart', { method: 'PUT', cookie, body: { user_id, items: rows } });
+    assert.equal((await write(customer, uid, items)).status, 200);
+    assert.deepEqual((await request('/cart', { cookie: admin })).body.items, []);
+    assert.equal((await write(admin, uid, [])).status, 409);
+    assert.equal((await write(customer, uid, [...items, ...items])).status, 400);
+    assert.equal((await write(customer, uid, [{ ...items[0], quantity: 11 }])).status, 400);
+    assert.equal((await write(customer, uid, [{ ...items[0], price: 1 }])).status, 400);
+    const another = await request('/auth/login', { method: 'POST', body: { email: 'student@keynest.local', password: 'Student123!' } });
+    assert.deepEqual((await request('/cart', { cookie: another.cookie })).body, { user_id: uid, items });
+    assert.equal((await write(admin, aid, [{ ...items[0], quantity: 1 }])).status, 200);
+    assert.deepEqual((await request('/cart', { cookie: customer })).body.items, items);
+    assert.equal((await write(customer, uid, [])).status, 200);
+    assert.deepEqual((await request('/cart', { cookie: another.cookie })).body.items, []);
+  });
   await t.test(
     "banner publishing requires admin and rejects unsafe content links",
     async () => {

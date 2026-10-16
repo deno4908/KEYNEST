@@ -1806,6 +1806,16 @@ try {
   await db.exec('reset role');
   pass('payment route pinning, late-order review, pre-expiry static wallet credit, idempotency and browser access denial');
   }
+  {
+    await db.exec("set role service_role; insert into public.account_carts(user_id,items) select id,'[]'::jsonb from public.profiles limit 1; reset role;");
+    for (const role of ['anon', 'authenticated']) {
+      await db.exec(`set role ${role}`);
+      await fails('select * from public.account_carts');
+      await fails("update public.account_carts set items='[]'");
+      await db.exec('reset role');
+    }
+    pass('account carts are service-only and deny direct browser reads and writes');
+  }
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

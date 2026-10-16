@@ -713,6 +713,13 @@ export class DemoStore {
     this.save();
     return existing || this.db.products.at(-1);
   }
+  cart(uid) { return this.db.carts?.[uid] || []; }
+  saveCart(uid, items) {
+    this.db.carts ||= {};
+    this.db.carts[uid] = items;
+    this.save();
+    return items;
+  }
   saveVariant(product_id, data) {
     const { shared_key, ...fields } = data;
     data = fields;

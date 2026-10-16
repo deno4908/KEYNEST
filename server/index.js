@@ -625,6 +625,21 @@ app.post("/api/auth/reset", async (req, res) => {
   res.json({ message: "Mật khẩu đã được cập nhật." });
 });
 app.get("/api/me", auth, async (req, res) => res.json(req.user));
+app.get('/api/cart', auth, async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ user_id: req.user.id, items: await store.cart(req.user.id) });
+});
+app.put('/api/cart', auth, limiter(120), async (req, res) => {
+  const input = z.object({
+    user_id: uuid,
+    items: z.array(z.object({ variant_id: uuid, quantity: z.number().int().min(1).max(10) }).strict()).max(20)
+      .refine(items => new Set(items.map(i => i.variant_id)).size === items.length),
+  }).strict().parse(req.body);
+  // A queued browser write must never cross an account switch.
+  if (input.user_id !== req.user.id) throw new AppError('Tài khoản đã thay đổi. Vui lòng tải lại giỏ hàng.', 409);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.json({ user_id: req.user.id, items: await store.saveCart(req.user.id, input.items) });
+});
 app.patch("/api/me", auth, async (req, res) =>
   res.json(
     await store.updateProfile(
