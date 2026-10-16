@@ -294,8 +294,14 @@ export function AccountPage({ logout }: { logout: () => void }) {
                             to={`/orders/${order.id}`}
                             key={order.id}
                           >
-                            <span className="member-order-icon">
-                              <Package size={22} />
+                            <span className="member-order-icon member-order-cover">
+                              {order.items[0]?.product_image ? (
+                                <img
+                                  src={order.items[0].product_image}
+                                  alt={order.items[0].name}
+                                  loading="lazy"
+                                />
+                              ) : <Package size={22} />}
                             </span>
                             <div>
                               <strong>
