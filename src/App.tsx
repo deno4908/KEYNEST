@@ -1290,7 +1290,7 @@ function CartPage() {
               <span>Miễn phí</span>
             </div>
             <label className="field-title">Mã giảm giá</label>
-            <div className="input-icon">
+            <div className="input-icon checkout-coupon-field">
               <TicketIcon size={18} />
               <input
                 value={coupon}

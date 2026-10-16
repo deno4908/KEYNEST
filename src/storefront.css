@@ -1683,3 +1683,30 @@
 .offer-pagination button[aria-pressed=true] span { width: 20px; background: #f3a078; }
 @keyframes offer-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .offer-slide { animation: none; } }
+.checkout-coupon-field {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.checkout-coupon-field:focus-within {
+  border-color: #8a808b;
+  box-shadow: 0 0 0 2px #b7a8bd12;
+}
+.checkout-coupon-field:focus-within > svg {
+  color: #c7bfca;
+}
+.checkout-coupon-field > svg {
+  flex-shrink: 0;
+}
+.checkout-coupon-field input,
+.checkout-coupon-field input:focus,
+.checkout-coupon-field input:focus-visible {
+  background: transparent;
+  border: 0;
+  outline: none;
+  outline-offset: 0;
+  box-shadow: none;
+  min-width: 0;
+  caret-color: #e5e1e8;
+}
+@media (prefers-reduced-motion: reduce) {
+  .checkout-coupon-field { transition: none; }
+}
