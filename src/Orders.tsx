@@ -66,7 +66,7 @@ function useOrderData<T>(path: string) {
   return { data, setData, error, load };
 }
 
-function OrderProduct({ item }: { item: OrderItem }) {
+function OrderProduct({ item, showPreorderNote = true }: { item: OrderItem; showPreorderNote?: boolean }) {
   const { products } = useStore();
   const product = products.find((p) => p.id === item.product_id);
   return (
@@ -91,7 +91,7 @@ function OrderProduct({ item }: { item: OrderItem }) {
           Số lượng: {item.quantity} <span>·</span>{" "}
           {item.is_preorder ? 'Đặt trước' : item.delivery === "key" ? "Giao mã tự động" : "Giao dịch vụ"}
         </small>
-        <PreorderNote item={item} />
+        {showPreorderNote && <PreorderNote item={item} />}
       </div>
       <strong className="purchase-line-price">
         {money(item.price * item.quantity)}
@@ -589,7 +589,7 @@ function OrderDetails({ id }: { id: string }) {
             </div>
             <div className="purchase-items">
               {order.items.map((i) => (
-                <OrderProduct key={i.id} item={i} />
+                <OrderProduct key={i.id} item={i} showPreorderNote={false} />
               ))}
             </div>
             <dl>
