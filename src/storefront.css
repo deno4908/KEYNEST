@@ -1686,6 +1686,10 @@
 .checkout-coupon-field {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
+.checkout-coupon-field + p[role="status"] {
+  margin-top: 10px;
+  line-height: 1.6;
+}
 .checkout-coupon-field:focus-within {
   border-color: #8a808b;
   box-shadow: 0 0 0 2px #b7a8bd12;
