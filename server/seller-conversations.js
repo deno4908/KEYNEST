@@ -40,7 +40,7 @@ export async function sellerConversation(
     ? new Date(Date.parse(item.delivered_at) + 48 * 3600000).toISOString()
     : null;
   const canRequest =
-    user.role !== "admin" &&
+    (actor === order.user_id || (actor === item.seller_id && user.role !== 'admin')) &&
     ["processing", "completed"].includes(order.status) &&
     !item.seller_settled_at &&
     !item.seller_reversed_at &&

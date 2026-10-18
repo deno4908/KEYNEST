@@ -1485,7 +1485,11 @@ try {
   await sellerCommand(sid,'fulfill',{item_id:escrowItem,keys:[{secret:'escrow-test-delivered',hash:randomUUID()}]});
   await scalar('select release_seller_funds($1)',[sid]);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
+  await fails('select seller_conversation($1,$2,$3,$4)',[other,escrowItem,'request','Observer cannot request a refund']);
+  await db.query("update profiles set role='admin' where id=$1",[user]);
+  assert.equal((await chat(user,escrowItem)).can_request,true);
   const disputed = await chat(user,escrowItem,'request','The delivered product cannot be used');
+  await db.query("update profiles set role='customer' where id=$1",[user]);
   assert.equal(disputed.dispute.status,'open');
   await scalar('select seller_support($1,$2,$3)',[sid,disputed.dispute.ticket_id,'Seller support reply for the buyer']);
   assert.equal((await scalar('select seller_support($1)',[sid])).find(t=>t.id===disputed.dispute.ticket_id).messages.at(-1).role,'seller');

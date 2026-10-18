@@ -418,6 +418,7 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   try {
     const adminBuyer = (await req(`/order-chat/${escrowItem.id}`, null, buyer.cookie)).body;
     assert.equal(adminBuyer.can_message, true);
+    assert.equal(adminBuyer.can_request, true);
     assert.equal(adminBuyer.viewer_role, 'customer');
     const sent = await req(`/order-chat/${escrowItem.id}`, { action: 'message', body: 'Admin purchasing as a customer', request_id: randomUUID() }, buyer.cookie);
     assert.equal(sent.status, 200);
@@ -444,16 +445,13 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
       .messages.length,
     1,
   );
-  assert.equal(
-    (
-      await req(
-        `/order-chat/${escrowItem.id}`,
-        { action: "request", body: "Product delivery needs a refund review" },
-        buyer.cookie,
-      )
-    ).status,
-    200,
-  );
+  assert.equal((await req(`/order-chat/${escrowItem.id}`, { action: 'request', body: 'Observer cannot request a refund' }, admin.cookie)).status, 409);
+  buyerProfile.role = 'admin';
+  try {
+    assert.equal((await req(`/order-chat/${escrowItem.id}`, { action: 'request', body: 'Product delivery needs a refund review' }, buyer.cookie)).status, 200);
+  } finally {
+    buyerProfile.role = originalRole;
+  }
   assert.equal(
     (
       await req(
