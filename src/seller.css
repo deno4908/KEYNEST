@@ -93,7 +93,32 @@
 }
 .seller-sale-detail {
   display: grid;
-  gap: 12px;
+  gap: 20px;
+}
+.seller-sale-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-width:220px; }
+.seller-sale-actions .badge { flex-basis:auto; white-space:nowrap; }
+.modal.seller-sale-modal { width:min(720px,calc(100vw - 32px)); }
+.seller-sale-modal .modal-title h2 { font-size:20px; overflow-wrap:anywhere; }
+.seller-sale-product { display:flex; align-items:center; flex-wrap:wrap; gap:14px; padding:18px; background:#202127; border:1px solid #32343c; border-radius:12px; }
+.seller-sale-product-icon { display:grid; place-items:center; width:48px; height:48px; flex-shrink:0; border-radius:12px; background:#ff704514; color:#ff9c78; }
+.seller-sale-product > div { flex:1; min-width:140px; overflow-wrap:anywhere; }
+.seller-sale-detail h3 { margin:0; font-size:15px; line-height:1.6; }
+.seller-sale-product p { margin:5px 0 0; font-size:12px; color:#a6adba; line-height:1.7; }
+.seller-sale-section { border:1px solid #32343c; border-radius:12px; padding:18px; min-width:0; }
+.seller-sale-section > h3 { margin-bottom:16px; }
+.seller-sale-finance { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:0; }
+.seller-sale-detail dt { font-size:12px; color:#a6adba; line-height:1.6; }
+.seller-sale-detail dd { margin:6px 0 0; font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+.seller-sale-finance > div:last-child dd { color:#9cd5b2; }
+.seller-sale-facts { display:grid; gap:14px; margin:0; }
+.seller-sale-facts > div { display:flex; align-items:baseline; justify-content:space-between; gap:20px; }
+.seller-sale-facts dd { margin:0; text-align:right; font-size:13px; }
+@media(max-width:480px) {
+ .seller-sale-product,.seller-sale-section { padding:14px; }
+ .seller-sale-finance { grid-template-columns:1fr; gap:12px; }
+ .seller-sale-finance > div { display:flex; justify-content:space-between; gap:12px; }
+ .seller-sale-finance dd { margin:0; }
+ .seller-sale-product > .badge { margin-left:62px; }
 }
 .seller-preserve {
   white-space: pre-wrap;

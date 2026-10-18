@@ -733,9 +733,10 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                       </p>
                     </td>
                     <td>
+                      <div className="seller-sale-actions">
                       <OrderChatButton itemId={s.id} label="Chat" />
                       {s.delivered_at ? (
-                        "Đã giao"
+                        <span className="badge status-completed">Đã giao</span>
                       ) : waiting(s) ? (
                         <button
                           className="button button-small"
@@ -753,11 +754,12 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                         "—"
                       )}
                       <button
-                        className="seller-text-button"
+                        className="button button-small button-outline"
                         onClick={() => setDetail(s.id)}
                       >
                         Chi tiết
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1112,32 +1114,41 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       {selectedSale && (
         <Modal
           title={`Đơn ${selectedSale.order.number}`}
+          className="seller-sale-modal"
           close={() => setDetail(null)}
         >
           <div className="seller-sale-detail">
-            <h3>
-              {selectedSale.name} · {selectedSale.variant_name}
-            </h3>
-            <p>
-              Số lượng: {selectedSale.quantity} ·{" "}
-              {statuses[selectedSale.order.status]}
-            </p>
-            <p>Đặt lúc {date(selectedSale.order.created_at)}</p>
+            <div className="seller-sale-product">
+              <span className="seller-sale-product-icon"><Package size={28} /></span>
+              <div><h3>{selectedSale.name}</h3><p>{selectedSale.variant_name} · Số lượng: {selectedSale.quantity}</p></div>
+              <span className={`badge status-${selectedSale.order.status}`}>{statuses[selectedSale.order.status] || selectedSale.order.status}</span>
+            </div>
+            <section className="seller-sale-section">
+              <h3>Doanh thu của sản phẩm</h3>
+              <dl className="seller-sale-finance">
+                <div><dt>Doanh thu</dt><dd>{selectedSale.seller_gross != null ? money(selectedSale.seller_gross) : '—'}</dd></div>
+                <div><dt>Phí nền tảng</dt><dd>{selectedSale.seller_fee != null ? money(selectedSale.seller_fee) : '—'}</dd></div>
+                <div><dt>Thực nhận</dt><dd>{selectedSale.seller_net != null ? money(selectedSale.seller_net) : '—'}</dd></div>
+              </dl>
+              {selectedSale.seller_reversed_at ? <p className="info-note">Khoản thu đã được thu hồi.</p> : selectedSale.seller_frozen && <p className="info-note">Khoản thu đang bị giữ để chờ xử lý.</p>}
+            </section>
+            <section className="seller-sale-section">
+            <h3>Thông tin giao hàng</h3>
+            <dl className="seller-sale-facts">
+              <div><dt>Ngày đặt hàng</dt><dd>{date(selectedSale.order.created_at)}</dd></div>
+              <div><dt>Hình thức giao</dt><dd>{selectedSale.delivery === 'manual' ? 'Người bán giao hàng' : 'Giao tự động'}</dd></div>
+              <div><dt>Giao hàng</dt><dd>{selectedSale.delivered_at ? date(selectedSale.delivered_at) : 'Chưa giao'}</dd></div>
+              <div><dt>Bảo hành</dt><dd>{selectedSale.warranty_days ? `${selectedSale.warranty_days} ngày` : 'Không bảo hành theo ngày'}</dd></div>
+            </dl>
             <PreorderNote item={selectedSale} />
-            <p>
-              Giao hàng:{" "}
-              {selectedSale.delivered_at
-                ? date(selectedSale.delivered_at)
-                : "Chưa giao"}
-            </p>
-            <p>Bảo hành: {selectedSale.warranty_days ?? 0} ngày</p>
+            </section>
             {selectedSale.order.customer_note && (
-              <>
-                <strong>Thông tin khách cung cấp</strong>
+              <section className="seller-sale-section">
+                <h3>Thông tin khách cung cấp</h3>
                 <p className="seller-preserve">
                   {selectedSale.order.customer_note}
                 </p>
-              </>
+              </section>
             )}
             {waiting(selectedSale) && (
               <button
