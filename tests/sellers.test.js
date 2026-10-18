@@ -488,6 +488,15 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   );
   const buyerUser = store.db.users.find((u) => u.id === escrowOrder.user_id),
     beforeRefund = buyerUser.balance;
+  // Actor identity must come from the authenticated session, never JSON fields.
+  for (const field of ['p_actor', 'seller_id', 'user_id', 'role']) {
+    const forged = await req(`/order-chat/${escrowItem.id}`, {
+      action: 'agree', [field]: field === 'role' ? 'seller' : escrowItem.seller_id,
+    }, buyer.cookie);
+    assert.equal(forged.status, 400);
+    assert.equal(buyerUser.balance, beforeRefund);
+    assert.equal(store.db.seller_disputes.find(d => d.item_id === escrowItem.id).status, 'open');
+  }
   // Hiding admin controls in the UI is not authorization: call every privileged
   // action directly with both conversation participants' valid sessions.
   for (const cookie of [buyer.cookie, login.cookie]) {
@@ -511,6 +520,13 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
     200,
   );
   assert.equal(buyerUser.balance, beforeRefund + escrowOrder.total);
+  for (const cookie of [buyer.cookie, login.cookie]) {
+    assert.equal((await req(`/order-chat/${escrowItem.id}`, { action: 'agree' }, cookie)).status, 409);
+    assert.equal((await req(`/order-chat/${escrowItem.id}`, {
+      action: 'request', body: 'Try to request a second refund for the same product',
+    }, cookie)).status, 409);
+    assert.equal(buyerUser.balance, beforeRefund + escrowOrder.total);
+  }
   assert.equal(owner.balance, beforeHold);
   assert.equal(
     (

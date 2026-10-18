@@ -1523,6 +1523,11 @@ try {
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
   assert.equal((await chat(user,escrowItem)).dispute.status,'refunded');
   await fails('select seller_conversation($1,$2,$3,$4)',[other,escrowItem,'refund','Duplicate refund should never credit']);
+  for (const actor of [user,sid]) {
+    await fails('select seller_conversation($1,$2,$3)',[actor,escrowItem,'agree']);
+    await fails('select seller_conversation($1,$2,$3,$4)',[actor,escrowItem,'request','Cannot refund the same product twice']);
+    assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),buyerBalance+100000);
+  }
   await scalar('select release_seller_funds($1)',[sid]);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
   const rejectedOrder = await newSale();
