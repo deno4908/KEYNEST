@@ -184,10 +184,10 @@ export class SupabaseStore {
         .map((i) => ({
           ...i,
           key_ids: inv
-            .filter((k) => k.order_id === o.id && k.item_id === i.id)
+            .filter((k) => !i.refunded_at && k.order_id === o.id && k.item_id === i.id)
             .map((k) => k.id),
           keys: inv
-            .filter((k) => k.order_id === o.id && k.item_id === i.id)
+            .filter((k) => !i.refunded_at && k.order_id === o.id && k.item_id === i.id)
             .map((k) => decrypt(k.secret, this.key)),
         })),
     }));

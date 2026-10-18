@@ -451,7 +451,7 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
     assert.equal((await req(`/order-chat/${escrowItem.id}`, { action: 'request', body: 'Product delivery needs a refund review' }, buyer.cookie)).status, 200);
     const inbox = (await req('/notifications?page_size=1', null, login.cookie)).body;
     assert.equal(inbox.unread_order_count, inbox.unread_chat_count + 1);
-    const notice = store.db.notifications.find(n => n.id === `seller-refund:${escrowOrder.id}`);
+    const notice = store.db.notifications.find(n => n.id === `seller-refund:${escrowItem.id}`);
     assert.equal(notice.user_id, escrowItem.seller_id);
     assert.equal(notice.href, '/seller?tab=sales');
   } finally {
@@ -466,16 +466,6 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
       )
     ).status,
     403,
-  );
-  assert.equal(
-    (
-      await req(
-        `/order-chat/${escrowItem.id}`,
-        { action: "agree" },
-        login.cookie,
-      )
-    ).body.dispute.status,
-    "agreed",
   );
   const beforeHold = owner.balance;
   mature(escrowOrder);
@@ -507,18 +497,15 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
       }, cookie)).status, 403);
       assert.equal(buyerUser.balance, beforeRefund);
       assert.equal(owner.balance, beforeHold);
-      assert.equal(store.db.seller_disputes.find(d => d.order_id === escrowOrder.id).status, 'agreed');
+      assert.equal(store.db.seller_disputes.find(d => d.order_id === escrowOrder.id).status, 'open');
     }
   }
   assert.equal(
     (
       await req(
         `/order-chat/${escrowItem.id}`,
-        {
-          action: "refund",
-          body: "Confirmed refund after reviewing the order",
-        },
-        admin.cookie,
+        { action: "agree" },
+        login.cookie,
       )
     ).status,
     200,

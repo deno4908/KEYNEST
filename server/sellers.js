@@ -100,7 +100,7 @@ export function createSellers(store) {
         !item ||
         order.status !== "processing" ||
         item.delivery !== "manual" ||
-        item.delivered_at
+        item.delivered_at || item.refunded_at
       )
         throw new AppError("Không có gói đang chờ giao của bạn.", 409);
       if (data.secrets.length !== item.quantity)
@@ -114,7 +114,7 @@ export function createSellers(store) {
           secret: encrypt(secret, store.key),
         });
       item.delivered_at = new Date().toISOString();
-      if (order.items.every((i) => i.delivered_at)) {
+      if (order.items.every((i) => i.delivered_at || i.refunded_at)) {
         order.status = "completed";
         store.stampDelivery(order);
       }
@@ -181,7 +181,7 @@ export function createSellers(store) {
             (o) =>
               o.id === t.order_id &&
               o.items.length &&
-              o.items.every((i) => i.seller_id === uid),
+              (t.refund_item_id ? o.items.some(i => i.id === t.refund_item_id && i.seller_id === uid) : o.items.every((i) => i.seller_id === uid)),
           ),
       );
       if (body !== null) {
@@ -221,6 +221,7 @@ export function createSellers(store) {
           updated_at,
           messages,
           order_id,
+          refund_item_id,
         }) => ({
           id,
           subject,
@@ -230,6 +231,8 @@ export function createSellers(store) {
           created_at,
           updated_at,
           messages: messages || [],
+          refund_item_id,
+          refund: (() => { const d = store.db.seller_disputes?.find(d=>d.item_id===refund_item_id); return d ? {...d,response_due_at:new Date(Date.parse(d.created_at)+48*3600000).toISOString(),needs_admin:['open','agreed'].includes(d.status)&&Date.parse(d.created_at)+48*3600000<=Date.now()} : null; })(),
           order_number: store.db.orders.find((o) => o.id === order_id)?.number,
         }),
       );
@@ -334,7 +337,7 @@ export function createSellers(store) {
           ? await all(() =>
               store.client
                 .from("seller_disputes")
-                .select("order_id,status")
+                .select("order_id,item_id,status")
                 .in("order_id", orderIds)
                 .order("order_id"),
             )
@@ -342,7 +345,7 @@ export function createSellers(store) {
       for (const sale of sales) {
         sale.seller_frozen = disputes.some(
           (d) =>
-            d.order_id === sale.order_id &&
+            d.item_id === sale.id &&
             ["open", "agreed"].includes(d.status),
         );
         sale.seller_hold_until = sale.delivered_at

@@ -1497,7 +1497,7 @@ try {
   const disputed = await chat(user,escrowItem,'request','The delivered product cannot be used');
   await db.query("update profiles set role='customer' where id=$1",[user]);
   assert.equal(disputed.dispute.status,'open');
-  const refundNotice = await scalar("select row_to_json(n) from notifications n where id=$1",['seller-refund:'+escrowOrder]);
+  const refundNotice = await scalar("select row_to_json(n) from notifications n where id=$1",['seller-refund:'+escrowItem]);
   assert.equal(refundNotice.user_id,sid);
   assert.equal(refundNotice.read_at,null);
   assert.equal(refundNotice.href,'/seller?tab=sales');
@@ -1505,10 +1505,9 @@ try {
   assert.equal((await scalar('select seller_support($1)',[sid])).find(t=>t.id===disputed.dispute.ticket_id).messages.at(-1).role,'seller');
   await fails('select seller_support($1,$2,$3)',[outsider,disputed.dispute.ticket_id,'Not my support request']);
   await fails('select seller_conversation($1,$2,$3)',[user,escrowItem,'agree']);
-  await chat(sid,escrowItem,'agree');
   await mature(escrowOrder);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
-  assert.equal((await chat(user,escrowItem)).dispute.status,'agreed');
+  assert.equal((await chat(user,escrowItem)).dispute.status,'open');
   await fails('select seller_conversation($1,$2,$3,$4)',[sid,escrowItem,'reject','Cannot self resolve this dispute']);
   const buyerBalance = Number(await scalar('select balance from profiles where id=$1',[user]));
   for (const participant of [user, sid]) {
@@ -1516,10 +1515,10 @@ try {
       await fails('select seller_conversation($1,$2,$3,$4)', [participant, escrowItem, action, 'Participant cannot resolve their own dispute']);
       assert.equal(Number(await scalar('select balance from profiles where id=$1', [user])), buyerBalance);
       assert.equal(Number(await scalar('select balance from profiles where id=$1', [sid])), balance);
-      assert.equal((await chat(user, escrowItem)).dispute.status, 'agreed');
+      assert.equal((await chat(user, escrowItem)).dispute.status, 'open');
     }
   }
-  await chat(other,escrowItem,'refund','Confirmed failure after checking evidence');
+  await chat(sid,escrowItem,'agree');
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),buyerBalance+100000);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);
   assert.equal((await chat(user,escrowItem)).dispute.status,'refunded');
@@ -1529,7 +1528,7 @@ try {
   const rejectedOrder = await newSale();
   const rejectedItem = await scalar('select id from order_items where order_id=$1',[rejectedOrder]);
   await chat(sid,rejectedItem,'request','Seller requests a review before delivery');
-  assert.equal((await chat(user,rejectedItem,'agree')).dispute.status,'agreed');
+  assert.equal((await chat(user,rejectedItem)).dispute.can_agree,true);
   await chat(other,rejectedItem,'reject','Evidence confirms delivery can proceed');
   await db.query("update order_items set delivered_at=clock_timestamp()-interval '47 hours 59 minutes' where id=$1",[rejectedItem]);
   await scalar('select release_seller_funds($1)',[sid]);
@@ -1552,13 +1551,59 @@ try {
   await chat(outsider,privateItem,'request','Private refund reason for the other shop');
   const redacted=await chat(sid,siblingItem);
   assert.equal(redacted.messages.length,0);
-  assert.equal(redacted.dispute.status,'open');
-  assert.equal(redacted.dispute.reason,undefined);
+  assert.equal(redacted.dispute,null);
   assert.equal((await scalar('select seller_support($1)',[sid])).some(t=>t.order_number===redacted.order_number),false);
   await mature(multiSellerOrder);
-  assert.equal(await scalar('select seller_settled_at from order_items where id=$1',[siblingItem]),null);
+  assert.ok(await scalar('select seller_settled_at from order_items where id=$1',[siblingItem]));
   await chat(other,privateItem,'refund','Refund all items after reviewing both shops');
-  assert.equal(await scalar('select status from orders where id=$1',[multiSellerOrder]),'refunded');
+  assert.notEqual(await scalar('select status from orders where id=$1',[multiSellerOrder]),'refunded');
+  assert.equal(Number(await scalar('select refund_amount from order_items where id=$1',[privateItem])),100000);
+  assert.equal(Number(await scalar('select refund_amount from order_items where id=$1',[siblingItem])),0);
+  const failsInTransaction=async (...args)=>{
+    await db.exec('savepoint expected_failure');
+    await fails(...args);
+    await db.exec('rollback to savepoint expected_failure');
+  };
+  await db.exec('begin');
+  const itemOrder = await scalar('select create_order($1,$2,$3)', [user, JSON.stringify({...sellerPayload,items:[{variant_id:sellerVariant,quantity:1},{variant_id:secondVariant,quantity:1}]}),randomUUID()]);
+  // Exercise a discount that cannot be split evenly between the two items.
+  await db.query('update orders set total=199999,discount=1 where id=$1',[itemOrder]);
+  const itemIds=(await db.query('select id from order_items where order_id=$1 order by id',[itemOrder])).rows.map(i=>i.id);
+  const beforeItems=Number(await scalar('select balance from profiles where id=$1',[user]));
+  await chat(sid,itemIds[0],'request','Seller proposes refund of this product only');
+  await chat(user,itemIds[1],'request','Buyer requests refund of the second product');
+  assert.equal((await scalar('select seller_support($1)',[sid])).filter(t=>t.refund_item_id && itemIds.includes(t.refund_item_id)).length,2);
+  await chat(user,itemIds[0],'agree');
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),beforeItems+99999);
+  assert.equal(await scalar('select refunded_at from order_items where id=$1',[itemIds[1]]),null);
+  await failsInTransaction('select seller_conversation($1,$2,$3)',[user,itemIds[0],'agree']);
+  await db.query("update seller_disputes set created_at=now()-interval '49 hours' where item_id=$1",[itemIds[1]]);
+  const overdue=await chat(sid,itemIds[1]);
+  assert.equal(overdue.dispute.needs_admin,true);
+  assert.equal(overdue.dispute.can_agree,false);
+  await failsInTransaction('select seller_conversation($1,$2,$3)',[sid,itemIds[1],'agree']);
+  await failsInTransaction('select resolve_warranty_refund($1,$2,$3,$4,$5,$6)',[itemOrder,overdue.dispute.ticket_id,other,'wallet','Must not convert item request into whole order refund','']);
+  await chat(other,itemIds[1],'refund','Admin resolves the overdue product request');
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),beforeItems+199999);
+  assert.equal(await scalar('select status from orders where id=$1',[itemOrder]),'refunded');
+  await db.exec('rollback');
+  await db.exec('begin');
+  const partialOrder=await scalar('select create_order($1,$2,$3)',[user,JSON.stringify({...sellerPayload,items:[{variant_id:sellerVariant,quantity:1},{variant_id:secondVariant,quantity:1}]}),randomUUID()]);
+  const partialItems=(await db.query('select id from order_items where order_id=$1 order by id',[partialOrder])).rows.map(i=>i.id);
+  const beforePartial=Number(await scalar('select balance from profiles where id=$1',[user]));
+  await chat(user,partialItems[0],'request','Refund first product before delivery');
+  await chat(other,partialItems[0],'refund','Admin can intervene before the response deadline');
+  await scalar('select fulfill_order($1,$2)',[partialOrder,JSON.stringify([{secret:'remaining-only',hash:randomUUID()}])]);
+  assert.equal(Number(await scalar('select count(*) from inventory where item_id=$1',[partialItems[0]])),0);
+  const remainingTicket=randomUUID();
+  await db.query("insert into tickets(id,user_id,order_id,kind,subject,message) values($1,$2,$3,'warranty','Remaining order refund','Review remaining purchase')",[remainingTicket,user,partialOrder]);
+  await scalar('select resolve_warranty_refund($1,$2,$3,$4,$5,$6)',[partialOrder,remainingTicket,other,'wallet','Refund the remaining paid amount only','']);
+  assert.equal(Number(await scalar('select balance from profiles where id=$1',[user])),beforePartial+200000);
+  await db.exec('rollback');
+  await db.exec('set role service_role');
+  await fails('select complete_item_refund($1,$2,$3)',[privateItem,other,'Cannot call internal refund helper directly']);
+  await db.exec('reset role');
+  pass('item refunds isolate same-seller products, allocate discount rounding, credit once, escalate after 48h, allow early admin intervention and refund only the remaining order balance');
   for(const role of ['anon','authenticated']) {
     await db.exec(`set role ${role}`);
     await fails('select * from seller_chat_messages');

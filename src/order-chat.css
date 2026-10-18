@@ -19,6 +19,12 @@
 .order-chat-empty > svg { color:#ff9c78; }
 .order-chat-tools { flex-shrink:0; max-height:35%; overflow-y:auto; padding:0 16px max(12px,env(safe-area-inset-bottom)); }
 .order-chat-tools:empty { display:none; }
+.order-dispute-card { margin:12px 0 0; padding:16px; border:1px solid #574333; border-radius:12px; background:#ff704508; }
+.order-dispute-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; font-size:14px; }
+.order-dispute-heading > span { color:#ffad8d; font-weight:600; }
+.order-dispute-card > small { display:block; margin-top:8px; line-height:1.6; }
+.order-dispute-card > p { font-size:12px; line-height:1.8; margin:12px 0; color:#c4c7d0; }
+.order-dispute-card > .button { width:100%; white-space:normal; font-size:13px; margin-top:8px; }
 .order-chat-tools.order-chat-tools-expanded { flex:1; min-height:0; max-height:none; padding:20px; }
 .order-refund-form { display:grid; gap:20px; }
 .order-refund-amount { display:grid; gap:8px; padding:20px; border:1px solid #38343a; border-radius:14px; background:#ff704508; }

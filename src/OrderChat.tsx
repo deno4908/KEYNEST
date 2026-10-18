@@ -13,6 +13,11 @@ export type SellerDispute = {
   status: string;
   resolution?: string;
   can_agree?: boolean;
+  amount?: number;
+  created_at?: string;
+  response_due_at?: string;
+  needs_admin?: boolean;
+  can_resolve?: boolean;
 };
 type Conversation = {
   viewer_role?: string;
@@ -22,13 +27,16 @@ type Conversation = {
   order_number: string;
   order_status: string;
   order_total: number;
+  refund_amount: number;
+  quantity: number;
+  variant_name: string;
   can_request: boolean;
   dispute: SellerDispute | null;
   messages: { id: string; body: string; role: string; created_at: string }[];
 };
 const state: Record<string, string> = {
   open: "Đang chờ phản hồi",
-  agreed: "Hai bên đã đồng ý · chờ admin đối soát",
+  agreed: "Đang xử lý hoàn tiền",
   rejected: "Admin đã từ chối yêu cầu",
   refunded: "Đã hoàn tiền",
 };
@@ -205,16 +213,18 @@ export function OrderChat({
           </>}
           <div className={`order-chat-tools${requesting ? ' order-chat-tools-expanded' : ''}`}>
           {data.dispute && (
-            <section className="panel">
-              <strong>{state[data.dispute.status]}</strong>
+            <section className="order-dispute-card">
+              <div className="order-dispute-heading"><strong>{data.dispute.needs_admin ? 'Quá 48 giờ · Chờ admin' : state[data.dispute.status]}</strong><span>{money(data.dispute.amount ?? data.refund_amount)}</span></div>
+              <small>{data.name} · {data.variant_name} · Số lượng: {data.quantity}</small>
               {data.dispute.reason && (
                 <p className="seller-preserve">{data.dispute.reason}</p>
               )}
               {data.dispute.resolution && <p>{data.dispute.resolution}</p>}
               {pending && (
                 <p>
-                  Tiền của đơn đang bị giữ đến khi admin giải quyết, kể cả đã
-                  qua 48 giờ. Hoàn tiền áp dụng cho toàn bộ đơn.
+                  Chỉ giữ tiền sản phẩm này. Hai bên đồng ý sẽ hoàn vào ví người mua.
+                  {data.dispute.response_due_at && <> Hạn phản hồi: {date(data.dispute.response_due_at)}.</>}
+                  {' '}Admin có thể can thiệp sớm; quá 48 giờ chưa xử lý sẽ chờ admin.
                 </p>
               )}
               {pending &&
@@ -225,7 +235,7 @@ export function OrderChat({
                     disabled={busy}
                     onClick={() => void send("agree")}
                   >
-                    Đồng ý đề nghị hoàn tiền, chuyển admin
+                    Đồng ý hoàn {money(data.dispute.amount ?? data.refund_amount)} vào ví
                   </button>
                 )}
             </section>
@@ -246,8 +256,8 @@ export function OrderChat({
                 void send("request");
               }}
             >
-              <div className="order-refund-amount"><span>Số tiền đề nghị hoàn</span><strong>{money(data.order_total)}</strong><small>Áp dụng cho toàn bộ đơn hàng</small></div>
-              <p className="order-refund-note">Khoản tiền của người bán sẽ được tạm giữ khi gửi yêu cầu. Admin sẽ kiểm tra tất cả sản phẩm trong đơn, kể cả đơn có nhiều người bán, trước khi quyết định hoàn tiền.</p>
+              <div className="order-refund-amount"><span>Số tiền đề nghị hoàn</span><strong>{money(data.refund_amount)}</strong><small>{data.name} · {data.variant_name} · Số lượng: {data.quantity}</small></div>
+              <p className="order-refund-note">Chỉ yêu cầu hoàn sản phẩm này, theo số tiền thực trả sau giảm giá. Khi bên còn lại đồng ý, tiền tự động hoàn vào ví người mua. Yêu cầu chưa xử lý sau 48 giờ sẽ chờ admin; admin cũng có thể can thiệp sớm.</p>
               <label>
                 Lý do yêu cầu
                 <textarea
@@ -268,7 +278,7 @@ export function OrderChat({
               </div>
             </form>
           )}
-          {admin && pending && (
+          {admin && data.dispute?.can_resolve && pending && (
             <form
               className="form panel"
               onSubmit={(e) => {
@@ -286,7 +296,7 @@ export function OrderChat({
                 >
                   <option value="">Chọn phương án</option>
                   <option value="refund">
-                    Hoàn toàn bộ đơn vào ví người mua
+                    Hoàn sản phẩm này vào ví người mua
                   </option>
                   <option value="reject">
                     Từ chối hoàn tiền, bỏ đóng băng
@@ -295,8 +305,7 @@ export function OrderChat({
               </label>
               {decision === "refund" && (
                 <p>
-                  Hoàn {money(data.order_total)} cho toàn bộ đơn, gồm cả các sản
-                  phẩm của người bán khác. Chỉ xác nhận sau khi đối soát đầy đủ.
+                  Hoàn {money(data.dispute?.amount ?? data.refund_amount)} cho sản phẩm {data.name}. Các sản phẩm khác giữ nguyên.
                 </p>
               )}
               <label>

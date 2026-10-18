@@ -95,6 +95,18 @@
   display: grid;
   gap: 20px;
 }
+.seller-support-card { padding:24px; border-radius:14px; }
+.seller-support-card-heading { display:flex; align-items:center; flex-wrap:wrap; gap:14px; }
+.seller-support-card-icon { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:#ff704514; color:#ffae8d; flex-shrink:0; }
+.seller-support-card-heading > div { flex:1; min-width:160px; }
+.seller-support-card-heading small { color:#a9adba; font-size:10px; letter-spacing:1px; }
+.seller-support-card-heading h3 { margin:6px 0 0; font-size:16px; line-height:1.6; overflow-wrap:anywhere; }
+.seller-support-preview { padding:14px 16px; background:#14161a; border-radius:10px; color:#c6c9d2; font-size:13px; line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere; max-height:130px; overflow-y:auto; margin:18px 0; }
+.seller-support-meta { display:flex; flex-wrap:wrap; gap:12px 24px; font-size:12px; color:#a3a8b5; }
+.seller-support-meta strong { color:#e4e5ed; font-weight:500; }
+.seller-support-deadline { color:#dfb38d; font-size:12px; line-height:1.8; padding:12px 0; }
+.seller-support-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; border-top:1px solid #30323a; padding-top:16px; margin-top:18px; }
+@media(max-width:600px) { .seller-support-card { padding:18px; } .seller-support-footer .button { width:100%; } }
 .seller-sale-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; min-width:220px; }
 .seller-sale-actions .badge { flex-basis:auto; white-space:nowrap; }
 .modal.seller-sale-modal { width:min(720px,calc(100vw - 32px)); }

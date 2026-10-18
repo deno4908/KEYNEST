@@ -101,7 +101,7 @@ export function settleSellerRevenue(store, order, reverse = false) {
         item.seller_reversed_at ||
         store.db.seller_disputes?.some(
           (d) =>
-            d.order_id === order.id && ["open", "agreed"].includes(d.status),
+            d.item_id === item.id && ["open", "agreed"].includes(d.status),
         )
       )
         continue;

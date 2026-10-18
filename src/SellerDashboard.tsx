@@ -1,4 +1,4 @@
-import { OrderChatButton } from "./OrderChat";
+import { OrderChat, OrderChatButton, type SellerDispute } from "./OrderChat";
 import { PreorderNote } from './PreorderNote';
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -12,6 +12,7 @@ import {
   Upload,
   Download,
   RefreshCw,
+  MessageCircle,
 } from "lucide-react";
 import { api, post, money, date, statuses, categories } from "./api";
 import { Loading, Modal, useStore } from "./App";
@@ -30,7 +31,7 @@ const fold = (s: string) =>
     .toLowerCase();
 const stock = (p: Product) => p.variants.reduce((sum, v) => sum + v.stock, 0);
 const waiting = (s: Sale) =>
-  s.delivery === "manual" && !s.delivered_at && s.order.status === "processing";
+  s.delivery === "manual" && !s.delivered_at && !s.refunded_at && s.order.status === "processing";
 function exportCsv(name: string, rows: (string | number)[][]) {
   const csv = rows
     .map((row) =>
@@ -86,7 +87,7 @@ function Pages({
   );
 }
 type Action = { endpoint: string; title: string; quantity?: number };
-type Support = Ticket & { order_number: string };
+type Support = Ticket & { order_number: string; refund_item_id?: string; refund?: SellerDispute };
 
 export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   const location = useLocation();
@@ -968,14 +969,16 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                   fold(`${t.subject} ${t.order_number}`).includes(fold(query)),
               )
               .map((t) => (
-                <article className="panel" key={t.id}>
-                  <div className="section-title">
-                    <strong>{t.subject}</strong>
-                    <span>{statuses[t.status]}</span>
+                <article className="panel seller-support-card" key={t.id}>
+                  <div className="seller-support-card-heading">
+                    <span className="seller-support-card-icon"><MessageCircle size={22} /></span>
+                    <div><small>{t.refund_item_id ? 'HOÀN TIỀN SẢN PHẨM' : 'TRAO ĐỔI ĐƠN HÀNG'}</small><h3>{t.subject}</h3></div>
+                    <span className={`badge status-${t.status}`}>{t.refund?.needs_admin ? 'Chờ admin' : t.refund?.status === 'refunded' ? 'Đã hoàn tiền' : t.refund?.status === 'rejected' ? 'Đã từ chối' : statuses[t.status]}</span>
                   </div>
-                  <p>
-                    {t.order_number} · {date(t.updated_at || t.created_at)}
-                  </p>
+                  <p className="seller-support-preview">{t.message}</p>
+                  <div className="seller-support-meta"><span>Đơn <strong>{t.order_number}</strong></span><span>Gửi lúc {date(t.created_at)}</span>{t.refund?.amount != null && <span>Số tiền <strong>{money(t.refund.amount)}</strong></span>}</div>
+                  {t.refund?.status === 'open' && <p className="seller-support-deadline">{t.refund.needs_admin ? 'Đã quá 48 giờ. Yêu cầu đang chờ admin xử lý.' : `Phản hồi trước ${date(t.refund.response_due_at!)}. Đồng ý sẽ tự hoàn tiền sản phẩm vào ví người mua.`}</p>}
+                  <div className="seller-support-footer">
                   <button
                     className="button button-outline"
                     onClick={() => {
@@ -983,8 +986,10 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                       setReply("");
                     }}
                   >
-                    Xem trao đổi
+                    {t.refund_item_id ? 'Xem yêu cầu & trao đổi' : 'Xem trao đổi'} <Arrow />
                   </button>
+                  <small>{t.messages?.length || 0} phản hồi</small>
+                  </div>
                 </article>
               ))}
             {!tickets.length && !supportError && (
@@ -1172,6 +1177,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         </Modal>
       )}
       {selectedTicket && (
+        selectedTicket.refund_item_id ? <OrderChat itemId={selectedTicket.refund_item_id} close={() => setTicketId(null)} /> :
         <Modal
           title={selectedTicket.subject}
           close={() => !busy && setTicketId(null)}

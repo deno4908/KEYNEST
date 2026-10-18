@@ -345,8 +345,10 @@ export function AdminSellers() {
         <>
           <section>
             {data.disputes?.map((d) => (
-              <article className="panel" key={d.order_id}>
-                <strong>{d.status}</strong>
+              <article className="panel seller-support-card" key={d.item_id}>
+                <strong>Yêu cầu hoàn tiền sản phẩm · {d.status === 'refunded' ? 'Đã hoàn tiền' : d.status === 'rejected' ? 'Đã từ chối' : 'Đang chờ'}</strong>
+                {d.amount != null && <p>Số tiền: {money(d.amount)}</p>}
+                {d.created_at && <small>Gửi lúc {date(d.created_at)}{['open','agreed'].includes(d.status) && ` · ${Date.now()-Date.parse(d.created_at)>=48*3600000 ? 'Quá 48 giờ' : 'Có thể can thiệp sớm'}`}</small>}
                 <p>{d.reason}</p>
                 <button
                   className="button button-outline"

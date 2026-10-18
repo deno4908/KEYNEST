@@ -126,14 +126,15 @@ export function AdminOrderDialog({
   const { notify } = useStore();
   const user = data.users.find((u) => u.id === order.user_id);
   const warranties = data.tickets.filter(
-    (t) => t.kind === "warranty" && t.order_id === order.id,
+    (t) => t.kind === "warranty" && t.order_id === order.id && !t.refund_item_id,
   );
   const [mode, setMode] = useState<"wallet" | "external">("wallet"),
     [ticket, setTicket] = useState(warranties[0]?.id || ""),
     [refundOpen, setRefundOpen] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const manual = order.items.filter((i) => i.delivery === "manual" && !i.delivered_at),
+  const remainingRefund = order.total - order.items.reduce((sum, item) => sum + (item.refund_amount || 0), 0);
+  const manual = order.items.filter((i) => i.delivery === "manual" && !i.delivered_at && !i.refunded_at),
     count = manual.reduce((n, i) => n + i.quantity, 0);
   async function fulfill(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -363,8 +364,8 @@ export function AdminOrderDialog({
                   {refundOpen && (
                     <form className="form admin-refund-form" onSubmit={refund}>
                       <div className="refund-amount">
-                        <span>Hoàn toàn bộ đơn hàng</span>
-                        <strong>{money(order.total)}</strong>
+                        <span>Hoàn số tiền còn lại của đơn</span>
+                        <strong>{money(remainingRefund)}</strong>
                       </div>
                       <label>
                         Yêu cầu bảo hành liên quan
@@ -396,7 +397,7 @@ export function AdminOrderDialog({
                       </label>
                       <p className="refund-explanation">
                         {mode === "wallet"
-                          ? "Cộng toàn bộ tiền vào ví khách, đóng yêu cầu bảo hành và cập nhật trạng thái đơn trong cùng giao dịch."
+                          ? "Cộng số tiền chưa hoàn vào ví khách, đóng yêu cầu bảo hành và cập nhật trạng thái đơn trong cùng giao dịch."
                           : "Chỉ ghi nhận khoản bạn đã chuyển trả bằng phương thức khác. Hệ thống không chuyển tiền ngân hàng và không cộng ví."}
                       </p>
                       {mode === "external" && (

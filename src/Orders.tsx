@@ -725,7 +725,7 @@ function OrderDetails({ id }: { id: string }) {
                   <strong>{item.name}</strong>
                   <span>{item.variant_name}</span>
                 </div>
-                {item.delivery === "manual" && !(item.is_preorder && item.delivered_at) ? (
+                {item.refunded_at ? <p className="info-note">Đã hoàn {money(item.refund_amount || 0)} vào ví cho sản phẩm này · {date(item.refunded_at)}</p> : item.delivery === "manual" && !(item.is_preorder && item.delivered_at) ? (
                   <div className="service-delivery-result">
                     <p>
                       <strong>

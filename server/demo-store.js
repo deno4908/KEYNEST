@@ -420,8 +420,8 @@ export class DemoStore {
     if (o.status === "completed") o.completed_at ||= now;
     for (const i of o.items)
       if (
-        o.status === "completed" ||
-        (o.status === "processing" && i.delivery === "key")
+        !i.refunded_at && (o.status === "completed" ||
+        (o.status === "processing" && i.delivery === "key"))
       )
         i.delivered_at ||= now;
   }
@@ -436,13 +436,13 @@ export class DemoStore {
           .sort((a, b) => a.id.localeCompare(b.id))
           .map((i) => ({
             ...i,
-            key_ids: ["processing", "completed"].includes(o.status)
+            key_ids: !i.refunded_at && ["processing", "completed"].includes(o.status)
               ? this.db.inventory
                   .filter((k) => k.order_id === o.id && k.item_id === i.id)
                   .sort((a, b) => a.id.localeCompare(b.id))
                   .map((k) => k.id)
               : [],
-            keys: !["pending", "expired", "cancelled", "refunded"].includes(
+            keys: !i.refunded_at && !["pending", "expired", "cancelled", "refunded"].includes(
               o.status,
             )
               ? this.db.inventory
@@ -506,6 +506,7 @@ export class DemoStore {
         (t) =>
           t.order_id === id &&
           t.kind === "warranty" &&
+          !t.refund_item_id &&
           ["open", "in_progress"].includes(t.status),
       )
     )
@@ -871,7 +872,7 @@ export class DemoStore {
     if (o?.status !== "processing")
       throw new AppError("Đơn không chờ xử lý.", 409);
     const manual = o.items
-      .filter((i) => i.delivery === "manual" && !i.delivered_at)
+      .filter((i) => i.delivery === "manual" && !i.delivered_at && !i.refunded_at)
       .sort((a, b) => a.id.localeCompare(b.id));
     if (secrets.length !== manual.reduce((n, i) => n + i.quantity, 0))
       throw new AppError("Cần một kết quả cho mỗi đơn vị dịch vụ.");
@@ -906,6 +907,8 @@ export class DemoStore {
         "Hoàn tiền cần gắn với yêu cầu bảo hành của đơn.",
         400,
       );
+    if (ticket.refund_item_id)
+      throw new AppError("Yêu cầu này chỉ hoàn sản phẩm. Xử lý tại trao đổi sản phẩm.", 409);
     if (
       !this.db.users.some((u) => u.id === options.actor && u.role === "admin")
     )
@@ -913,11 +916,13 @@ export class DemoStore {
     if (!["wallet", "external"].includes(options.method))
       throw new AppError("Phương thức hoàn tiền không hợp lệ.");
     if (options.method === "wallet") {
-      this.db.users.find((u) => u.id === o.user_id).balance += o.total;
+      const remaining = o.total - o.items.reduce((sum,i)=>sum+(i.refund_amount||0),0);
+      if(remaining<0) throw new AppError('Số tiền hoàn không hợp lệ.',409);
+      this.db.users.find((u) => u.id === o.user_id).balance += remaining;
       this.db.ledger.unshift({
         id: randomUUID(),
         user_id: o.user_id,
-        amount: o.total,
+        amount: remaining,
         description: `Hoàn tiền ${o.number}`,
         created_at: new Date().toISOString(),
       });

@@ -70,6 +70,8 @@ export type Payment = {
   demo: boolean;
 };
 export type OrderItem = {
+  refund_amount?: number;
+  refunded_at?: string | null;
   product_kind?: ProductKind;
   seller_id?: string;
   seller_name?: string;
@@ -127,6 +129,7 @@ export type Ticket = {
   kind?: "support" | "warranty";
   order_id?: string;
   warranty_key_ids?: string[];
+  refund_item_id?: string;
   priority?: "low" | "normal" | "high";
   updated_at?: string;
   messages?: {
