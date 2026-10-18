@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, post, date, money } from "./api";
 import { Modal, useStore } from "./App";
@@ -44,7 +44,7 @@ export function OrderChatButton({
   return (
     <>
       <button
-        className="button button-outline button-small"
+        className="button button-outline button-small order-chat-trigger"
         onClick={() => setOpen(true)}
       >
         {label}
@@ -66,7 +66,6 @@ export function OrderChat({
   close: () => void;
   admin?: boolean;
 }) {
-  const messageId = useId();
   const { user } = useStore();
   const [data, setData] = useState<Conversation | null>(null),
     [error, setError] = useState(""),
@@ -139,10 +138,10 @@ export function OrderChat({
   return (
     <Modal
       className="order-chat-modal"
-      title={data ? `${data.order_number} · ${data.name}` : "Trao đổi đơn hàng"}
+      title={readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Chat với người mua' : data?.seller_name || 'Chat với người bán'}
       close={() => !busy && close()}
     >
-      <div className="order-chat-intro"><MessageCircle size={22} /><div><strong>{readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Trao đổi với người mua' : data?.seller_name || 'Trao đổi với người bán'}</strong><p>Trao đổi về đơn hàng · KEYNEST có thể xem để hỗ trợ.</p></div></div>
+      <div className="order-chat-intro"><MessageCircle size={20} /><div><strong>{data ? `${data.order_number} · ${data.name}` : 'Đang tải cuộc trò chuyện…'}</strong><p>KEYNEST có thể xem để hỗ trợ đơn hàng.</p></div></div>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -178,9 +177,8 @@ export function OrderChat({
                 void send("message");
               }}
             >
-              <label className="sr-only" htmlFor={messageId}>Tin nhắn</label>
               <textarea
-                id={messageId}
+                aria-label="Tin nhắn"
                 disabled={busy}
                 value={body}
                 onChange={(e) => {
@@ -193,13 +191,14 @@ export function OrderChat({
                   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send('message'); }
                 }}
                 maxLength={3000}
-                rows={2}
+                rows={1}
               />
               <button className="button" aria-label="Gửi tin nhắn" disabled={busy || !body.trim()}>
-                <Send size={19} /><span>{busy ? 'Đang gửi…' : 'Gửi'}</span>
+                <Send size={19} />
               </button>
             </form>
           )}
+          <div className="order-chat-tools">
           {data.dispute && (
             <section className="panel">
               <strong>{state[data.dispute.status]}</strong>
@@ -311,6 +310,7 @@ export function OrderChat({
               </button>
             </form>
           )}
+          </div>
         </>
       )}
     </Modal>
