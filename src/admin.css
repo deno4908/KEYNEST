@@ -1098,3 +1098,44 @@
     flex-basis: 100%;
   }
 }
+.admin-product-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 220px;
+  padding: 6px 0;
+}
+.admin-product-review-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+.admin-product-actions .button {
+  margin: 0;
+  min-height: 38px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.admin-product-actions .admin-product-approve {
+  color: #a4e4bc;
+  background: #214531;
+  border-color: #3d7352;
+}
+.admin-product-actions .admin-product-approve:hover:not(:disabled) {
+  background: #2b593f;
+  border-color: #6da580;
+}
+.admin-product-actions .admin-product-reject {
+  color: #edb0b0;
+  background: #352326;
+  border-color: #684046;
+}
+.admin-product-actions .admin-product-reject:hover:not(:disabled) {
+  background: #4b2b30;
+  border-color: #a06169;
+}
