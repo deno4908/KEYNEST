@@ -236,6 +236,7 @@ export function createSellers(store) {
     },
     async visibility(uid, id, active) {
       if (demo) {
+        if (active && ownProduct(uid, id).review_status !== 'approved') throw new AppError('Sản phẩm cần được admin duyệt trước khi mở bán.', 409);
         ownProduct(uid, id).active = active;
         store.save();
       } else {
@@ -245,10 +246,11 @@ export function createSellers(store) {
             .update({ active })
             .eq("id", id)
             .eq("seller_id", uid)
-            .select("id"),
+            .select("id,active"),
         );
         if (!rows.length)
           throw new AppError("Không tìm thấy sản phẩm của bạn.", 404);
+        if (active && !rows[0].active) throw new AppError('Sản phẩm cần được admin duyệt trước khi mở bán.', 409);
       }
       await store.audit(uid, "seller_visibility", `${id}:${active}`);
       return { ok: true };

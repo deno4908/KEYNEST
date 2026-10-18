@@ -995,6 +995,20 @@ app.post("/api/admin/coupons", async (req, res) => {
   await store.audit(req.user.id, "save_coupon", input.code);
   res.json(result);
 });
+app.post('/api/admin/products/:id/review', async (req, res) => {
+  const id = uuid.parse(req.params.id);
+  const { version, approve, reason } = z.object({ version: z.number().int().positive(), approve: z.boolean(), reason: z.string().trim().max(2000).default('') }).strict().parse(req.body);
+  if (!approve && reason.length < 10) throw new AppError('Nhập lý do từ chối ít nhất 10 ký tự.');
+  if (store.db) {
+    const p = store.db.products.find(p => p.id === id && p.seller_id);
+    if (!p || (p.review_version || 1) !== version) throw new AppError('Sản phẩm đã thay đổi. Tải lại để kiểm tra.', 409);
+    if (approve && !p.variants.some(v => v.active !== false)) throw new AppError('Cần ít nhất một gói đang hoạt động.');
+    Object.assign(p, { review_status: approve ? 'approved' : 'rejected', review_reason: reason, active: approve, review_version: version + 1 });
+    store.save();
+    await store.audit(req.user.id, approve ? 'seller_product_approved' : 'seller_product_rejected', id);
+  } else await store.query(store.client.rpc('review_seller_product', { p_actor: req.user.id, p_product: id, p_version: version, p_approve: approve, p_reason: reason }));
+  res.json({ ok: true });
+});
 app.post("/api/admin/products", async (req, res) => {
   const input = productSchema.parse(req.body);
   await categoryStore.require(input.category);

@@ -710,10 +710,15 @@ export class DemoStore {
         sort_order: this.db.products.length,
         variants: [],
       });
+    const result = existing || this.db.products.at(-1);
+    this.invalidateProductReview(result);
     this.save();
-    return existing || this.db.products.at(-1);
+    return result;
   }
   cart(uid) { return this.db.carts?.[uid] || []; }
+  invalidateProductReview(p) {
+    if (p?.seller_id) Object.assign(p, { active: false, review_status: 'pending', review_reason: '', review_version: (p.review_version || 0) + 1 });
+  }
   saveCart(uid, items) {
     this.db.carts ||= {};
     this.db.carts[uid] = items;
@@ -746,6 +751,7 @@ export class DemoStore {
         warranty_days: data.warranty_days ?? 30,
       });
     if (unlimited && shared_key) { this.db.sharedKeys ||= {}; this.db.sharedKeys[variantId] = encrypt(shared_key, this.key); }
+    this.invalidateProductReview(p);
     this.save();
     return p;
   }
@@ -805,6 +811,7 @@ export class DemoStore {
         409,
       );
     product.variants = product.variants.filter((variant) => variant.id !== id);
+    this.invalidateProductReview(product);
     this.db.inventory = this.db.inventory.filter(
       (item) => item.variant_id !== id,
     );
@@ -855,6 +862,7 @@ export class DemoStore {
         order_id: null,
       });
     v.stock += secrets.length;
+    this.invalidateProductReview(this.db.products.find(p => p.variants.some(item => item.id === variant_id)));
     this.save();
     return { count: secrets.length };
   }

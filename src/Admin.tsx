@@ -314,6 +314,7 @@ export function Admin() {
                             </td>
                             <td>
                               <Badge status={p.active ? "Đang bán" : "Đã ẩn"} />
+                              {p.seller_id && <small>{p.review_status === 'approved' ? 'Đã duyệt' : p.review_status === 'rejected' ? 'Từ chối' : 'Chờ admin kiểm hàng'}{p.review_reason && ` · ${p.review_reason}`}</small>}
                             </td>
                             <td>
                               <button
@@ -323,6 +324,21 @@ export function Admin() {
                                 <Pencil size={14} />
                                 Quản lý
                               </button>
+                              {p.seller_id && <div>
+                                <button className="button button-outline button-small" disabled={busy} onClick={async () => {
+                                  if (!window.confirm(`Đã kiểm tra thông tin, gói bán và hàng của “${p.name}”? Duyệt sẽ mở bán sản phẩm.`)) return;
+                                  setBusy(true);
+                                  try { await post(`/admin/products/${p.id}/review`, { version: p.review_version || 1, approve: true }); await afterSave(); notify('Đã duyệt mở bán.'); }
+                                  catch (e) { notify((e as Error).message, true); } finally { setBusy(false); }
+                                }}>Duyệt mở bán</button>
+                                <button className="button button-outline button-small" disabled={busy} onClick={async () => {
+                                  const reason = window.prompt('Lý do từ chối (ít nhất 10 ký tự):');
+                                  if (reason === null) return;
+                                  setBusy(true);
+                                  try { await post(`/admin/products/${p.id}/review`, { version: p.review_version || 1, approve: false, reason }); await afterSave(); notify('Đã từ chối sản phẩm.'); }
+                                  catch (e) { notify((e as Error).message, true); } finally { setBusy(false); }
+                                }}>Từ chối</button>
+                              </div>}
                             </td>
                           </tr>
                         ))}
@@ -639,7 +655,7 @@ export function ProductEditor({
         active: f.get("active") === "on",
       });
       setProduct({ ...p, variants: product.variants || [] });
-      notify("Đã lưu sản phẩm.");
+      notify(scope === 'seller' ? 'Đã gửi sản phẩm để admin kiểm hàng. Sửa gói hoặc nhập hàng mới cần được duyệt lại.' : "Đã lưu sản phẩm.");
       await changed();
     } catch (e) {
       notify((e as Error).message, true);

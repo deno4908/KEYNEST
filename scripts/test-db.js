@@ -1368,6 +1368,19 @@ try {
   await fails('select seller_command($1,$2,$3)',[sid,'product',JSON.stringify({...sellerProduct,id:product})]);
   await fails('select seller_command($1,$2,$3)',[sid,'variant',JSON.stringify({product_id:sellerProduct.id,variant:{id:variant,name:'Forged',price:1000,original_price:1000,delivery:'key',region:'Global'}})]);
   await db.query('update profiles set balance=1000000 where id=$1',[user]);
+  const reviewProduct = async id => db.query('select review_seller_product($1,$2,(select review_version from products where id=$2),true,$3)',[other,id,'']);
+  assert.equal(await scalar('select active from products where id=$1',[sellerProduct.id]),false);
+  await db.query('update products set active=true where id=$1',[sellerProduct.id]);
+  assert.equal(await scalar('select active from products where id=$1',[sellerProduct.id]),false);
+  await fails('select review_seller_product($1,$2,2,true,$3)',[sid,sellerProduct.id,'']);
+  await reviewProduct(sellerProduct.id);
+  const reviewedVersion = await scalar('select review_version from products where id=$1',[sellerProduct.id]);
+  await db.query('update variants set price=price+1 where id=$1',[sellerVariant]);
+  assert.equal(await scalar('select active from products where id=$1',[sellerProduct.id]),false);
+  await fails('select review_seller_product($1,$2,$3,true,$4)',[other,sellerProduct.id,reviewedVersion,'']);
+  await db.query('update variants set price=price-1 where id=$1',[sellerVariant]);
+  await reviewProduct(sellerProduct.id);
+  pass('seller listings require admin approval and changed variants invalidate stale approvals');
   const sellerPayload={items:[{variant_id:sellerVariant,quantity:1}],method:'wallet',coupon:'',customer_note:'Player'};
   await fails('select create_order($1,$2,$3)',[sid,JSON.stringify(sellerPayload),randomUUID()]);
   const saleKey=randomUUID();
@@ -1416,6 +1429,7 @@ try {
   await db.query('update products set active=true where id=$1',[sellerProduct.id]);
   const secondVariant=randomUUID();
   await db.query("insert into variants(id,product_id,name,price,original_price,delivery,stock,region) values($1,$2,'Second',100000,100000,'manual',5,'Global')",[secondVariant,sellerProduct.id]);
+  await reviewProduct(sellerProduct.id);
   const mixedOrder=await scalar('select create_order($1,$2,$3)',[user,JSON.stringify({...sellerPayload,items:[{variant_id:sellerVariant,quantity:1},{variant_id:secondVariant,quantity:1}]}),randomUUID()]);
   const ownItem=await scalar('select id from order_items where order_id=$1 and variant_id=$2',[mixedOrder,sellerVariant]);
   await sellerCommand(sid,'fulfill',{item_id:ownItem,keys:[{secret:'encrypted-seller-delivery',hash:randomUUID()}]});
@@ -1498,6 +1512,7 @@ try {
   const otherProduct=await sellerCommand(outsider,'product',{slug:'other-seller-chat',name:'Other shop product',category:'game',platform:'PC',subcategory:'',subtitle:'',description:'',image:'',active:true});
   const otherVariant=randomUUID();
   await db.query("insert into variants(id,product_id,name,price,original_price,delivery,stock) values($1,$2,'Manual',100000,100000,'manual',2)",[otherVariant,otherProduct.id]);
+  await reviewProduct(otherProduct.id);
   const multiSellerOrder=await scalar('select create_order($1,$2,$3)',[user,JSON.stringify({...sellerPayload,items:[{variant_id:sellerVariant,quantity:1},{variant_id:otherVariant,quantity:1}]}),randomUUID()]);
   const privateItem=await scalar('select id from order_items where order_id=$1 and seller_id=$2',[multiSellerOrder,outsider]);
   const siblingItem=await scalar('select id from order_items where order_id=$1 and seller_id=$2',[multiSellerOrder,sid]);

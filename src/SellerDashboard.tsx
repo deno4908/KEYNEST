@@ -589,7 +589,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                     <strong>{p.name}</strong>
                   </Link>
                   <p>
-                    {p.active ? "Đang bán" : "Đã ẩn"} · {p.variants.length} gói
+                    {p.review_status !== 'approved' ? (p.review_status === 'rejected' ? `Từ chối: ${p.review_reason}` : 'Chờ admin kiểm hàng') : p.active ? "Đang bán" : "Đã ẩn"} · {p.variants.length} gói
                     · {stock(p)} tồn kho
                   </p>
                   <details>
@@ -636,6 +636,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                     className="icon-button"
                     disabled={busy}
                     aria-label={`${p.active ? "Ẩn bán" : "Mở bán"} ${p.name}`}
+                    title={p.review_status !== 'approved' ? 'Cần admin duyệt trước khi mở bán' : undefined}
                     onClick={() =>
                       void run(
                         () =>

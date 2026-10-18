@@ -172,6 +172,14 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
     ).status,
     200,
   );
+  assert.equal(product.active, false);
+  assert.equal((await req(`/seller/products/${product.id}/visibility`, { active: true }, login.cookie)).status, 409);
+  const review = { version: product.review_version, approve: true };
+  assert.equal((await req(`/admin/products/${product.id}/review`, review, login.cookie)).status, 403);
+  assert.equal((await req(`/admin/products/${product.id}/review`, review, buyer.cookie)).status, 403);
+  assert.equal((await req(`/admin/products/${product.id}/review`, review, admin.cookie)).status, 200);
+  assert.equal((await req(`/admin/products/${product.id}/review`, review, admin.cookie)).status, 409);
+  assert.equal(product.active, true);
   const orderPayload = {
     items: [{ variant_id: product.variants[0].id, quantity: 1 }],
     method: "wallet",

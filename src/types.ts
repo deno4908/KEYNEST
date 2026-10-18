@@ -15,6 +15,9 @@ export type Variant = {
 };
 export type ProductKind = "key" | "account" | "source" | "product" | "service";
 export type Product = {
+  review_status?: 'pending' | 'approved' | 'rejected';
+  review_reason?: string;
+  review_version?: number;
   product_kind?: ProductKind;
   seller_id?: string;
   seller?: { id: string; name: string } | null;
