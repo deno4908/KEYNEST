@@ -103,8 +103,9 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     [sort, setSort] = useState("name"),
     [page, setPage] = useState(1);
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("tab") === "sales") {
-      setTab("sales");
+    const target = new URLSearchParams(location.search).get("tab");
+    if (target === "sales" || target === "products") {
+      setTab(target);
       setQuery("");
       setFilter("all");
       setPage(1);

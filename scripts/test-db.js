@@ -1375,6 +1375,15 @@ try {
   await fails('select review_seller_product($1,$2,2,true,$3)',[sid,sellerProduct.id,'']);
   await reviewProduct(sellerProduct.id);
   const reviewedVersion = await scalar('select review_version from products where id=$1',[sellerProduct.id]);
+  const reviewNoticeCount = () => scalar("select count(*)::int from notifications where user_id=$1 and id like $2",[sid,`seller-review:${sellerProduct.id}:%`]);
+  assert.equal(await reviewNoticeCount(),1);
+  await reviewProduct(sellerProduct.id);
+  assert.equal(await reviewNoticeCount(),1);
+  await db.query('select review_seller_product($1,$2,(select review_version from products where id=$2),false,$3)',[other,sellerProduct.id,'Please correct product details']);
+  assert.equal(await reviewNoticeCount(),2);
+  assert.ok((await scalar("select body from notifications where user_id=$1 and title like 'Sản phẩm bị từ chối%' order by created_at desc limit 1",[sid])).includes('Please correct product details'));
+  await reviewProduct(sellerProduct.id);
+  assert.equal(await reviewNoticeCount(),3);
   await db.query('update variants set price=price+1 where id=$1',[sellerVariant]);
   assert.equal(await scalar('select active from products where id=$1',[sellerProduct.id]),false);
   await fails('select review_seller_product($1,$2,$3,true,$4)',[other,sellerProduct.id,reviewedVersion,'']);

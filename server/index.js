@@ -1003,7 +1003,17 @@ app.post('/api/admin/products/:id/review', async (req, res) => {
     const p = store.db.products.find(p => p.id === id && p.seller_id);
     if (!p || (p.review_version || 1) !== version) throw new AppError('Sản phẩm đã thay đổi. Tải lại để kiểm tra.', 409);
     if (approve && !p.variants.some(v => v.active !== false)) throw new AppError('Cần ít nhất một gói đang hoạt động.');
-    Object.assign(p, { review_status: approve ? 'approved' : 'rejected', review_reason: reason, active: approve, review_version: version + 1 });
+    const reviewStatus = approve ? 'approved' : 'rejected';
+    if (p.review_status !== reviewStatus || p.review_reason !== reason) {
+      store.db.notifications ||= [];
+      store.db.notifications.push({
+        id: `seller-review:${id}:${version + 1}`, user_id: p.seller_id,
+        title: `${approve ? 'Sản phẩm đã được duyệt' : 'Sản phẩm bị từ chối'} · ${p.name}`,
+        body: approve ? 'Admin đã duyệt sản phẩm của bạn và mở bán trên cửa hàng.' : `Lý do: ${reason}\nChỉnh sửa sản phẩm để admin kiểm tra lại.`,
+        href: '/seller?tab=products', created_at: new Date().toISOString(), read_at: null,
+      });
+    }
+    Object.assign(p, { review_status: reviewStatus, review_reason: reason, active: approve, review_version: version + 1 });
     store.save();
     await store.audit(req.user.id, approve ? 'seller_product_approved' : 'seller_product_rejected', id);
   } else await store.query(store.client.rpc('review_seller_product', { p_actor: req.user.id, p_product: id, p_version: version, p_approve: approve, p_reason: reason }));

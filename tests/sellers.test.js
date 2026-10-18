@@ -180,6 +180,10 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   assert.equal((await req(`/admin/products/${product.id}/review`, review, admin.cookie)).status, 200);
   assert.equal((await req(`/admin/products/${product.id}/review`, review, admin.cookie)).status, 409);
   assert.equal(product.active, true);
+  const reviewNotice = store.db.notifications.filter(n => n.id.startsWith(`seller-review:${product.id}:`));
+  assert.equal(reviewNotice.length, 1);
+  assert.equal(reviewNotice[0].user_id, seller.id);
+  assert.equal(reviewNotice[0].href, '/seller?tab=products');
   const orderPayload = {
     items: [{ variant_id: product.variants[0].id, quantity: 1 }],
     method: "wallet",

@@ -9,3 +9,5 @@ Trong Admin → Sản phẩm, chọn Quản lý để kiểm tra thông tin/gói
 Sửa nội dung sản phẩm, thêm/sửa/xóa gói, nhập mã mới hoặc thay key dùng chung sẽ ẩn sản phẩm và yêu cầu duyệt lại. Thay đổi tồn kho do mua hàng không làm mất trạng thái đã duyệt. Seller có thể ẩn/mở sản phẩm đã được duyệt, nhưng không thể tự duyệt sản phẩm.
 
 Lần duyệt dùng phiên bản dữ liệu đang xem. Nếu sản phẩm hoặc hàng đã thay đổi, tải lại và kiểm tra trước khi duyệt lại. Kết quả duyệt/từ chối được ghi audit log.
+
+Chạy thêm `046_seller_review_notifications.sql` để gửi thông báo trong website cho seller khi duyệt/từ chối. Thông báo ghi cùng giao dịch với kết quả duyệt, có tên sản phẩm, lý do từ chối và liên kết về mục Sản phẩm. Không gửi email và không gửi bù các lần duyệt trước migration. Lặp cùng trạng thái/lý do không tạo thông báo mới; duyệt lại sau khi sửa hàng sẽ có thông báo mới.
