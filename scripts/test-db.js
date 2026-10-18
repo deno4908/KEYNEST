@@ -1474,6 +1474,14 @@ try {
   await fails('select seller_conversation($1,$2,$3,$4,$5)',[user,escrowItem,'message','Changed body',messageId]);
   await chat(sid,escrowItem,'message','We are checking the delivery',randomUUID());
   assert.equal((await chat(user,escrowItem)).messages.length,2);
+  await db.query("update profiles set role='admin' where id=$1",[user]);
+  assert.equal((await chat(user,escrowItem)).can_message,true);
+  assert.equal((await chat(user,escrowItem)).viewer_role,'customer');
+  const adminBuyerMessage = await chat(user,escrowItem,'message','Admin buyer message',randomUUID());
+  assert.equal(adminBuyerMessage.messages.at(-1).role,'customer');
+  await db.query("update profiles set role='customer' where id=$1",[user]);
+  assert.equal((await chat(other,escrowItem)).can_message,false);
+  await fails('select seller_conversation($1,$2,$3,$4,$5)',[other,escrowItem,'message','Unrelated admin',randomUUID()]);
   await sellerCommand(sid,'fulfill',{item_id:escrowItem,keys:[{secret:'escrow-test-delivered',hash:randomUUID()}]});
   await scalar('select release_seller_funds($1)',[sid]);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[sid])),balance);

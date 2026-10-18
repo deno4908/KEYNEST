@@ -412,6 +412,20 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   assert.equal(adminChat.viewer_role, 'admin');
   const deniedMessage = await req(`/order-chat/${escrowItem.id}`, { action: 'message', body: 'Admin test', request_id: randomUUID() }, admin.cookie);
   assert.equal(deniedMessage.status, 403);
+  const buyerProfile = store.db.users.find(u => u.id === escrowOrder.user_id);
+  const originalRole = buyerProfile.role;
+  buyerProfile.role = 'admin';
+  try {
+    const adminBuyer = (await req(`/order-chat/${escrowItem.id}`, null, buyer.cookie)).body;
+    assert.equal(adminBuyer.can_message, true);
+    assert.equal(adminBuyer.viewer_role, 'customer');
+    const sent = await req(`/order-chat/${escrowItem.id}`, { action: 'message', body: 'Admin purchasing as a customer', request_id: randomUUID() }, buyer.cookie);
+    assert.equal(sent.status, 200);
+    assert.equal(sent.body.messages.at(-1).role, 'customer');
+  } finally {
+    buyerProfile.role = originalRole;
+    store.db.seller_chat_messages = store.db.seller_chat_messages.filter(m => m.body !== 'Admin purchasing as a customer');
+  }
   const message = {
     action: "message",
     body: "Can you check my order?",

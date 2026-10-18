@@ -77,7 +77,7 @@ export function OrderChat({
     [decision, setDecision] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const sequence = useRef(0);
-  const readOnly = admin || user?.role === 'admin' || data?.can_message === false;
+  const readOnly = data?.can_message === undefined ? admin || user?.role === 'admin' : !data.can_message;
   const viewerRole = data?.viewer_role || (user?.role === 'seller' ? 'seller' : 'customer');
   const logRef = useRef<HTMLDivElement>(null);
   const followLatest = useRef(true);
