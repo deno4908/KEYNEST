@@ -447,7 +447,7 @@ export function App() {
                     url={user.avatar_url}
                     className="header-avatar signed-in"
                   />
-                  {user.role === 'seller' && <UnreadChatBadge key={user.id} />}
+                  <UnreadChatBadge key={user.id} />
                   </span>
                 ) : (
                   <span className="header-avatar">

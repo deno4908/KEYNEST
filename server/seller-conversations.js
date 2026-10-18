@@ -73,6 +73,14 @@ export async function sellerConversation(
         created_at: new Date().toISOString(),
       });
       db.notifications ||= [];
+      const incoming = new Set(db.seller_chat_messages
+        .filter(m => m.item_id === itemId && m.author_id !== actor)
+        .map(m => `seller-chat:${m.id}`));
+      for (const notice of db.notifications) {
+        if (notice.user_id === actor && !notice.read_at && incoming.has(notice.id)) {
+          notice.read_at = new Date().toISOString();
+        }
+      }
       db.notifications.push({
         id: `seller-chat:${id}`,
         user_id: actor === order.user_id ? item.seller_id : order.user_id,

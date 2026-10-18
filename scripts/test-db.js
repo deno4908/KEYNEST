@@ -1473,12 +1473,18 @@ try {
   assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1",[sid])),1);
   await fails('select seller_conversation($1,$2,$3,$4,$5)',[user,escrowItem,'message','Changed body',messageId]);
   await chat(sid,escrowItem,'message','We are checking the delivery',randomUUID());
+  assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1 and read_at is null",[sid])),0);
+  assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1 and read_at is null",[user])),1);
+  // Replaying the buyer's old send does not acknowledge the seller's new reply.
+  await chat(user,escrowItem,'message','Need help with delivery',messageId);
+  assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1 and read_at is null",[user])),1);
   assert.equal((await chat(user,escrowItem)).messages.length,2);
   await db.query("update profiles set role='admin' where id=$1",[user]);
   assert.equal((await chat(user,escrowItem)).can_message,true);
   assert.equal((await chat(user,escrowItem)).viewer_role,'customer');
   const adminBuyerMessage = await chat(user,escrowItem,'message','Admin buyer message',randomUUID());
   assert.equal(adminBuyerMessage.messages.at(-1).role,'customer');
+  assert.equal(Number(await scalar("select count(*) from notifications where id like 'seller-chat:%' and user_id=$1 and read_at is null",[user])),0);
   await db.query("update profiles set role='customer' where id=$1",[user]);
   assert.equal((await chat(other,escrowItem)).can_message,false);
   await fails('select seller_conversation($1,$2,$3,$4,$5)',[other,escrowItem,'message','Unrelated admin',randomUUID()]);
