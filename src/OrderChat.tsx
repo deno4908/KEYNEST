@@ -138,7 +138,7 @@ export function OrderChat({
   return (
     <Modal
       className="order-chat-modal"
-      title={readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Chat với người mua' : data?.seller_name || 'Chat với người bán'}
+      title={requesting ? 'Yêu cầu hoàn tiền' : readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Chat với người mua' : data?.seller_name || 'Chat với người bán'}
       close={() => !busy && close()}
     >
       <div className="order-chat-intro"><MessageCircle size={20} /><div><strong>{data ? `${data.order_number} · ${data.name}` : 'Đang tải cuộc trò chuyện…'}</strong><p>KEYNEST có thể xem để hỗ trợ đơn hàng.</p></div></div>
@@ -149,6 +149,7 @@ export function OrderChat({
       )}
       {data && (
         <>
+          {!requesting && <>
           <div
             className="order-chat-messages"
             ref={logRef}
@@ -198,7 +199,8 @@ export function OrderChat({
               </button>
             </form>
           )}
-          <div className="order-chat-tools">
+          </>}
+          <div className={`order-chat-tools${requesting ? ' order-chat-tools-expanded' : ''}`}>
           {data.dispute && (
             <section className="panel">
               <strong>{state[data.dispute.status]}</strong>
@@ -225,7 +227,7 @@ export function OrderChat({
                 )}
             </section>
           )}
-          {!readOnly && !data.dispute && data.can_request && (
+          {!requesting && !readOnly && !data.dispute && data.can_request && (
             <button
               className="button button-outline"
               onClick={() => setRequesting(!requesting)}
@@ -235,32 +237,32 @@ export function OrderChat({
           )}
           {requesting && (
             <form
-              className="form panel"
+              className="order-refund-form"
               onSubmit={(e) => {
                 e.preventDefault();
                 void send("request");
               }}
             >
-              <p>
-                Gửi đề nghị hoàn toàn bộ đơn ({money(data.order_total)}). Tiền
-                người bán của đơn sẽ bị đóng băng để chờ xử lý. Với đơn có nhiều
-                người bán, admin sẽ kiểm tra tất cả sản phẩm trước khi quyết
-                định.
-              </p>
+              <div className="order-refund-amount"><span>Số tiền đề nghị hoàn</span><strong>{money(data.order_total)}</strong><small>Áp dụng cho toàn bộ đơn hàng</small></div>
+              <p className="order-refund-note">Khoản tiền của người bán sẽ được tạm giữ khi gửi yêu cầu. Admin sẽ kiểm tra tất cả sản phẩm trong đơn, kể cả đơn có nhiều người bán, trước khi quyết định hoàn tiền.</p>
               <label>
-                Lý do
+                Lý do yêu cầu
                 <textarea
                   disabled={busy}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   minLength={10}
                   maxLength={2000}
+                  rows={4}
+                  placeholder="Mô tả vấn đề bạn gặp phải và nội dung đã trao đổi với người bán…"
                   required
                 />
+                <span className="order-refund-hint"><span>Tối thiểu 10 ký tự</span><span>{reason.length}/2000</span></span>
               </label>
-              <button className="button" disabled={busy}>
-                Gửi yêu cầu và giữ tiền
-              </button>
+              <div className="order-refund-actions">
+                <button type="button" className="button button-outline" disabled={busy} onClick={() => setRequesting(false)}>Quay lại chat</button>
+                <button className="button" disabled={busy || reason.trim().length < 10}>{busy ? 'Đang gửi…' : 'Gửi yêu cầu'}</button>
+              </div>
             </form>
           )}
           {admin && pending && (

@@ -13,6 +13,19 @@
 .order-chat-empty > svg { color:#ff9c78; }
 .order-chat-tools { flex-shrink:0; max-height:35%; overflow-y:auto; padding:0 16px max(12px,env(safe-area-inset-bottom)); }
 .order-chat-tools:empty { display:none; }
+.order-chat-tools.order-chat-tools-expanded { flex:1; min-height:0; max-height:none; padding:20px; }
+.order-refund-form { display:grid; gap:20px; }
+.order-refund-amount { display:grid; gap:8px; padding:20px; border:1px solid #38343a; border-radius:14px; background:#ff704508; }
+.order-refund-amount > span { color:#c4c5ce; font-size:13px; }
+.order-refund-amount > strong { color:#ffad8d; font-size:28px; letter-spacing:-.5px; }
+.order-refund-amount > small { color:#a6a9b5; font-size:12px; }
+.order-refund-form .order-refund-note { margin:0; color:#aeb2bf; font-size:13px; line-height:1.8; }
+.order-refund-form > label { display:grid; gap:10px; color:#e4e5ed; font-size:14px; font-weight:500; }
+.order-refund-form textarea { width:100%; min-height:120px; padding:14px; border:1px solid #3b3e4b; border-radius:12px; background:#14161c; font-size:16px; line-height:1.6; resize:vertical; }
+.order-refund-form textarea:focus { border-color:#ff9c78; outline:2px solid #ff9c7826; outline-offset:2px; }
+.order-refund-hint { display:flex; justify-content:space-between; gap:12px; color:#979cab; font-size:11px; font-weight:400; }
+.order-refund-actions { display:flex; flex-wrap:wrap; gap:12px; padding-top:4px; }
+.order-refund-actions > .button { flex:1; min-width:130px; min-height:44px; font-size:13px; }
 .order-chat-tools > .button { min-height:36px; padding:8px 12px; font-size:12px; }
 .order-chat-tools > .panel { margin:12px 0 0; }
 .order-chat-modal .order-chat-readonly { flex-shrink:0; margin:0; padding:12px 20px; }
