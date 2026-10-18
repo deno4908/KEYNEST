@@ -518,6 +518,7 @@ export function createOperations(store) {
           ),
           unread_count: all.filter((n) => !n.read_at).length,
           unread_chat_count: all.filter((n) => !n.read_at && n.id.startsWith('seller-chat:')).length,
+          unread_order_count: all.filter((n) => !n.read_at && (n.id.startsWith('seller-chat:') || n.id.startsWith('seller-refund:'))).length,
         };
       }
       let q = store.client
@@ -526,7 +527,7 @@ export function createOperations(store) {
         .eq("user_id", uid);
       if (f.unread) q = q.is("read_at", null);
       if (f.read) q = q.not("read_at", "is", null);
-      const [result, unread, unreadChat] = await Promise.all([
+      const [result, unread, unreadChat, unreadOrder] = await Promise.all([
         q
           .order("created_at", { ascending: false })
           .order("id")
@@ -539,13 +540,17 @@ export function createOperations(store) {
         store.client.from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", uid).is("read_at", null).like("id", "seller-chat:%"),
+        store.client.from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", uid).is("read_at", null).or("id.like.seller-chat:%,id.like.seller-refund:%"),
       ]);
-      if (result.error || unread.error || unreadChat.error)
+      if (result.error || unread.error || unreadChat.error || unreadOrder.error)
         throw new AppError("Không thể tải thông báo.", 503);
       return {
         ...shape(result.data, result.count, f),
         unread_count: unread.count,
         unread_chat_count: unreadChat.count,
+        unread_order_count: unreadOrder.count,
       };
     },
     async readNotification(uid, id) {

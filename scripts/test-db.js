@@ -1497,6 +1497,10 @@ try {
   const disputed = await chat(user,escrowItem,'request','The delivered product cannot be used');
   await db.query("update profiles set role='customer' where id=$1",[user]);
   assert.equal(disputed.dispute.status,'open');
+  const refundNotice = await scalar("select row_to_json(n) from notifications n where id=$1",['seller-refund:'+escrowOrder]);
+  assert.equal(refundNotice.user_id,sid);
+  assert.equal(refundNotice.read_at,null);
+  assert.equal(refundNotice.href,'/seller?tab=sales');
   await scalar('select seller_support($1,$2,$3)',[sid,disputed.dispute.ticket_id,'Seller support reply for the buyer']);
   assert.equal((await scalar('select seller_support($1)',[sid])).find(t=>t.id===disputed.dispute.ticket_id).messages.at(-1).role,'seller');
   await fails('select seller_support($1,$2,$3)',[outsider,disputed.dispute.ticket_id,'Not my support request']);

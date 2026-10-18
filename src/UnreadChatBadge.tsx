@@ -9,8 +9,8 @@ export function UnreadChatBadge() {
   const sequence = useRef(0);
   const load = async () => {
     const version = ++sequence.current;
-    const data = await api<{ unread_chat_count: number }>('/notifications?page_size=1');
-    if (active.current && version === sequence.current) setCount(data.unread_chat_count || 0);
+    const data = await api<{ unread_order_count?: number; unread_chat_count: number }>('/notifications?page_size=1');
+    if (active.current && version === sequence.current) setCount(data.unread_order_count ?? data.unread_chat_count ?? 0);
   };
   useEffect(() => {
     active.current = true;
@@ -18,5 +18,5 @@ export function UnreadChatBadge() {
     return () => { active.current = false; sequence.current++; };
   }, []);
   useDataRefresh(load, ['/notifications/read', '/order-chat/'], { intervalMs: 10000 });
-  return count > 0 ? <span className="header-chat-badge" aria-label={`${count} tin nhắn chưa đọc`} role="status">{count > 99 ? '99+' : count}</span> : null;
+  return count > 0 ? <span className="header-chat-badge" aria-label={`${count} thông báo đơn hàng chưa đọc`} role="status">{count > 99 ? '99+' : count}</span> : null;
 }

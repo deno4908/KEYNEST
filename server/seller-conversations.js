@@ -131,6 +131,15 @@ export async function sellerConversation(
       created_at: new Date().toISOString(),
     };
     db.seller_disputes.push(dispute);
+    db.notifications ||= [];
+    db.notifications.push({
+      id: `seller-refund:${order.id}`,
+      user_id: actor === order.user_id ? item.seller_id : order.user_id,
+      title: `Yêu cầu hoàn tiền · ${order.number} · ${item.name}`,
+      body: body.trim(),
+      href: actor === order.user_id ? '/seller?tab=sales' : `/orders/${order.id}`,
+      created_at: new Date().toISOString(),
+    });
   } else if (["agree", "reject", "refund"].includes(action)) {
     if (
       !dispute ||

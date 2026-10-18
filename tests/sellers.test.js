@@ -449,6 +449,11 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   buyerProfile.role = 'admin';
   try {
     assert.equal((await req(`/order-chat/${escrowItem.id}`, { action: 'request', body: 'Product delivery needs a refund review' }, buyer.cookie)).status, 200);
+    const inbox = (await req('/notifications?page_size=1', null, login.cookie)).body;
+    assert.equal(inbox.unread_order_count, inbox.unread_chat_count + 1);
+    const notice = store.db.notifications.find(n => n.id === `seller-refund:${escrowOrder.id}`);
+    assert.equal(notice.user_id, escrowItem.seller_id);
+    assert.equal(notice.href, '/seller?tab=sales');
   } finally {
     buyerProfile.role = originalRole;
   }
