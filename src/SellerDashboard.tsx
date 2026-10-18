@@ -330,6 +330,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     />
   );
   const selectedSale = data.sales.find((s) => s.id === detail);
+  const selectedSaleImage = selectedSale && (selectedSale.product_image || data.products.find(p => p.id === selectedSale.product_id)?.image);
   const selectedTicket = tickets.find((t) => t.id === ticketId);
   const saleExport = () =>
     exportCsv("keynest-don-ban.csv", [
@@ -1119,7 +1120,9 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         >
           <div className="seller-sale-detail">
             <div className="seller-sale-product">
-              <span className="seller-sale-product-icon"><Package size={28} /></span>
+              <span className="seller-sale-product-icon">
+                {selectedSaleImage ? <img src={selectedSaleImage} alt={selectedSale.name} loading="lazy" /> : <Package size={28} />}
+              </span>
               <div><h3>{selectedSale.name}</h3><p>{selectedSale.variant_name} · Số lượng: {selectedSale.quantity}</p></div>
               <span className={`badge status-${selectedSale.order.status}`}>{statuses[selectedSale.order.status] || selectedSale.order.status}</span>
             </div>
