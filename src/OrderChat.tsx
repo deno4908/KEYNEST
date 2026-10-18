@@ -138,7 +138,10 @@ export function OrderChat({
   return (
     <Modal
       className="order-chat-modal"
-      title={requesting ? 'Yêu cầu hoàn tiền' : readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Chat với người mua' : data?.seller_name || 'Chat với người bán'}
+      title={<span className="order-chat-heading">
+        <span className="order-chat-heading-icon" aria-hidden="true"><MessageCircle size={22} /></span>
+        <span className="order-chat-heading-copy"><span>{requesting ? 'Yêu cầu hoàn tiền' : readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Chat với người mua' : data?.seller_name || 'Chat với người bán'}</span><small>{requesting ? 'Hỗ trợ xử lý đơn hàng' : 'Trao đổi về sản phẩm và đơn hàng'}</small></span>
+      </span>}
       close={() => !busy && close()}
     >
       <div className="order-chat-intro"><MessageCircle size={20} /><div><strong>{data ? `${data.order_number} · ${data.name}` : 'Đang tải cuộc trò chuyện…'}</strong><p>KEYNEST có thể xem để hỗ trợ đơn hàng.</p></div></div>

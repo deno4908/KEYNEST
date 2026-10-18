@@ -6,13 +6,16 @@ test('chat composer stays visible and order chat trigger has space below it', as
   for (const [width,height] of [[360,740],[390,420],[1440,900]]) {
     await page.setViewportSize({width,height});
     await page.setContent(`<style>${css}</style><div class="modal-backdrop"><section class="modal order-chat-modal">
-      <div class="modal-title"><h2>Deno90991</h2><button class="icon-button">×</button></div>
+      <div class="modal-title"><h2><span class="order-chat-heading"><span class="order-chat-heading-icon">♧</span><span class="order-chat-heading-copy"><span>Deno90991</span><small>Trao đổi về sản phẩm và đơn hàng</small></span></span></h2><button class="icon-button">×</button></div>
       <div class="order-chat-intro"><div><strong>KN-6F5B63331315 · Product</strong><p>Order conversation</p></div></div>
       <div class="order-chat-messages">${Array.from({length:30},(_,i)=>`<article class="chat-message"><strong>Buyer</strong><p>Message ${i}</p><small>12:20</small></article>`).join('')}</div>
       <form class="order-chat-composer"><textarea aria-label="Message" rows="1" placeholder="Message"></textarea><button class="button" type="button" aria-label="Send">➤</button></form>
       <div class="order-chat-tools"><button class="button button-outline">Request refund</button></div>
     </section></div>`);
     const input = page.getByRole('textbox');
+    const modal = await page.locator('.order-chat-modal').boundingBox();
+    const heading = await page.locator('.order-chat-heading').boundingBox();
+    expect(heading!.x - modal!.x).toBeGreaterThanOrEqual(20);
     await input.fill('Hello');
     await expect(input).toHaveCSS('resize','none');
     const bounds = await input.boundingBox();

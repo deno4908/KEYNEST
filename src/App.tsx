@@ -143,7 +143,7 @@ export function Modal({
   wide = false,
   className = "",
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   close: () => void;
   wide?: boolean;

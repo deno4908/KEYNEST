@@ -1,6 +1,12 @@
 .modal-backdrop > .modal.order-chat-modal { width:min(620px,calc(100vw - 32px)); height:min(760px,calc(100dvh - 48px)); max-height:none; display:flex; flex-direction:column; padding:0; overflow:hidden; border-radius:20px; background:#191a1e; }
-.order-chat-modal > .modal-title { flex-shrink:0; position:static; margin:0; padding:16px 20px; min-height:64px; border-bottom:1px solid #303238; }
-.order-chat-modal > .modal-title h2 { font-size:17px; overflow-wrap:anywhere; }
+.modal.order-chat-modal > .modal-title { flex-shrink:0; position:static; margin:0; padding:20px 24px; min-height:84px; gap:16px; border-bottom:1px solid #303238; background:#1d1e24; }
+.modal.order-chat-modal > .modal-title h2 { flex:1; min-width:0; margin:0; font-size:17px; overflow-wrap:anywhere; }
+.order-chat-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+.order-chat-heading-icon { display:grid; place-items:center; width:44px; height:44px; flex-shrink:0; border:1px solid #ff9c7830; border-radius:14px; color:#ffad8d; background:#ff704512; }
+.order-chat-heading-copy { display:grid; gap:5px; min-width:0; line-height:1.4; }
+.order-chat-heading-copy > span { overflow-wrap:anywhere; }
+.order-chat-heading-copy > small { font-size:11px; font-weight:400; letter-spacing:0; color:#a6a9b8; }
+.modal.order-chat-modal > .modal-title .icon-button { width:36px; height:36px; flex-shrink:0; border:1px solid #383b45; border-radius:50%; background:#25272e; color:#bfc3cf; }
 .order-chat-modal > .form-error { flex-shrink:0; margin:8px 16px; }
 .order-chat-modal .order-chat-intro { flex-shrink:0; padding:12px 20px; gap:10px; border-bottom:1px solid #282a31; }
 .order-chat-intro > div { min-width:0; }
@@ -32,7 +38,7 @@
 .order-detail-page .order-chat-trigger { margin:12px 0 18px; }
 @media(max-width:600px) {
  .modal-backdrop > .modal.order-chat-modal { width:100%; height:100dvh; margin:0; border:0; border-radius:0; padding:0; overflow:hidden; }
- .order-chat-modal > .modal-title { padding:max(12px,env(safe-area-inset-top)) 16px 12px; margin:0; }
+ .modal.order-chat-modal > .modal-title { padding:max(18px,env(safe-area-inset-top)) 20px 18px; margin:0; }
  .order-chat-modal .order-chat-intro { padding:10px 16px; }
 }
 .order-chat-intro { display:flex; align-items:center; gap:12px; padding: 4px 0 16px; color:#e7e7ed; }
