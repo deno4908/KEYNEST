@@ -583,15 +583,20 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           <div className="seller-product-list">
             {displayed(products).map((p) => (
               <article key={p.id}>
-                <img src={p.image} alt="" />
-                <div>
-                  <Link to={`/products/${p.slug}`}>
-                    <strong>{p.name}</strong>
-                  </Link>
-                  <p>
-                    {p.review_status !== 'approved' ? (p.review_status === 'rejected' ? `Từ chối: ${p.review_reason}` : 'Chờ admin kiểm hàng') : p.active ? "Đang bán" : "Đã ẩn"} · {p.variants.length} gói
-                    · {stock(p)} tồn kho
-                  </p>
+                <span className="seller-product-cover">
+                  {p.image ? <img src={p.image} alt={p.name} loading="lazy" /> : <Package size={28} />}
+                </span>
+                <div className="seller-product-copy">
+                  <div className="seller-product-heading">
+                    {p.active && p.review_status === 'approved' ? <Link to={`/products/${p.slug}`}><strong>{p.name}</strong></Link> : <strong>{p.name}</strong>}
+                    <span className={`seller-review-badge seller-review-${p.review_status || 'pending'}`}>
+                      {p.review_status === 'approved' ? (p.active ? 'Đang bán' : 'Đã ẩn') : p.review_status === 'rejected' ? 'Cần chỉnh sửa' : 'Chờ duyệt'}
+                    </span>
+                  </div>
+                  <p className="seller-product-meta">{p.variants.length} gói bán · {p.variants.some(v => v.unlimited) ? 'Kho không giới hạn' : `${stock(p)} tồn kho`}</p>
+                  {p.review_status !== 'approved' && <p className="seller-product-review-note">
+                    {p.review_status === 'rejected' ? `Lý do từ chối: ${p.review_reason || 'Liên hệ hỗ trợ để biết thêm.'}` : 'Admin đang kiểm tra. Sản phẩm sẽ được mở bán sau khi duyệt.'}
+                  </p>}
                   <details>
                     <summary>Xem gói & nhập kho</summary>
                     <div className="seller-stock-list">
@@ -600,10 +605,10 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                           <span>
                             {v.name} · {money(v.price)} ·{" "}
                             <b className={v.stock <= 5 ? "orange" : ""}>
-                              {v.is_preorder ? 'Còn lượt đặt' : 'Tồn'} {v.stock}
+                              {v.unlimited ? 'Không giới hạn' : `${v.is_preorder ? 'Còn lượt đặt' : 'Tồn'} ${v.stock}`}
                             </b>
                           </span>
-                          {v.delivery === "key" && (
+                          {v.delivery === "key" && !v.unlimited && (
                             <button
                               className="button button-small button-outline"
                               onClick={() =>
@@ -634,7 +639,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                   </button>
                   <button
                     className="icon-button"
-                    disabled={busy}
+                    disabled={busy || (!p.active && p.review_status !== 'approved')}
                     aria-label={`${p.active ? "Ẩn bán" : "Mở bán"} ${p.name}`}
                     title={p.review_status !== 'approved' ? 'Cần admin duyệt trước khi mở bán' : undefined}
                     onClick={() =>
