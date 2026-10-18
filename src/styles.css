@@ -3592,3 +3592,8 @@ td small {
 }
 .admin-delete-button { color: #ff9b9b !important; border-color: #713d43 !important; }
 .admin-delete-button:hover:not(:disabled) { background: #3b2228 !important; }
+.order-summary > .checkout-stock-error {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  line-height: 1.6;
+}

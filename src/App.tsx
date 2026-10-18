@@ -1332,7 +1332,7 @@ function CartPage() {
               <ArrowRight size={17} />
             </button>
             {unavailable && (
-              <p className="form-error">Có sản phẩm không còn đủ số lượng.</p>
+              <p className="form-error checkout-stock-error" role="status">Có sản phẩm không còn đủ số lượng.</p>
             )}
             <p className="checkout-note">
               <ShieldCheck size={15} />
