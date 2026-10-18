@@ -325,7 +325,7 @@ export function Admin() {
                                 <Pencil size={14} />
                                 Quản lý
                               </button>
-                              {p.seller_id && <div className="admin-product-review-actions">
+                              {p.seller_id && p.review_status === 'pending' && <div className="admin-product-review-actions">
                                 <button className="button button-outline button-small admin-product-approve" disabled={busy} onClick={async () => {
                                   if (!window.confirm(`Đã kiểm tra thông tin, gói bán và hàng của “${p.name}”? Duyệt sẽ mở bán sản phẩm.`)) return;
                                   setBusy(true);
