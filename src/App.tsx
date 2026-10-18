@@ -1,4 +1,5 @@
 import { useAccountCart } from "./useAccountCart";
+import { UnreadChatBadge } from './UnreadChatBadge';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
@@ -440,11 +441,14 @@ export function App() {
                 }
               >
                 {user ? (
+                  <span className="header-avatar-wrap">
                   <Avatar
                     name={user.name}
                     url={user.avatar_url}
                     className="header-avatar signed-in"
                   />
+                  {user.role === 'seller' && <UnreadChatBadge key={user.id} />}
+                  </span>
                 ) : (
                   <span className="header-avatar">
                     <UserRound size={19} />

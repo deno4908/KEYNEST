@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import { useDataRefresh } from './useDataRefresh';
 import { Link } from "react-router-dom";
 import { Bell, Monitor, ShieldCheck, Smartphone, LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 import "./sessions.css";
@@ -171,6 +172,7 @@ export function NotificationInbox({ history = false }: { history?: boolean } = {
   const [version, setVersion] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  useDataRefresh(() => setVersion(v => v + 1), ['/notifications/read', '/order-chat/'], { intervalMs: 10000 });
   useEffect(() => {
     const c = new AbortController();
     setError("");

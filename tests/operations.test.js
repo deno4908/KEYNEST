@@ -46,6 +46,21 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
   const admin = (await login("admin@keynest.local", "Admin123!")).cookie;
   let buyer = (await login()).cookie;
   const uid = (await req("/me", buyer)).data.id;
+  await t.test('unread chat count is scoped, independent of pagination and only clears on explicit read', async () => {
+    store.db.notifications ||= [];
+    const ids = [randomUUID(), randomUUID()].map(id => `seller-chat:${id}`);
+    for (const id of ids) store.db.notifications.push({ id, user_id: uid, title: 'New message', href: '/account', created_at: new Date().toISOString() });
+    const get = async () => (await req('/notifications?page_size=1', buyer)).data;
+    assert.equal((await get()).unread_chat_count, 2);
+    assert.equal((await get()).unread_chat_count, 2);
+    assert.equal((await req('/notifications', admin)).data.unread_chat_count, 0);
+    assert.equal((await req('/notifications/read', admin, { id: ids[0] })).status, 404);
+    await req('/notifications/read', buyer, { id: ids[0] });
+    assert.equal((await get()).unread_chat_count, 1);
+    await req('/notifications/read', buyer, { id: ids[1] });
+    assert.equal((await get()).unread_chat_count, 0);
+    store.db.notifications = store.db.notifications.filter(n => !ids.includes(n.id));
+  });
   await t.test('email registration appears in customer list and role filters apply before pagination', async () => {
     const registration = await req('/auth/register', '', { email: 'listed@example.test', password: 'Registered123!', name: 'Listed Customer' });
     assert.equal(registration.status, 200);
