@@ -47,6 +47,7 @@ export async function sellerConversation(
     (!deadline || Date.parse(deadline) > Date.now());
   let dispute = db.seller_disputes.find((d) => d.order_id === order.id);
   if (action === "message") {
+    if (user.role === 'admin') throw new AppError('Quản trị viên chỉ được xem cuộc trò chuyện. Hãy phản hồi qua yêu cầu hỗ trợ.', 403);
     if (
       user.role === "admin" ||
       !body.trim() ||
@@ -171,6 +172,8 @@ export async function sellerConversation(
     seller_hold_until: deadline,
     seller_settled_at: item.seller_settled_at,
     can_request: canRequest,
+    can_message: user.role !== 'admin',
+    viewer_role: user.role === 'admin' ? 'admin' : actor === order.user_id ? 'customer' : 'seller',
     dispute: dispute
       ? dispute.item_id !== itemId &&
         actor !== order.user_id &&

@@ -401,6 +401,17 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
       .status,
     403,
   );
+  const buyerChat = (await req(`/order-chat/${escrowItem.id}`, null, buyer.cookie)).body;
+  assert.equal(buyerChat.viewer_role, 'customer');
+  assert.equal(buyerChat.can_message, true);
+  const sellerChat = (await req(`/order-chat/${escrowItem.id}`, null, login.cookie)).body;
+  assert.equal(sellerChat.viewer_role, 'seller');
+  assert.equal(sellerChat.can_message, true);
+  const adminChat = (await req(`/order-chat/${escrowItem.id}`, null, admin.cookie)).body;
+  assert.equal(adminChat.can_message, false);
+  assert.equal(adminChat.viewer_role, 'admin');
+  const deniedMessage = await req(`/order-chat/${escrowItem.id}`, { action: 'message', body: 'Admin test', request_id: randomUUID() }, admin.cookie);
+  assert.equal(deniedMessage.status, 403);
   const message = {
     action: "message",
     body: "Can you check my order?",

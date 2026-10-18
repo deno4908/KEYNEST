@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, post, date, money } from "./api";
-import { Modal } from "./App";
+import { Modal, useStore } from "./App";
+import { Send, MessageCircle } from 'lucide-react';
+import './order-chat.css';
 import { useDataRefresh } from "./useDataRefresh";
 
 export type SellerDispute = {
@@ -13,6 +15,8 @@ export type SellerDispute = {
   can_agree?: boolean;
 };
 type Conversation = {
+  viewer_role?: string;
+  can_message?: boolean;
   name: string;
   seller_name: string;
   order_number: string;
@@ -63,6 +67,7 @@ export function OrderChat({
   admin?: boolean;
 }) {
   const messageId = useId();
+  const { user } = useStore();
   const [data, setData] = useState<Conversation | null>(null),
     [error, setError] = useState(""),
     [body, setBody] = useState(""),
@@ -72,13 +77,20 @@ export function OrderChat({
     [decision, setDecision] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const sequence = useRef(0);
+  const readOnly = admin || user?.role === 'admin' || data?.can_message === false;
+  const viewerRole = data?.viewer_role || (user?.role === 'seller' ? 'seller' : 'customer');
+  const logRef = useRef<HTMLDivElement>(null);
+  const followLatest = useRef(true);
+  const lastMessage = data?.messages.at(-1)?.id;
+  useEffect(() => {
+    if (followLatest.current && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [lastMessage]);
   const load = async () => {
     const version = ++sequence.current;
     try {
       const next = await api<Conversation>(`/order-chat/${itemId}`);
       if (version === sequence.current) {
         setData(next);
-        setError("");
       }
     } catch (e) {
       if (version === sequence.current) setError((e as Error).message);
@@ -95,6 +107,7 @@ export function OrderChat({
     enabled: !busy,
   });
   const send = async (action: string) => {
+    if (busy || (action === 'message' && (readOnly || !body.trim()))) return;
     setBusy(true);
     setError("");
     sequence.current++;
@@ -107,6 +120,7 @@ export function OrderChat({
         }),
       );
       if (action === "message") {
+        followLatest.current = true;
         setBody("");
         setRequestId(crypto.randomUUID());
       } else {
@@ -124,14 +138,11 @@ export function OrderChat({
     data?.dispute && ["open", "agreed"].includes(data.dispute.status);
   return (
     <Modal
+      className="order-chat-modal"
       title={data ? `${data.order_number} · ${data.name}` : "Trao đổi đơn hàng"}
       close={() => !busy && close()}
     >
-      <p className="muted">
-        Cuộc trò chuyện riêng giữa người mua và{" "}
-        {data?.seller_name || "người bán"}. KEYNEST có thể xem khi xử lý hỗ trợ.
-        Tự cập nhật mỗi 5 giây; hiển thị 200 tin gần nhất.
-      </p>
+      <div className="order-chat-intro"><MessageCircle size={22} /><div><strong>{readOnly ? 'Theo dõi cuộc trò chuyện' : viewerRole === 'seller' ? 'Trao đổi với người mua' : data?.seller_name || 'Trao đổi với người bán'}</strong><p>Trao đổi về đơn hàng · KEYNEST có thể xem để hỗ trợ.</p></div></div>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -140,31 +151,34 @@ export function OrderChat({
       {data && (
         <>
           <div
-            className="seller-conversation"
+            className="order-chat-messages"
+            ref={logRef}
+            onScroll={() => { const el = logRef.current; if (el) followLatest.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; }}
             role="log"
             aria-label="Tin nhắn đơn hàng"
             aria-live="polite"
           >
-            {!data.messages.length && <p>Chưa có tin nhắn.</p>}
+            {!data.messages.length && <div className="order-chat-empty"><MessageCircle size={32} /><strong>Bắt đầu cuộc trò chuyện</strong><p>Gửi lời nhắn để trao đổi về sản phẩm và đơn hàng.</p></div>}
             {data.messages.map((m) => (
-              <article key={m.id}>
+              <article key={m.id} className={!readOnly && m.role === viewerRole ? 'chat-message chat-message-own' : 'chat-message'}>
                 <strong>
-                  {m.role === "seller" ? "Người bán" : "Người mua"}
+                  {!readOnly && m.role === viewerRole ? 'Bạn' : m.role === "seller" ? "Người bán" : "Người mua"}
                 </strong>
-                <small> · {date(m.created_at)}</small>
                 <p className="seller-preserve">{m.body}</p>
+                <small>{date(m.created_at)}</small>
               </article>
             ))}
           </div>
-          {!admin && (
+          {readOnly && <p className="order-chat-readonly">Chế độ xem dành cho quản trị viên. Phản hồi khách hàng qua mục Hỗ trợ.</p>}
+          {!readOnly && (
             <form
-              className="form"
+              className="order-chat-composer"
               onSubmit={(e) => {
                 e.preventDefault();
                 void send("message");
               }}
             >
-              <label htmlFor={messageId}>Tin nhắn</label>
+              <label className="sr-only" htmlFor={messageId}>Tin nhắn</label>
               <textarea
                 id={messageId}
                 disabled={busy}
@@ -174,11 +188,15 @@ export function OrderChat({
                   setRequestId(crypto.randomUUID());
                 }}
                 required
+                placeholder="Nhập tin nhắn…"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send('message'); }
+                }}
                 maxLength={3000}
-                rows={3}
+                rows={2}
               />
-              <button className="button" disabled={busy || !body.trim()}>
-                Gửi tin nhắn
+              <button className="button" aria-label="Gửi tin nhắn" disabled={busy || !body.trim()}>
+                <Send size={19} /><span>{busy ? 'Đang gửi…' : 'Gửi'}</span>
               </button>
             </form>
           )}
@@ -208,7 +226,7 @@ export function OrderChat({
                 )}
             </section>
           )}
-          {!admin && !data.dispute && data.can_request && (
+          {!readOnly && !data.dispute && data.can_request && (
             <button
               className="button button-outline"
               onClick={() => setRequesting(!requesting)}
