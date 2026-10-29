@@ -1,5 +1,5 @@
 // Smoke test the real built assets served by Node, including CSP and cookies.
-import { chromium } from "@playwright/test";
+import { chromium, expect } from "@playwright/test";
 import { existsSync, mkdtempSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -31,12 +31,13 @@ try {
     if (m.type() === "error" && /content security policy/i.test(m.text()))
       csp.push(m.text());
   });
-  const response = await page.goto(base, { waitUntil: "networkidle" });
+  // SSE intentionally stays open. Wait for rendered content rather than for
+  // all network connections to become idle.
+  const response = await page.goto(base, { waitUntil: "domcontentloaded" });
   assert.ok(response.headers()["content-security-policy"]);
-  assert.equal(await page.locator(".product-card").count(), 12);
+  await expect(page.locator(".product-card")).toHaveCount(12);
   await page.locator(".account-button").click();
-  await page.waitForLoadState("networkidle");
-  assert.ok(await page.locator(".auth-dialog").isVisible());
+  await expect(page.locator(".auth-dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   const login = await page.request.post(base + "/api/auth/login", {
     headers: { Origin: base, "X-App-Request": "keynest" },
@@ -88,10 +89,12 @@ try {
     "/promotions",
     "/guide",
   ]) {
-    await page.goto(base + route, { waitUntil: "networkidle" });
+    await page.goto(base + route, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('main .loading')).toHaveCount(0);
     if (route === `/orders/${order.id}`) {
-      assert.equal(await page.locator(".delivered-key code").count(), 1);
-      assert.ok(await page.locator(".warranty-section").isVisible());
+      await expect(page.locator(".delivered-key code")).toHaveCount(1);
+      await expect(page.locator(".warranty-section")).toBeVisible();
     }
     assert.equal(await page.locator(".form-error").count(), 0, route);
     for (const width of [1440, 390]) {
@@ -115,8 +118,8 @@ try {
     headers: { Origin: base, "X-App-Request": "keynest" },
     data: { email: "admin@keynest.local", password: "Admin123!" },
   });
-  await page.goto(base + "/admin", { waitUntil: "networkidle" });
-  assert.ok(await page.locator(".admin-nav").isVisible());
+  await page.goto(base + "/admin", { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".admin-nav")).toBeVisible();
   await page.screenshot({ path: ".data/qa/admin-desktop.png", fullPage: true });
   assert.deepEqual(errors, []);
   assert.deepEqual(csp, []);

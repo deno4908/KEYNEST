@@ -187,6 +187,37 @@ try {
   pass(
     "auth trigger creates customer profile and inventory imports update stock",
   );
+  {
+    await db.exec('begin');
+    const fingerprint = () => scalar('select public.catalog_live_version()');
+    const initial = await fingerprint();
+    assert.match(initial, /^[a-f0-9]{32}$/);
+    assert.equal(await fingerprint(), initial);
+    await db.query('update variants set stock=stock+1 where id=$1', [variant]);
+    const changedStock = await fingerprint();
+    assert.notEqual(changedStock, initial);
+    await db.query("update products set description='Changed catalog content' where id=$1", [product]);
+    const changedProduct = await fingerprint();
+    assert.notEqual(changedProduct, changedStock);
+    await db.query('update products set seller_id=$2 where id=$1', [product, other]);
+    await db.query("update products set active=true,review_status='approved' where id=$1", [product]);
+    const sellerProduct = await fingerprint();
+    await db.query("update profiles set seller_name='New storefront name' where id=$1", [other]);
+    const changedSeller = await fingerprint();
+    assert.notEqual(changedSeller, sellerProduct);
+    await db.query('update profiles set balance=balance+1 where id=$1', [other]);
+    assert.equal(await fingerprint(), changedSeller, 'private balances do not change public catalog fingerprint');
+    await db.query("insert into reviews(user_id,product_id,name,rating,comment) values($1,$2,'Buyer',5,'Good product')", [user, product]);
+    const changedReview = await fingerprint();
+    assert.notEqual(changedReview, changedSeller);
+    await db.query('update variants set active=false where id=$1', [variant]);
+    assert.notEqual(await fingerprint(), changedReview);
+    for (const role of ['anon', 'authenticated'])
+      assert.equal(await scalar('select has_function_privilege($1,$2,$3)', [role, 'catalog_live_version()', 'EXECUTE']), false);
+    assert.equal(await scalar("select has_function_privilege('service_role','catalog_live_version()','EXECUTE')"), true);
+    await db.exec('rollback');
+    pass('catalog fingerprint detects stock, product, seller, rating and visibility changes; excludes private balances; service-only access');
+  }
   await db.exec("begin");
   const catalogProduct = randomUUID(),
     hiddenProduct = randomUUID();
@@ -1880,6 +1911,48 @@ try {
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),0);
   const polls=await db.query('select * from claim_tingee_polls()');
   assert.equal(polls.rows.length,1);assert.equal((await db.query('select * from claim_tingee_polls()')).rows.length,0);
+  {
+    await db.exec('begin');
+    let job = Object.values(polls.rows[0])[0];
+    assert.ok(job.claim_token && job.polled_at);
+    assert.equal(job.qr_image, undefined);
+    assert.ok(!JSON.stringify(job).includes(routeData.qr_image));
+    const ack = (token, error = null, closed = false, failed = false) =>
+      scalar('select finish_tingee_poll($1,$2,$3,$4,$5)', [paymentId, token, error, closed, failed]);
+    assert.equal(await ack(randomUUID()), false);
+    // Even a legacy worker writing a past VPS timestamp cannot steal the lease.
+    await db.query("update payment_routes set next_poll_at=now()-interval '1 day' where payment_id=$1", [paymentId]);
+    assert.equal((await db.query('select * from claim_tingee_polls()')).rows.length, 0);
+    const stale = job.claim_token;
+    await db.query("update payment_routes set lease_until=now()-interval '1 second' where payment_id=$1", [paymentId]);
+    job = Object.values((await db.query('select * from claim_tingee_polls()')).rows[0])[0];
+    assert.notEqual(job.claim_token, stale);
+    assert.equal(await ack(stale), false);
+    assert.equal(await ack(job.claim_token), true);
+    let seconds = Number(await scalar('select extract(epoch from next_poll_at-clock_timestamp()) from payment_routes where payment_id=$1', [paymentId]));
+    assert.ok(seconds > 3 && seconds <= 5, `healthy pending delay ${seconds}`);
+    for (const minimum of [14, 29, 59]) {
+      await db.query("update payment_routes set next_poll_at=now()-interval '1 second' where payment_id=$1", [paymentId]);
+      job = Object.values((await db.query('select * from claim_tingee_polls()')).rows[0])[0];
+      assert.equal(await ack(job.claim_token, 'tingee_timeout', true, true), true);
+      seconds = Number(await scalar('select extract(epoch from next_poll_at-clock_timestamp()) from payment_routes where payment_id=$1', [paymentId]));
+      assert.ok(seconds > minimum && seconds <= minimum + 1, `failure delay ${seconds}`);
+      assert.equal(await scalar('select remote_closed from payment_routes where payment_id=$1', [paymentId]), false);
+    }
+    // Recovery resets retry count. Terminal static routes remain monitored, slowly.
+    await db.query("update payment_routes set qr_kind='static',next_poll_at=now()-interval '1 second' where payment_id=$1", [paymentId]);
+    await db.query("update payments set status='expired' where id=$1", [paymentId]);
+    job = Object.values((await db.query('select * from claim_tingee_polls()')).rows[0])[0];
+    assert.equal(await ack(job.claim_token), true);
+    seconds = Number(await scalar('select extract(epoch from next_poll_at-clock_timestamp()) from payment_routes where payment_id=$1', [paymentId]));
+    assert.ok(seconds > 598 && seconds <= 600);
+    assert.equal(await scalar('select poll_failures from payment_routes where payment_id=$1', [paymentId]), 0);
+    for (const role of ['anon', 'authenticated'])
+      assert.equal(await scalar('select has_function_privilege($1,$2,$3)', [role, 'finish_tingee_poll(uuid,uuid,text,boolean,boolean)', 'EXECUTE']), false);
+    assert.equal(await scalar("select has_function_privilege('service_role','finish_tingee_poll(uuid,uuid,text,boolean,boolean)','EXECUTE')"), true);
+    await db.exec('rollback');
+    pass('Tingee polling omits QR blobs, leases reject stale workers, DB-time scheduling enforces retry/backoff, errors never close routes and RPC is service-only');
+  }
   assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','tingee-paid',paymentCode,33000,routeData.bill_id])).paid,true);
   assert.equal((await scalar('select settle_routed_payment($1,$2,$3,$4,$5)', ['tingee','tingee-paid',paymentCode,33000,routeData.bill_id])).duplicate,true);
   assert.equal(Number(await scalar('select balance from profiles where id=$1',[routeUser])),33000);

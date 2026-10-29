@@ -272,7 +272,7 @@ function memoryStore(
   settlementResult = { paid: true },
 ) {
   let saved = { ...initial };
-  const settlements = [];
+  const settlements = [], acknowledgements = [];
   const store = {
     query: async (p) => (await p).data,
     client: {
@@ -297,8 +297,17 @@ function memoryStore(
           };
           return { data: true };
         }
-        if (name === "claim_tingee_polls")
+        if (name === "claim_tingee_polls") {
+          saved.claim_token ||= 'poll-claim';
           return { data: [{ ...saved, payment: saved.payment || payment }] };
+        }
+        if (name === 'finish_tingee_poll') {
+          acknowledgements.push(args);
+          if (args.p_claim !== saved.claim_token) return { data: false };
+          saved = { ...saved, remote_closed: args.p_closed && !args.p_failed,
+            last_error: args.p_error, claim_token: null };
+          return { data: true };
+        }
         if (name === "settle_routed_payment") {
           settlements.push(args);
           return { data: settlementResult };
@@ -306,19 +315,11 @@ function memoryStore(
         throw new Error("Unexpected RPC");
       },
       from(table) {
-        assert.equal(table, "payment_routes");
-        return {
-          update: (data) => ({
-            eq: async () => {
-              saved = { ...saved, ...data };
-              return { data: null };
-            },
-          }),
-        };
+        assert.fail(`Polling must acknowledge through RPC, not PATCH ${table}`);
       },
     },
   };
-  return { store, read: () => saved, settlements };
+  return { store, read: () => saved, settlements, acknowledgements };
 }
 test("one creation claim across concurrent requests; primary is pinned after publication", async () => {
   const db = memoryStore();
@@ -423,6 +424,7 @@ test("polling credits a fully paid exact bill and status failures never switch t
       },
     });
     await router.tick();
+    assert.equal(db.acknowledgements.length, 1);
     assert.equal(db.settlements.length, outcome === "paid" ? 1 : 0);
     assert.equal(db.read().provider, "tingee");
     if (outcome === "paid") {
@@ -444,13 +446,13 @@ test("a database-ignored Tingee settlement remains pollable and records a diagno
 
   await router.tick();
 
-  assert.equal(db.read().remote_closed, undefined);
+  assert.notEqual(db.read().remote_closed, true);
   assert.equal(db.read().last_error, "tingee_settlement_ignored");
   assert.equal(db.settlements.length, 1);
   assert.ok(logs.some((message) => message.includes("tingee_settlement_ignored")));
 });
 
-test("active dynamic QR bills are scheduled for a five-second reconciliation retry", async () => {
+test("active dynamic QR uses one acknowledgement and lets database time schedule the next check", async () => {
   const db = memoryStore(route);
   const router = createPaymentRouting({
     store: db.store,
@@ -460,12 +462,45 @@ test("active dynamic QR bills are scheduled for a five-second reconciliation ret
       status: async () => ({ ...bill, status: "active", totalAmountPaid: 0 }),
     },
   });
-  const startedAt = Date.now();
-
   await router.tick();
+  assert.deepEqual(db.acknowledgements, [{ p_id: payment.id, p_claim: 'poll-claim',
+    p_error: null, p_closed: false, p_failed: false }]);
+});
 
-  const delay = Date.parse(db.read().next_poll_at) - startedAt;
-  assert.ok(delay >= 4000 && delay <= 6000, `expected about 5s, got ${delay}ms`);
+test('idle queue reads back off using monotonic time and preparing a QR wakes the queue', async () => {
+  const db = memoryStore();
+  let clock = 0, claims = 0;
+  const rpc = db.store.client.rpc;
+  db.store.client.rpc = async (name, args) => {
+    if (name === 'claim_tingee_polls') { claims++; return { data: [] }; }
+    return rpc(name, args);
+  };
+  const router = createPaymentRouting({ store: db.store, config, logger,
+    monotonicNow: () => clock, client: { generate: async () => route } });
+  await router.tick();
+  clock = 1000; await router.tick();
+  clock = 29000; await router.tick();
+  assert.equal(claims, 1);
+  clock = 30000; await router.tick();
+  assert.equal(claims, 2);
+  await router.prepare(payment);
+  await router.tick();
+  assert.equal(claims, 3, 'new local payment bypasses the idle delay');
+});
+
+test('static monitoring uses the claimed database time and failure never closes the original route', async () => {
+  for (const fail of [false, true]) {
+    const db = memoryStore({ ...route, qr_kind: 'static',
+      polled_at: new Date(Date.parse(payment.expires_at) + 8 * 24 * 3600000).toISOString() });
+    const router = createPaymentRouting({ store: db.store, config, logger, client: {
+      transactions: async () => { if (fail) throw new Error('tingee_timeout'); return []; },
+    } });
+    await router.tick();
+    assert.equal(db.acknowledgements.length, 1);
+    assert.equal(db.read().remote_closed, !fail);
+    assert.equal(db.acknowledgements[0].p_failed, fail);
+    assert.equal(db.read().provider, 'tingee');
+  }
 });
 
 test("a provider-paid bill that needs review is not reported as a successful settlement", async () => {

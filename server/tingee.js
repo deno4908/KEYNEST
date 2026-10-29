@@ -202,7 +202,8 @@ export function createTingeeClient(config, fetcher = fetch) {
         throw new Error('tingee_static_va_required');
       }
       const start=Date.parse(route.payment.created_at);
-      const end=Math.min(Date.now(),Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS);
+      const polledAt = Date.parse(route.polled_at);
+      const end=Math.min(Number.isFinite(polledAt) ? polledAt : Date.now(),Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS);
       if (!Number.isFinite(start) || !Number.isFinite(end) || end<start || end-start>10*24*3600000)
         throw new Error('tingee_invalid_response');
       const items=[];

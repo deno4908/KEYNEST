@@ -16,7 +16,9 @@ export function createPaymentRouting({
   config,
   client = createTingeeClient(config.tingee),
   logger = console,
+  monotonicNow = () => performance.now(),
 }) {
+  let running = false, nextCheckAt = 0, lastClaimAt = -Infinity;
   const rpc = (name, args) => store.query(store.client.rpc(name, args));
   async function prepare(payment) {
     if (!payment || config.mode === "demo") return null;
@@ -84,19 +86,26 @@ export function createPaymentRouting({
       p_id: payment.id,
       p_claim: randomUUID(),
     });
+    nextCheckAt = 0;
+    lastClaimAt = monotonicNow();
     return saved || null;
   }
-  let running = false;
   async function tick() {
-    if (running || config.mode !== "supabase" || !tingeeReady(config.tingee))
+    if (running || monotonicNow() < nextCheckAt || config.mode !== "supabase" || !tingeeReady(config.tingee))
       return;
     running = true;
     try {
       const rows = await rpc("claim_tingee_polls");
+      if (rows.length) lastClaimAt = monotonicNow();
+      // No pending work recently: keep the timer cheap, query the DB at most
+      // every 30s. Preparing a new QR wakes the local queue immediately.
+      nextCheckAt = monotonicNow() + (rows.length || monotonicNow() - lastClaimAt < 60000 ? 5000 : 30000);
       // Bound request concurrency. Jobs are claimed durably across Node instances.
       for (let i = 0; i < rows.length; i += 4)
         await Promise.all(
           rows.slice(i, i + 4).map(async (route) => {
+            let closed = false, failed = false, lastError = null;
+            const polledAt = Number.isFinite(Date.parse(route.polled_at)) ? Date.parse(route.polled_at) : Date.now();
             try {
               if (route.qr_kind === 'static') {
                 const transactions=await client.transactions(route);
@@ -110,11 +119,8 @@ export function createPaymentRouting({
                 }
                 // A static QR cannot be disabled. Keep scanning paid/cancelled/
                 // expired orders for seven days to flag extra or late transfers.
-                await store.query(store.client.from('payment_routes').update({
-                  remote_closed:Date.now()>=Date.parse(route.payment.expires_at)+STATIC_MONITOR_MS,
-                  last_error:transactions.length===0 && route.payment.status==='pending'
-                    ? 'tingee_no_matching_credit' : null,
-                }).eq('payment_id',route.payment_id));
+                closed = polledAt >= Date.parse(route.payment.expires_at) + STATIC_MONITOR_MS;
+                lastError = transactions.length===0 && route.payment.status==='pending' ? 'tingee_no_matching_credit' : null;
                 return;
               }
               const status = await client.status(route);
@@ -138,41 +144,22 @@ export function createPaymentRouting({
                   throw new Error("tingee_settlement_ignored");
                 }
                 if (settlement?.review) {
-                  await store.query(
-                    store.client
-                      .from("payment_routes")
-                      .update({
-                        remote_closed: true,
-                        last_error: "tingee_payment_review",
-                      })
-                      .eq("payment_id", route.payment_id),
-                  );
+                  closed = true;
+                  lastError = 'tingee_payment_review';
                   return;
                 }
                 if (settlement?.duplicate) {
-                  await store.query(
-                    store.client
-                      .from("payment_routes")
-                      .update({
-                        remote_closed: true,
-                        last_error: "tingee_duplicate_review",
-                      })
-                      .eq("payment_id", route.payment_id),
-                  );
+                  closed = true;
+                  lastError = 'tingee_duplicate_review';
                   return;
                 }
                 if (!settlement?.paid) {
                   throw new Error("tingee_settlement_unconfirmed");
                 }
-                await store.query(
-                  store.client
-                    .from("payment_routes")
-                    .update({ remote_closed: true, last_error: null })
-                    .eq("payment_id", route.payment_id),
-                );
+                closed = true;
               } else if (
                 route.payment.status !== "pending" ||
-                Date.parse(route.payment.expires_at) <= Date.now()
+                Date.parse(route.payment.expires_at) <= polledAt
               ) {
                 // Read first, then disable. A final read catches money arriving during deletion.
                 if (status.status !== "expired" && status.status !== "deleted")
@@ -190,43 +177,23 @@ export function createPaymentRouting({
                     p_bill: route.bill_id,
                   });
                 }
-                await store.query(
-                  store.client
-                    .from("payment_routes")
-                    .update({ remote_closed: true, last_error: null })
-                    .eq("payment_id", route.payment_id),
-                );
+                closed = true;
               }
             } catch (error) {
-              const failure=tingeeFailureCode(error);
-              logger.error(
-                `Tingee status check deferred (${failure}); retaining the original payment provider.`,
+              failed = true;
+              lastError = tingeeFailureCode(error);
+              if (route.last_error !== lastError) logger.error(
+                `Tingee status check deferred (${lastError}); retaining the original payment provider.`,
               );
-              await store
-                .query(
-                  store.client
-                    .from("payment_routes")
-                    .update({ last_error: failure })
-                    .eq("payment_id", route.payment_id),
-                )
-                .catch(() => {});
             } finally {
-              await store
-                .query(
-                  store.client
-                    .from("payment_routes")
-                    .update({
-                      next_poll_at: new Date(Date.now() + (route.qr_kind==='static' &&
-                        (route.payment.status!=='pending' || Date.parse(route.payment.expires_at)<=Date.now()) ? 600000 :
-                        route.qr_kind==='static' ? 30000 : 5000)).toISOString(),
-                    })
-                    .eq("payment_id", route.payment_id),
-                )
-                .catch(() => {});
+              await rpc('finish_tingee_poll', { p_id: route.payment_id, p_claim: route.claim_token,
+                p_error: lastError, p_closed: closed, p_failed: failed,
+              }).catch(() => logger.error('Tingee poll acknowledgement unavailable; database lease retained.'));
             }
           }),
         );
     } catch {
+      nextCheckAt = monotonicNow() + 30000;
       logger.error("Tingee payment queue unavailable; will retry.");
     } finally {
       running = false;

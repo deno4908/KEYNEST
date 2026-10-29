@@ -163,7 +163,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   useDataRefresh(
     load,
     ["/seller/", "/admin/", "/orders", "/wallet", "/tickets", "/order-chat/"],
-    { intervalMs: 5000, enabled: user?.role === "seller" },
+    { intervalMs: 30000, enabled: user?.role === "seller" },
   );
   useDataRefresh(loadSupport, ["/seller/support/", "/tickets", "/admin/"], {
     intervalMs: 5000,

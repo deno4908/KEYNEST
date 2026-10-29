@@ -59,9 +59,9 @@ export const store =
     : new SupabaseStore();
 if (config.mode === 'supabase') {
   // Do not pass deployment health checks with an incompatible payment schema.
-  const { error } = await store.client.from('payment_routes').select('payment_id,qr_kind').limit(0)
+  const { error } = await store.client.from('payment_routes').select('payment_id,qr_kind,poll_failures').limit(0)
     .abortSignal(AbortSignal.timeout(10000));
-  if (error) throw new Error('Không truy cập được payment_routes/qr_kind. Kiểm tra kết nối Supabase và áp dụng migration 037, 038 theo đúng thứ tự trước khi triển khai.');
+  if (error) throw new Error('Không truy cập được schema payment_routes. Kiểm tra kết nối Supabase và áp dụng đầy đủ migration đến 056 trước khi triển khai.');
 }
 export const bankPayments = createBankPayments({
   config,
@@ -79,7 +79,9 @@ const paymentIngress = createPaymentIngress({
 export const operations = createOperations(store);
 const categoryStore = createCategories(store);
 export const app = express();
-const catalogLive = createCatalogLive(() => store.products());
+const catalogLive = createCatalogLive(() => store.products(), {
+  version: config.mode === 'supabase' ? () => store.catalogVersion() : undefined,
+});
 app.use((req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
       /^\/api\/(?:orders|admin|seller|webhooks|demo\/pay)(?:\/|$)/.test(req.path)) {
@@ -1245,7 +1247,7 @@ if (process.env.NODE_ENV !== "test") {
   const receiptTimer = setInterval(() => void receiptWorker.tick(), 15000);
   receiptTimer.unref();
   void receiptWorker.tick();
-  const tingeeTimer=setInterval(()=>void paymentRouting.tick(),2000);
+  const tingeeTimer=setInterval(()=>void paymentRouting.tick(),5000);
   tingeeTimer.unref();
   void paymentRouting.tick();
   let shuttingDown = false;

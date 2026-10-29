@@ -1,6 +1,7 @@
 import express from "express";
 import sharp from "sharp";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { createMediaCache } from './media-cache.js';
 import { requireSeller } from './seller-accounting.js';
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -16,10 +17,19 @@ export const isStoreImage = (value) =>
   ) ||
   (value.startsWith("/api/media/") && filePattern.test(value.slice(11)));
 
-export function mediaRouter({ store, mode, auth, admin, limiter }) {
+export function mediaRouter({ store, mode, auth, admin, limiter, cacheDirectory = process.env.MEDIA_CACHE_DIR || '.data/media-cache' }) {
   const router = express.Router();
   const directory =
     mode === "demo" ? join(dirname(store.path), "uploads") : null;
+  // Namespace by project so changing Supabase projects cannot reuse old images.
+  const cache = directory ? null : createMediaCache({
+    directory: join(cacheDirectory, createHash('sha256').update(store.client.supabaseUrl).digest('hex').slice(0, 16)),
+    load: async file => {
+      const { data, error } = await store.client.storage.from('store-assets').download(file);
+      if (error) throw new AppError('Không thể tải ảnh.', 404);
+      return Buffer.from(await data.arrayBuffer());
+    },
+  });
   router.get("/media/:file", async (req, res) => {
     if (!filePattern.test(req.params.file))
       throw new AppError("Không tìm thấy ảnh.", 404);
@@ -32,11 +42,7 @@ export function mediaRouter({ store, mode, auth, admin, limiter }) {
         throw e;
       }
     } else {
-      const { data, error } = await store.client.storage
-        .from("store-assets")
-        .download(req.params.file);
-      if (error) throw new AppError("Không thể tải ảnh.", 404);
-      buffer = Buffer.from(await data.arrayBuffer());
+      buffer = await cache(req.params.file);
     }
     res
       .set({

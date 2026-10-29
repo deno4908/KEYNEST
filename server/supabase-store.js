@@ -34,6 +34,17 @@ export class SupabaseStore {
     }
     return data;
   }
+  async catalogVersion() {
+    if (this.catalogVersionUnavailable) return null;
+    const { data, error } = await this.client.rpc('catalog_live_version');
+    if (error?.code === 'PGRST202' || error?.code === '42883') {
+      this.catalogVersionUnavailable = true;
+      console.warn('Apply migration 055 and restart to enable lightweight catalog polling.');
+      return null;
+    }
+    if (error) throw new AppError('Không thể kiểm tra danh mục.', 503);
+    return data;
+  }
   async products(admin = false, identifier) {
     let q = this.client
       .from("products")
@@ -45,10 +56,11 @@ export class SupabaseStore {
         /^[a-f0-9]{8}-[a-f0-9-]{27}$/i.test(identifier) ? "id" : "slug",
         identifier,
       );
-    const [products, stats] = await Promise.all([
-      this.query(q),
-      this.query(this.client.from("product_review_stats").select("*")),
-    ]);
+    const products = await this.query(q);
+    if (!products.length) return [];
+    let statsQuery = this.client.from("product_review_stats").select("*");
+    if (identifier) statsQuery = statsQuery.eq('product_id', products[0].id);
+    const stats = await this.query(statsQuery);
     const byProduct = new Map(stats.map((s) => [s.product_id, s]));
     const withSellers = await this.attachSellers(products);
     return withSellers.map((p) => {
