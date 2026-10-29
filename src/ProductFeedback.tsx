@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { CheckCircle2, MessageSquare, Star, Trash2 } from "lucide-react";
 import { useStore } from "./App";
 import { api, date, post } from "./api";
+import { Avatar } from "./Avatar";
 import type { Product, ProductComment, Review } from "./types";
 
 export function RatingStars({ value }: { value: number }) {
@@ -255,9 +256,11 @@ export function ProductFeedback({
           {rows.map((row) => (
             <article className="feedback-entry" key={row.id}>
               <div className="feedback-author">
-                <span className="feedback-avatar" aria-hidden="true">
-                  {(row.name || "K").trim().slice(0, 1).toUpperCase()}
-                </span>
+                <Avatar
+                  className="feedback-avatar"
+                  name={row.name || "Khách hàng"}
+                  url={row.avatar_url}
+                />
                 <div>
                   <strong>{row.name || "Khách hàng"}</strong>
                   <time dateTime={row.created_at}>{date(row.created_at)}</time>

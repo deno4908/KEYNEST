@@ -279,8 +279,17 @@ export class SupabaseStore {
       }),
     );
   }
+  async withFeedbackAvatars(rows) {
+    if (!rows.length) return rows;
+    const authors = await this.query(
+      this.client.from("profiles").select("id,avatar_url")
+        .in("id", [...new Set(rows.map((row) => row.user_id))]),
+    );
+    const avatars = new Map(authors.map((author) => [author.id, author.avatar_url]));
+    return rows.map((row) => ({ ...row, avatar_url: avatars.get(row.user_id) || null }));
+  }
   async reviews(product_id, page = 1) {
-    return this.query(
+    const rows = await this.query(
       this.client
         .from("reviews")
         .select("*")
@@ -289,6 +298,7 @@ export class SupabaseStore {
         .order("id", { ascending: false })
         .range((page - 1) * 20, page * 20 - 1),
     );
+    return this.withFeedbackAvatars(rows);
   }
   async comments(product_id, page = 1) {
     const result = await this.client
@@ -299,7 +309,7 @@ export class SupabaseStore {
       .order("id", { ascending: false })
       .range((page - 1) * 20, page * 20 - 1);
     const items = await this.query(Promise.resolve(result));
-    return { items, total: result.count || 0 };
+    return { items: await this.withFeedbackAvatars(items), total: result.count || 0 };
   }
   async createComment(uid, data) {
     const product = await this.query(
@@ -311,13 +321,15 @@ export class SupabaseStore {
         .maybeSingle(),
     );
     if (!product) throw new AppError("Sản phẩm không có sẵn.", 404);
-    return this.query(
+    const author = await this.profile(uid);
+    const row = await this.query(
       this.client
         .from("product_comments")
-        .insert({ ...data, user_id: uid, name: (await this.profile(uid)).name })
+        .insert({ ...data, user_id: uid, name: author.name })
         .select()
         .single(),
     );
+    return { ...row, avatar_url: author.avatar_url || null };
   }
   async deleteComment(uid, admin, id) {
     let query = this.client.from("product_comments").delete().eq("id", id);
@@ -336,13 +348,15 @@ export class SupabaseStore {
       )
     )
       throw new AppError("Chỉ đánh giá sản phẩm đã mua và nhận.", 403);
-    return this.query(
+    const author = await this.profile(uid);
+    const row = await this.query(
       this.client
         .from("reviews")
-        .insert({ user_id: uid, name: (await this.profile(uid)).name, ...data })
+        .insert({ user_id: uid, name: author.name, ...data })
         .select()
         .single(),
     );
+    return { ...row, avatar_url: author.avatar_url || null };
   }
   async saveProduct(data) {
     const { id, ...fields } = data;

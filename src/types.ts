@@ -146,6 +146,7 @@ export type Review = {
   id: string;
   user_id: string;
   name: string;
+  avatar_url?: string | null;
   rating: number;
   comment: string;
   created_at: string;
@@ -155,6 +156,7 @@ export type ProductComment = {
   user_id: string;
   product_id: string;
   name: string;
+  avatar_url?: string | null;
   body: string;
   created_at: string;
 };

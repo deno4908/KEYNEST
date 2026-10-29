@@ -248,6 +248,7 @@
   color: #d7b39d;
   font-size: 13px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .feedback-author > div {
   min-width: 0;

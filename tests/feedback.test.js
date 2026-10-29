@@ -79,7 +79,16 @@ test("product feedback: verified ratings, discussion isolation, author permissio
     buyer.cookie,
   );
   assert.equal(order.status, 201);
-  assert.equal((await req("/reviews", review, buyer.cookie)).status, 201);
+  const buyerProfile = store.db.users.find((u) => u.email === "student@keynest.local");
+  buyerProfile.avatar_url = "/api/media/buyer.webp";
+  const reviewed = await req("/reviews", review, buyer.cookie);
+  assert.equal(reviewed.status, 201);
+  assert.equal(reviewed.body.avatar_url, buyerProfile.avatar_url);
+  buyerProfile.avatar_url = "https://lh3.googleusercontent.com/updated-avatar";
+  const publicReview = (await req(`/products/${p.id}/reviews`)).body[0];
+  assert.equal(publicReview.avatar_url, buyerProfile.avatar_url);
+  assert.equal(publicReview.email, undefined);
+  assert.equal(publicReview.balance, undefined);
   assert.equal((await req("/reviews", review, buyer.cookie)).status, 400);
   const stats = (await req("/products")).body.find((x) => x.id === p.id);
   assert.equal(stats.review_count, 1);
@@ -119,10 +128,20 @@ test("product feedback: verified ratings, discussion isolation, author permissio
     ).status,
     404,
   );
+  const otherProfile = store.db.users.find((u) => u.id === other.body.user.id);
+  otherProfile.avatar_url = "/api/media/commenter.webp";
   const posted = await req("/comments", comment, other.cookie);
   assert.equal(posted.status, 201);
   assert.equal(posted.body.user_id, other.body.user.id);
   assert.equal(posted.body.name, "Other");
+  assert.equal(posted.body.avatar_url, otherProfile.avatar_url);
+  otherProfile.avatar_url = "/api/media/updated-commenter.webp";
+  const publicComment = (await req(`/products/${p.id}/comments`)).body.items[0];
+  assert.equal(publicComment.avatar_url, otherProfile.avatar_url);
+  assert.equal(publicComment.email, undefined);
+  assert.equal(publicComment.password_hash, undefined);
+  otherProfile.avatar_url = null;
+  assert.equal((await req(`/products/${p.id}/comments`)).body.items[0].avatar_url, null);
   assert.equal(
     (await req(`/products/${p.id}/comments`)).body.items[0].body,
     comment.body,

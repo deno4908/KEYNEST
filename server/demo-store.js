@@ -625,6 +625,12 @@ export class DemoStore {
     this.save();
     return t;
   }
+  feedbackWithAvatar(row) {
+    return {
+      ...row,
+      avatar_url: this.db.users.find((user) => user.id === row.user_id)?.avatar_url || null,
+    };
+  }
   reviews(product_id, page = 1) {
     return this.db.reviews
       .filter((r) => r.product_id === product_id)
@@ -632,7 +638,8 @@ export class DemoStore {
         (a, b) =>
           b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id),
       )
-      .slice((page - 1) * 20, page * 20);
+      .slice((page - 1) * 20, page * 20)
+      .map((row) => this.feedbackWithAvatar(row));
   }
   comments(product_id, page = 1) {
     const rows = this.db.product_comments
@@ -642,7 +649,7 @@ export class DemoStore {
           b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id),
       );
     return {
-      items: rows.slice((page - 1) * 20, page * 20),
+      items: rows.slice((page - 1) * 20, page * 20).map((row) => this.feedbackWithAvatar(row)),
       total: rows.length,
     };
   }
@@ -658,7 +665,7 @@ export class DemoStore {
     };
     this.db.product_comments.unshift(row);
     this.save();
-    return row;
+    return this.feedbackWithAvatar(row);
   }
   deleteComment(uid, admin, id) {
     const row = this.db.product_comments.find((c) => c.id === id);
@@ -695,7 +702,7 @@ export class DemoStore {
     };
     this.db.reviews.unshift(r);
     this.save();
-    return r;
+    return this.feedbackWithAvatar(r);
   }
   saveProduct(data) {
     const { variants, ...p } = data;
