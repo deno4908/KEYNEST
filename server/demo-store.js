@@ -351,6 +351,12 @@ export class DemoStore {
     } else this.payment(uid, total, o.id);
     this.db.orders.unshift(o);
     settleSellerRevenue(this, o);
+    const purchased = new Map(items.map((item) => [item.variant_id, item.quantity]));
+    if (this.db.carts?.[uid]) {
+      this.db.carts[uid] = this.db.carts[uid]
+        .map((item) => ({ ...item, quantity: item.quantity - (purchased.get(item.variant_id) || 0) }))
+        .filter((item) => item.quantity > 0);
+    }
     this.save();
     return o;
   }

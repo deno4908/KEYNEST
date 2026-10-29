@@ -26,6 +26,10 @@ OAuth: `POST /auth/oauth/:provider` với `google` hoặc `discord`, trả `{url
 
 Đánh giá/bình luận: `GET /products/:id/reviews?page=1` trả mảng, 20 mục/trang; `GET /products/:id/comments?page=1` trả `{items,total}`. Sản phẩm có `review_count`, `rating_average`, `rating_counts` (thứ tự 1–5 sao), tính từ dữ liệu đánh giá thật. Không có đánh giá thì số lượng/điểm bằng 0.
 
+`GET /products?live=1` mở luồng SSE công khai, trả cùng dữ liệu sản phẩm đang mở bán như `GET /products`. Máy chủ chia sẻ một lần đọc cho các kết nối trong cùng tiến trình, kiểm tra thay đổi mỗi 2 giây và đẩy ngay sau các thao tác đơn hàng, kho, sản phẩm hoặc thanh toán qua API. Luồng có heartbeat và header `X-Accel-Buffering: no` cho Nginx. Không cần mở quyền Supabase Realtime cho trình duyệt.
+
+Frontend đồng bộ trang sản phẩm, danh mục và giỏ qua luồng này; khi kết nối gián đoạn, tải lại dữ liệu mỗi 5 giây và khi quay lại tab/kết nối mạng. Thêm vào giỏ hoặc tăng số lượng luôn đọc tồn mới trước khi thay đổi giỏ. `PUT /cart` cũng từ chối thêm/tăng vượt tồn hoặc gói không còn bán với HTTP 409; vẫn cho giảm/xóa các dòng đã hết hàng. Giá và tồn cuối cùng tiếp tục được kiểm tra trong giao dịch tạo đơn.
+
 `POST /comments` nhận `{product_id,body}` với nội dung 3–1.000 ký tự, yêu cầu đăng nhập; tên/người gửi do server xác định. `POST /comments/:id/delete` chỉ tác giả hoặc quản trị viên được xóa. `POST /reviews` chỉ nhận từ khách đã nhận hàng, một lần/sản phẩm. Gửi đánh giá và bình luận có rate limit riêng 12 lần/15 phút/IP. Chạy migration `004_product_feedback.sql` trước khi dùng Supabase thật. Bình luận không làm thay đổi điểm sao; nội dung hiển thị dưới dạng văn bản.
 
 ## Khách đã đăng nhập

@@ -124,6 +124,7 @@ test("admin uploads images, configures a fixed single-use coupon and resolves wa
     const customer = await customerContext.newPage();
     await customer.goto("http://127.0.0.1:5173/products/hollow-knight");
     await customer.getByRole("button", { name: "Thêm vào giỏ" }).click();
+    await expect(customer.getByRole('status').filter({hasText:'Đã thêm vào giỏ hàng.'})).toBeVisible();
     await customer.goto("http://127.0.0.1:5173/cart");
     await customer.getByRole("textbox", { name: "Mã giảm giá" }).fill(code);
     await expect(customer.getByRole("status")).toContainText("Đã áp dụng mã");

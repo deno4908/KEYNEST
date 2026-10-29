@@ -1,4 +1,5 @@
 import { useAccountCart } from "./useAccountCart";
+import { useLiveProducts } from "./useLiveProducts";
 import { UnreadChatBadge } from './UnreadChatBadge';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
@@ -92,8 +93,10 @@ type Context = {
   cartReady: boolean;
   cartError: string;
   retryCart: () => void;
-  add: (id: string, quantity?: number) => void;
+  add: (id: string, quantity?: number) => Promise<boolean>;
+  adding: boolean;
   setCart: (items: CartItem[]) => void;
+  flushCart: () => Promise<void>;
   refresh: () => Promise<void>;
   notify: (message: string, error?: boolean) => void;
   login: () => void;
@@ -315,6 +318,11 @@ export function App() {
   const notify = (message: string, error = false) =>
     setToast({ message, error });
   const { cart, setCart, cartReady, cartError, retryCart, flushCart } = useAccountCart(user?.id, ready, notify);
+  useLiveProducts(catalogReady, setProducts);
+  const [adding, setAdding] = useState(false);
+  const addingNow = useRef(false);
+  const currentCart = useRef({ items: cart, owner: user?.id || '', ready: cartReady });
+  currentCart.current = { items: cart, owner: user?.id || '', ready: cartReady };
   const refreshVersion = useRef(0);
   const refresh = async () => {
     const version = ++refreshVersion.current;
@@ -355,24 +363,39 @@ export function App() {
     window.scrollTo(0, 0);
     setMobile(false);
   }, [location.pathname]);
-  const add = (id: string, quantity = 1) => {
-    if (!cartReady) return notify('Giỏ hàng chưa tải xong. Vui lòng thử lại.', true);
-    if (cart.length >= 20 && !cart.some(item => item.variant_id === id))
-      return notify('Giỏ hàng tối đa 20 gói sản phẩm.', true);
-    const p = products.find((p) => p.variants.some((v) => v.id === id));
-    const v = p?.variants.find((v) => v.id === id);
-    if (!v?.stock) return notify("Sản phẩm đã hết hàng.", true);
-    const current = cart.find((i) => i.variant_id === id)?.quantity || 0;
-    if (current + quantity > Math.min(10, v.stock))
-      return notify("Vượt số lượng có thể mua.", true);
-    setCart(
-      current
-        ? cart.map((i) =>
-            i.variant_id === id ? { ...i, quantity: i.quantity + quantity } : i,
-          )
-        : [...cart, { variant_id: id, quantity }],
-    );
-    notify("Đã thêm vào giỏ hàng.");
+  const add = async (id: string, quantity = 1): Promise<boolean> => {
+    if (addingNow.current) return false;
+    if (!cartReady) { notify('Giỏ hàng chưa tải xong. Vui lòng thử lại.', true); return false; }
+    const owner = currentCart.current.owner;
+    addingNow.current = true;
+    setAdding(true);
+    try {
+      const latest = await api<Product[]>('/products');
+      setProducts(latest);
+      const snapshot = currentCart.current;
+      if (snapshot.owner !== owner || !snapshot.ready) {
+        notify('Tài khoản đã thay đổi. Vui lòng thử lại.', true); return false;
+      }
+      const items = snapshot.items;
+      const variant = latest.flatMap(product => product.variants).find(variant => variant.id === id);
+      if (!variant?.stock) { notify('Sản phẩm đã hết hàng hoặc tạm ngừng bán.', true); return false; }
+      if (items.length >= 20 && !items.some(item => item.variant_id === id)) {
+        notify('Giỏ hàng tối đa 20 gói sản phẩm.', true); return false;
+      }
+      const current = items.find(item => item.variant_id === id)?.quantity || 0;
+      if (!Number.isInteger(quantity) || quantity < 1 || current + quantity > Math.min(10, variant.stock)) {
+        notify('Sản phẩm không còn đủ số lượng để thêm vào giỏ.', true); return false;
+      }
+      setCart(current
+        ? items.map(item => item.variant_id === id ? { ...item, quantity: item.quantity + quantity } : item)
+        : [...items, { variant_id: id, quantity }]);
+      await flushCart();
+      notify('Đã thêm vào giỏ hàng.');
+      return true;
+    } catch {
+      notify('Không thêm được vào giỏ. Vui lòng kiểm tra kết nối và thử lại.', true);
+      return false;
+    } finally { addingNow.current = false; setAdding(false); }
   };
   const logout = async () => {
     try {
@@ -397,7 +420,9 @@ export function App() {
         cartError,
         retryCart,
         add,
+        adding,
         setCart,
+        flushCart,
         refresh,
         notify,
         login: () => setAuthOpen(true),
@@ -763,7 +788,7 @@ export function ProductCard({ product }: { product: Product }) {
   );
 }
 function ProductPage() {
-  const { products, add } = useStore();
+  const { products, add, adding } = useStore();
   const location = useLocation();
   const navigate = useNavigate();
   const p = products.find(
@@ -912,20 +937,19 @@ function ProductPage() {
                   </button>
                 </div>
                 <button
-                  disabled={!v.stock}
+                  disabled={adding || !v.stock || quantity > v.stock}
                   className="button"
                   onClick={() => add(v.id, quantity)}
                 >
                   <ShoppingBag size={18} />
-                  Thêm vào giỏ
+                  {adding ? 'Đang kiểm tra…' : 'Thêm vào giỏ'}
                 </button>
               </div>
               <button
-                disabled={!v.stock}
+                disabled={adding || !v.stock || quantity > v.stock}
                 className="button button-dark full"
-                onClick={() => {
-                  add(v.id, quantity);
-                  navigate("/cart");
+                onClick={async () => {
+                  if (await add(v.id, quantity)) navigate("/cart");
                 }}
               >
                 {v.is_preorder ? 'Đặt trước ngay' : 'Mua ngay'} <ArrowRight size={17} />
@@ -1028,7 +1052,7 @@ function ProductPage() {
   );
 }
 function CartPage() {
-  const { products, cart, setCart, cartReady, cartError, retryCart, user, login, refresh, notify } = useStore();
+  const { products, cart, setCart, add, adding, flushCart, cartReady, cartError, retryCart, user, login, refresh, notify } = useStore();
   const navigate = useNavigate();
   const [method, setMethod] = useState("wallet"),
     [coupon, setCoupon] = useState(""),
@@ -1103,13 +1127,16 @@ function CartPage() {
       return notify("Vui lòng cập nhật sản phẩm không đủ tồn kho.", true);
     setBusy(true);
     try {
+      await flushCart();
       const o = await post<Order>(
         "/orders",
         { items: cart, method, coupon, customer_note: note },
         { "Idempotency-Key": key },
       );
-      setCart([]);
-      await refresh();
+      // The order transaction already consumed its items in the saved cart.
+      // Reload it instead of overwriting other products with a separate PUT [].
+      retryCart();
+      try { await refresh(); } catch { /* The order succeeded; do not offer to submit it again. */ }
       navigate("/orders", { state: { payment: o.payment } });
       notify(
         o.method === "wallet"
@@ -1181,7 +1208,7 @@ function CartPage() {
                   <div className="quantity">
                     <button
                       aria-label="Giảm"
-                      disabled={i.quantity === 1}
+                      disabled={busy || i.quantity === 1}
                       onClick={() =>
                         setCart(
                           cart.map((x) =>
@@ -1198,17 +1225,9 @@ function CartPage() {
                     <button
                       aria-label="Tăng"
                       disabled={
-                        i.quantity >= Math.min(10, i.variant?.stock || 0)
+                        busy || adding || i.quantity >= Math.min(10, i.variant?.stock || 0)
                       }
-                      onClick={() =>
-                        setCart(
-                          cart.map((x) =>
-                            x.variant_id === i.variant_id
-                              ? { ...x, quantity: x.quantity + 1 }
-                              : x,
-                          ),
-                        )
-                      }
+                      onClick={() => void add(i.variant_id, 1)}
                     >
                       <Plus size={14} />
                     </button>
@@ -1217,6 +1236,7 @@ function CartPage() {
                   <button
                     className="icon-button"
                     aria-label="Xóa sản phẩm"
+                    disabled={busy}
                     onClick={() =>
                       setCart(cart.filter((x) => x.variant_id !== i.variant_id))
                     }
@@ -1325,7 +1345,7 @@ function CartPage() {
             </div>
             <button
               className="button full"
-              disabled={busy || unavailable}
+              disabled={busy || adding || unavailable}
               onClick={checkout}
             >
               {busy

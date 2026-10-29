@@ -38,7 +38,7 @@ export function Catalog() {
     message: string;
   } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  useDataRefresh(() => setAttempt(n => n + 1), ['/admin/products', '/admin/variants', '/admin/inventory', '/admin/categories', '/seller/products', '/seller/variants', '/seller/inventory']);
+  useDataRefresh(() => setAttempt(n => n + 1), ['/catalog-live', '/admin/products', '/admin/variants', '/admin/inventory', '/admin/categories', '/seller/products', '/seller/variants', '/seller/inventory']);
   const requestKey = params.toString();
   const data = result?.key === requestKey ? result.data : null;
   const error = failure?.key === requestKey ? failure.message : "";

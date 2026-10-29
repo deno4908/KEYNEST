@@ -27,6 +27,7 @@ export function useAccountCart(userId: string | undefined, sessionReady: boolean
   const queue = useRef<Promise<void>>(Promise.resolve());
   const revision = useRef(0);
   const generation = useRef(0);
+  const writeError = useRef<Error | null>(null);
   useEffect(() => {
     if (!sessionReady) return;
     const epoch = ++generation.current;
@@ -38,7 +39,10 @@ export function useAccountCart(userId: string | undefined, sessionReady: boolean
       try {
         const result = owner ? await api<SavedCart>('/cart') : null;
         if (result && result.user_id !== owner) throw new Error('Tài khoản đã thay đổi. Vui lòng tải lại giỏ hàng.');
-        if (alive && generation.current === epoch) setState({ owner, items: result?.items || guestCart(), ready: true, error: '' });
+        if (alive && generation.current === epoch) {
+          writeError.current = null;
+          setState({ owner, items: result?.items || guestCart(), ready: true, error: '' });
+        }
       } catch (error) {
         if (alive) setState({ owner, items: [], ready: false, error: (error as Error).message });
       }
@@ -63,10 +67,14 @@ export function useAccountCart(userId: string | undefined, sessionReady: boolean
       try {
         const result = await api<SavedCart>('/cart', { method: 'PUT', body: JSON.stringify({ user_id: owner, items }) });
         if (result.user_id !== owner) throw new Error('Tài khoản đã thay đổi.');
+        if (revision.current === version) writeError.current = null;
       } catch {
         if (active.current !== owner || generation.current !== epoch) return;
         notice.current('Chưa lưu được giỏ hàng. Vui lòng tải lại và thử lại.', true);
-        if (revision.current === version) setState({ owner, items, ready: false, error: 'Chưa lưu được giỏ hàng vào tài khoản.' });
+        if (revision.current === version) {
+          writeError.current = new Error('Chưa lưu được giỏ hàng vào tài khoản. Vui lòng tải lại và thử lại.');
+          setState({ owner, items, ready: false, error: writeError.current.message });
+        }
       }
     });
   }
@@ -76,6 +84,10 @@ export function useAccountCart(userId: string | undefined, sessionReady: boolean
     cartError: state.owner === owner ? state.error : '',
     retryCart: () => setReload(value => value + 1),
     setCart,
-    flushCart: () => queue.current,
+    flushCart: async () => {
+      await queue.current;
+      if (active.current !== owner) throw new Error('Tài khoản đã thay đổi. Vui lòng tải lại giỏ hàng.');
+      if (writeError.current) throw writeError.current;
+    },
   };
 }

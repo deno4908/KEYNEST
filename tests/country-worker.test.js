@@ -13,7 +13,7 @@ test('public storefront is globally readable without credentials, private routes
     assert.equal(req.headers.get('Authorization'), null);
     return new Response('public');
   });
-  for (const path of ['/', '/catalog', '/products/steam', '/robots.txt', '/sitemap.xml', '/assets/index.js', '/api/products']) {
+  for (const path of ['/', '/catalog', '/products/steam', '/robots.txt', '/sitemap.xml', '/assets/index.js', '/api/products', '/api/products?live=1']) {
     const req = request(path, 'US');
     req.headers.set('Cookie', 'session=secret');
     req.headers.set('Authorization', 'Bearer secret');

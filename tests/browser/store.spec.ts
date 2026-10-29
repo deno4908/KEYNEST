@@ -43,7 +43,7 @@ test("customer can register, top up, buy a key and submit a support request", as
   const email = `browser-${Date.now()}@example.test`;
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
-  const dialog = page.getByRole("dialog");
+  const dialog = page.locator(".auth-dialog");
   await dialog.getByRole("button", { name: "Đăng ký", exact: true }).click();
   await dialog.getByLabel("Tên của bạn").fill("Browser Customer");
   await dialog.getByLabel("Email", { exact: true }).fill(email);
@@ -57,6 +57,9 @@ test("customer can register, top up, buy a key and submit a support request", as
     .getByRole("button", { name: "Tạo tài khoản", exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
+  const welcome = page.locator('.oauth-welcome');
+  await welcome.getByRole('button', {name:/Tiếp tục vào cửa hàng/}).click();
+  await expect(welcome).not.toBeVisible();
   await page.goto("/wallet");
   await page.getByRole("button", { name: "200.000", exact: false }).click();
   await page.getByRole("button", { name: "Tạo mã nạp tiền" }).click();
@@ -70,6 +73,7 @@ test("customer can register, top up, buy a key and submit a support request", as
   await expect(page.locator(".wallet-card")).toContainText("200.000");
   await page.goto("/products/hollow-knight");
   await page.getByRole("button", { name: "Thêm vào giỏ" }).click();
+  await expect(page.getByRole('status').filter({hasText:'Đã thêm vào giỏ hàng.'})).toBeVisible();
   await page.goto("/cart");
   await expect(page.locator(".cart-item")).toHaveCount(1);
   await page.getByRole("textbox", { name: "Mã giảm giá" }).fill("WELCOME10");

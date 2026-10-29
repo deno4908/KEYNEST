@@ -254,6 +254,38 @@ try {
   assert.equal(Number(await scalar("select count(*) from inventory where variant_id=$1 and secret_hash='hash-0'", [variant])),3);
   await db.exec('rollback');
   pass("repeated inventory contents create distinct stock units, including existing hashes");
+  await db.exec('begin');
+  const cartItems = [{ variant_id: variant, quantity: 3 }, { variant_id: manual, quantity: 2 }];
+  await db.query('insert into account_carts(user_id,items) values($1,$3),($2,$3)', [user, other, JSON.stringify(cartItems)]);
+  const cartPayload = { items: [{ variant_id: variant, quantity: 1 }], method: 'wallet', coupon: '', customer_note: '' };
+  const cartKey = randomUUID();
+  const cartOrder = await scalar('select create_order($1,$2,$3)', [user, JSON.stringify(cartPayload), cartKey]);
+  const savedCart = uid => scalar('select items from account_carts where user_id=$1', [uid]);
+  assert.deepEqual(await savedCart(user), [{ variant_id: variant, quantity: 2 }, cartItems[1]]);
+  assert.deepEqual(await savedCart(other), cartItems);
+  await db.query('update account_carts set items=$2 where user_id=$1', [user, JSON.stringify([{ variant_id: variant, quantity: 1 }, cartItems[1]])]);
+  assert.equal(await scalar('select create_order($1,$2,$3)', [user, JSON.stringify(cartPayload), cartKey]), cartOrder);
+  assert.deepEqual(await savedCart(user), [{ variant_id: variant, quantity: 1 }, cartItems[1]], 'replaying an old order must retain newly added items');
+  await scalar('select create_order($1,$2,$3)', [user, JSON.stringify({ ...cartPayload, method: 'sepay' }), randomUUID()]);
+  assert.deepEqual(await savedCart(user), [cartItems[1]], 'accepted QR order consumes only its purchased line');
+  await scalar('select create_order($1,$2,$3)', [user, JSON.stringify({ ...cartPayload, items: [cartItems[1]], customer_note: 'Cart service delivery' }), randomUUID()]);
+  assert.deepEqual(await savedCart(user), []);
+  const failedCart = [{ variant_id: variant, quantity: 6 }];
+  await db.query('update account_carts set items=$2 where user_id=$1', [user, JSON.stringify(failedCart)]);
+  // Force inventory allocation to fail after the order line and cart trigger ran.
+  await db.query('update variants set stock=10 where id=$1', [variant]);
+  const ordersBeforeFailure = await scalar('select count(*) from orders where user_id=$1', [user]);
+  const balanceBeforeFailure = await scalar('select balance from profiles where id=$1', [user]);
+  await db.exec('savepoint failed_cart_checkout');
+  await fails('select create_order($1,$2,$3)', [user, JSON.stringify({ ...cartPayload, items: failedCart }), randomUUID()]);
+  await db.exec('rollback to savepoint failed_cart_checkout');
+  assert.deepEqual(await savedCart(user), failedCart, 'failed checkout must roll back cart consumption');
+  assert.equal(await scalar('select count(*) from orders where user_id=$1', [user]), ordersBeforeFailure);
+  assert.equal(await scalar('select balance from profiles where id=$1', [user]), balanceBeforeFailure);
+  assert.equal(await scalar("select has_function_privilege('authenticated','consume_order_item_cart()','EXECUTE')"), false);
+  assert.equal(await scalar("select has_function_privilege('anon','consume_order_item_cart()','EXECUTE')"), false);
+  await db.exec('rollback');
+  pass('checkout atomically subtracts purchased cart quantities, isolates accounts, preserves unrelated items, rolls back failure and ignores replay');
   const key = randomUUID();
   const payload = {
     items: [{ variant_id: variant, quantity: 1 }],

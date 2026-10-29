@@ -228,9 +228,11 @@ export function SupportManager({
               className={`inbox-ticket ${t.priority === "high" ? "priority-high" : ""}`}
               key={t.id}
             >
-              <div className="inbox-avatar">
-                {customer?.name.slice(0, 1).toUpperCase() || "K"}
-              </div>
+              <Avatar
+                className="inbox-avatar"
+                name={customer?.name || "Khách hàng"}
+                url={customer?.avatar_url}
+              />
               <div className="inbox-ticket-main">
                 <div className="inbox-ticket-labels">
                   <span>

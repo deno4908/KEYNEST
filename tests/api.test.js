@@ -68,7 +68,8 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
   await t.test('account carts persist across sessions and remain isolated', async () => {
     const uid = (await request('/me', { cookie: customer })).body.id;
     const aid = (await request('/me', { cookie: admin })).body.id;
-    const items = [{ variant_id: randomUUID(), quantity: 2 }];
+    const cartVariant = (await request('/products')).body[0].variants[0];
+    const items = [{ variant_id: cartVariant.id, quantity: 2 }];
     assert.equal((await request('/cart')).status, 401);
     const write = (cookie, user_id, rows) => request('/cart', { method: 'PUT', cookie, body: { user_id, items: rows } });
     assert.equal((await write(customer, uid, items)).status, 200);
@@ -83,6 +84,18 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
     assert.deepEqual((await request('/cart', { cookie: customer })).body.items, items);
     assert.equal((await write(customer, uid, [])).status, 200);
     assert.deepEqual((await request('/cart', { cookie: another.cookie })).body.items, []);
+    assert.equal((await write(customer, uid, [{ variant_id: randomUUID(), quantity: 1 }])).status, 409);
+    const liveVariant = store.db.products.flatMap(p => p.variants).find(v => v.id === cartVariant.id);
+    const previousStock = liveVariant.stock;
+    liveVariant.stock = 0;
+    assert.equal((await write(customer, uid, [{ variant_id: cartVariant.id, quantity: 1 }])).status, 409);
+    liveVariant.stock = previousStock;
+    assert.equal((await write(customer, uid, items)).status, 200);
+    liveVariant.stock = 0;
+    assert.equal((await write(customer, uid, [{ variant_id: cartVariant.id, quantity: 3 }])).status, 409);
+    assert.equal((await write(customer, uid, [{ variant_id: cartVariant.id, quantity: 1 }])).status, 200);
+    assert.equal((await write(customer, uid, [])).status, 200);
+    liveVariant.stock = previousStock;
   });
   await t.test(
     "banner publishing requires admin and rejects unsafe content links",
@@ -255,12 +268,18 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
           coupon: "WELCOME10",
           customer_note: "",
         };
+      const cartOwner = (await request('/me', { cookie: customer })).body.id;
+      const otherVariant = (await request('/products')).body.flatMap(p => p.variants).find(v => v.id !== variant.id && v.stock >= 3);
+      const untouched = { variant_id: otherVariant.id, quantity: 3 };
+      const originalCart = [{ variant_id: variant.id, quantity: 2 }, untouched];
+      assert.equal((await request('/cart', { method: 'PUT', cookie: customer, body: { user_id: cartOwner, items: originalCart } })).status, 200);
       const responses = await Promise.all([
         request("/orders", { method: "POST", cookie: customer, key, body }),
         request("/orders", { method: "POST", cookie: customer, key, body }),
       ]);
       assert.ok(responses.every((r) => r.status === 201));
       assert.equal(responses[0].body.id, responses[1].body.id);
+      assert.deepEqual((await request('/cart', { cookie: customer })).body.items, [{ variant_id: variant.id, quantity: 1 }, untouched]);
       order = responses[0].body;
       assert.equal(order.total, 89100);
       assert.equal(order.status, "completed");

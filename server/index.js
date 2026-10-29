@@ -24,6 +24,7 @@ import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
+import { createCatalogLive } from "./catalog-live.js";
 import { createSteamArt } from './steam-art.js';
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
 import { deleteAdminRecord } from './admin-deletion.js';
@@ -78,6 +79,14 @@ const paymentIngress = createPaymentIngress({
 export const operations = createOperations(store);
 const categoryStore = createCategories(store);
 export const app = express();
+const catalogLive = createCatalogLive(() => store.products());
+app.use((req, res, next) => {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+      /^\/api\/(?:orders|admin|seller|webhooks|demo\/pay)(?:\/|$)/.test(req.path)) {
+    res.on('finish', () => { if (res.statusCode < 400) void catalogLive.refresh(); });
+  }
+  next();
+});
 app.disable("x-powered-by");
 if (config.trustProxy) app.set("trust proxy", config.trustProxy);
 app.use(
@@ -475,7 +484,9 @@ app.get("/api/config", (req, res) =>
   }),
 );
 app.get("/api/products", async (req, res) => {
+  if (req.query.live === '1') return catalogLive.subscribe(req, res);
   await store.expire();
+  res.setHeader('Cache-Control', 'no-store');
   res.json(await store.products());
 });
 app.get("/api/catalog", async (req, res) => {
@@ -637,6 +648,14 @@ app.put('/api/cart', auth, limiter(120), async (req, res) => {
   }).strict().parse(req.body);
   // A queued browser write must never cross an account switch.
   if (input.user_id !== req.user.id) throw new AppError('Tài khoản đã thay đổi. Vui lòng tải lại giỏ hàng.', 409);
+  const current = new Map((await store.cart(req.user.id)).map(item => [item.variant_id, item.quantity]));
+  const added = input.items.filter(item => item.quantity > (current.get(item.variant_id) || 0));
+  if (added.length) {
+    await store.expire();
+    const available = new Map((await store.products()).flatMap(product => product.variants.map(variant => [variant.id, variant])));
+    if (added.some(item => !available.has(item.variant_id) || available.get(item.variant_id).stock < item.quantity))
+      throw new AppError('Sản phẩm đã hết hoặc không còn đủ số lượng. Vui lòng cập nhật giỏ hàng.', 409);
+  }
   res.setHeader('Cache-Control', 'private, no-store');
   res.json({ user_id: req.user.id, items: await store.saveCart(req.user.id, input.items) });
 });
@@ -1236,6 +1255,7 @@ if (process.env.NODE_ENV !== "test") {
     clearInterval(timer);
     clearInterval(receiptTimer);
     clearInterval(tingeeTimer);
+    catalogLive.close();
     const force = setTimeout(() => process.exit(1), 30000);
     force.unref();
     await new Promise((done) => server.close(done));

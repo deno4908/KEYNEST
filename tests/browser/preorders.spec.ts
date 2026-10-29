@@ -97,6 +97,7 @@ test("admin creates a preorder without keys and buyer pays with a visible delive
     await buyer
       .getByRole("button", { name: "Thêm vào giỏ", exact: true })
       .click();
+    await expect(buyer.getByRole('status').filter({hasText:'Đã thêm vào giỏ hàng.'})).toBeVisible();
     await buyer.goto(`${base}/cart`);
     await expect(buyer.locator(".cart-item")).toContainText(
       "Đặt trước · Dự kiến giao",
