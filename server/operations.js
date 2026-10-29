@@ -595,7 +595,7 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
     res.json({ success: true });
   });
   router.get("/notifications", auth, async (req, res) =>
-    res.json(
+    res.set('Cache-Control', 'private, no-store').json(
       await ops.notifications(
         req.user.id,
         paging

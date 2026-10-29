@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDataRefresh } from './useDataRefresh';
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowUpRight,
   BarChart3,
@@ -58,6 +58,7 @@ const blankVariant = {
 };
 export function Admin() {
   const { notify, refresh } = useStore();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<Overview | null>(null),
     [error, setError] = useState(""),
     [tab, setTab] = useState("overview"),
@@ -72,6 +73,13 @@ export function Admin() {
     [busy, setBusy] = useState(false),
     [orderFilter, setOrderFilter] = useState("all");
   const loadVersion = useRef(0);
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab') || 'overview';
+    setTab(['overview', 'products', 'categories', 'orders', 'tickets', 'users', 'sellers', 'notifications', 'payments', 'coupons', 'banners', 'audit'].includes(requestedTab) ? requestedTab : 'overview');
+    setOrderId(requestedTab === 'orders' ? searchParams.get('order') : null);
+    setTicketId(requestedTab === 'tickets' ? searchParams.get('ticket') : null);
+  }, [searchParams]);
+  const selectTab = (value: string) => setSearchParams({ tab: value });
   const load = () => {
     const version = ++loadVersion.current;
     return api<Overview>("/admin/overview")
@@ -163,7 +171,7 @@ export function Admin() {
               <button
                 className={tab === id ? "selected" : ""}
                 key={String(id)}
-                onClick={() => setTab(String(id))}
+                onClick={() => selectTab(String(id))}
               >
                 <I size={18} />
                 {String(label)}
@@ -243,7 +251,7 @@ export function Admin() {
                       <h2>Đơn cần xử lý</h2>
                       <button
                         className="text-button"
-                        onClick={() => setTab("orders")}
+                        onClick={() => selectTab("orders")}
                       >
                         Xem tất cả <ArrowUpRight size={16} />
                       </button>

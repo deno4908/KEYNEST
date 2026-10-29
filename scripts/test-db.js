@@ -1944,6 +1944,126 @@ try {
     }
     pass('account carts are service-only and deny direct browser reads and writes');
   }
+  {
+    const aid = randomUUID(), secondAdmin = randomUUID(), suspendedAdmin = randomUUID();
+    const buyer = randomUUID(), seller = randomUUID(), pid = randomUUID(), vid = randomUUID();
+    await db.exec('begin');
+    for (const [id, role] of [[aid, 'admin'], [secondAdmin, 'admin'], [suspendedAdmin, 'admin'], [buyer, 'customer'], [seller, 'seller']]) {
+      await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@admin-notice.test`]);
+      await db.query('update profiles set role=$2,balance=1000000 where id=$1', [id, role]);
+    }
+    await db.query('insert into account_controls(user_id,suspended) values($1,true)', [suspendedAdmin]);
+    const notice = key => scalar('select count(*)::int from notifications where id=$1', [`admin:${key}:${aid}`]);
+    const flush = () => db.exec('set constraints all immediate; set constraints all deferred');
+    const ticket = await scalar("insert into tickets(user_id,subject,message) values($1,'Need support','Please help with my purchase') returning id", [buyer]);
+    assert.equal(await notice(`ticket:${ticket}`), 1);
+    assert.equal(await scalar('select count(*)::int from notifications where user_id=$1 and id=$2', [secondAdmin, `admin:ticket:${ticket}:${secondAdmin}`]), 1);
+    assert.equal(await scalar("select count(*)::int from notifications where user_id in($1,$2) and id like 'admin:%'", [suspendedAdmin, buyer]), 0);
+    await db.query('update notifications set read_at=now() where id=$1', [`admin:ticket:${ticket}:${aid}`]);
+    await db.query("select add_ticket_message($1,$2,'Additional customer information')", [buyer, ticket]);
+    const mid = await scalar("select id from ticket_messages where ticket_id=$1 and role='customer'", [ticket]);
+    assert.equal(await notice(`ticket-message:${mid}`), 1);
+    assert.ok(await scalar('select read_at from notifications where id=$1', [`admin:ticket:${ticket}:${aid}`]));
+    assert.equal(await scalar('select read_at from notifications where id=$1', [`admin:ticket:${ticket}:${secondAdmin}`]), null);
+    const beforeReply = await scalar("select count(*)::int from notifications where user_id=$1 and id like 'admin:%'", [aid]);
+    await db.query("select add_ticket_message($1,$2,'Admin reply to customer','closed','normal')", [aid, ticket]);
+    assert.equal(await scalar("select count(*)::int from notifications where user_id=$1 and id like 'admin:%'", [aid]), beforeReply);
+
+    await db.query("insert into products(id,slug,name,category,platform) values($1,$2,'Upcoming product','game','PC')", [pid, `admin-events-${pid}`]);
+    await db.query("insert into variants(id,product_id,name,price,original_price,stock,delivery,is_preorder,expected_delivery) values($1,$2,'Preorder',10000,10000,10,'manual',true,current_date+7)", [vid, pid]);
+    const payload = { items: [{ variant_id: vid, quantity: 1 }], method: 'wallet', coupon: '', customer_note: '' };
+    const requestId = randomUUID();
+    const walletOrder = await scalar('select create_order($1,$2,$3)', [buyer, JSON.stringify(payload), requestId]);
+    await flush();
+    assert.equal(await notice(`order-paid:${walletOrder}`), 1);
+    assert.equal(await notice(`preorder:${walletOrder}`), 0);
+    assert.match(await scalar('select title from notifications where id=$1', [`admin:order-paid:${walletOrder}:${aid}`]), /Đơn đặt trước đã thanh toán/);
+    await scalar('select create_order($1,$2,$3)', [buyer, JSON.stringify(payload), requestId]);
+    await flush();
+    assert.equal(await notice(`order-paid:${walletOrder}`), 1);
+    const bankOrder = await scalar('select create_order($1,$2,$3)', [buyer, JSON.stringify({ ...payload, method: 'sepay' }), randomUUID()]);
+    await flush();
+    assert.equal(await notice(`preorder:${bankOrder}`), 1);
+    assert.equal(await notice(`order-paid:${bankOrder}`), 0);
+    const paymentCode = await scalar('select code from payments where order_id=$1', [bankOrder]);
+    await scalar('select settle_payment($1,$2,10000)', [`admin-test-${randomUUID()}`, paymentCode]);
+    await flush();
+    assert.equal(await notice(`order-paid:${bankOrder}`), 1);
+    await db.query("update orders set customer_note='Non-status edit' where id=$1", [bankOrder]);
+    await flush();
+    assert.equal(await notice(`order-paid:${bankOrder}`), 1);
+    await db.query('update variants set is_preorder=false where id=$1', [vid]);
+    const ordinary = { ...payload, customer_note: 'Service information' };
+    // Triggers still work for backend writes although manual helper execution is revoked.
+    await db.exec('set local role service_role');
+    const ordinaryOrder = await scalar('select create_order($1,$2,$3)', [buyer, JSON.stringify(ordinary), randomUUID()]);
+    await flush();
+    await db.exec('reset role');
+    assert.equal(await notice(`order-paid:${ordinaryOrder}`), 1);
+    assert.match(await scalar('select title from notifications where id=$1', [`admin:order-paid:${ordinaryOrder}:${aid}`]), /^Đơn hàng đã thanh toán/);
+    assert.match(await scalar('select body from notifications where id=$1', [`admin:order-paid:${ordinaryOrder}:${aid}`]), /giao thủ công/);
+    const ordinaryPending = await scalar('select create_order($1,$2,$3)', [buyer, JSON.stringify({ ...ordinary, method: 'sepay' }), randomUUID()]);
+    await flush();
+    assert.equal(await notice(`preorder:${ordinaryPending}`), 0);
+    assert.equal(await notice(`order-paid:${ordinaryPending}`), 0);
+
+    const sp = await scalar("insert into products(slug,name,category,platform,seller_id) values($1,'Seller listing','game','PC',$2) returning id", [`notice-seller-${pid}`, seller]);
+    await flush();
+    assert.equal(await notice(`product-review:${sp}:1`), 1);
+    await db.query("update products set description='Updated offering' where id=$1", [sp]);
+    await flush();
+    assert.equal(await notice(`product-review:${sp}:2`), 1);
+    await db.query("update products set description='Updated again' where id=$1", [sp]);
+    await db.query("update products set subtitle='Final offering' where id=$1", [sp]);
+    await flush();
+    assert.equal(await notice(`product-review:${sp}:3`), 0);
+    assert.equal(await notice(`product-review:${sp}:4`), 1);
+    const wid = await scalar("insert into seller_withdrawals(user_id,amount,bank,account_number,account_name,idempotency) values($1,50000,'LAB','PRIVATE_BANK_ACCOUNT','Seller',$2) returning id", [seller, randomUUID()]);
+    assert.equal(await notice(`withdrawal:${wid}`), 1);
+    const item = await scalar('select id from order_items where order_id=$1', [bankOrder]);
+    const disputeTicket = await scalar("insert into tickets(user_id,order_id,refund_item_id,kind,subject,message) values($1,$2,$3,'warranty','Refund product','Please refund this product') returning id", [buyer, bankOrder, item]);
+    await db.query('insert into seller_disputes(order_id,item_id,requested_by,seller_id,ticket_id,reason,amount) values($1,$2,$3,$4,$5,$6,10000)', [bankOrder, item, buyer, seller, disputeTicket, 'Private refund reason']);
+    assert.equal(await notice(`dispute:${item}`), 1);
+    assert.equal(await notice(`ticket:${disputeTicket}`), 0);
+    const tx = `notice-${randomUUID()}`;
+    await db.query("insert into payment_events(transaction_id,code,amount,outcome) values($1,'LAB',10000,'needs_review')", [tx]);
+    await flush();
+    const txhash = await scalar('select md5($1)', [tx]);
+    assert.equal(await notice(`payment-review:${txhash}`), 1);
+    const transientTx = `transient-${randomUUID()}`;
+    await db.query("insert into payment_events(transaction_id,code,amount,outcome) values($1,'LAB',10000,'needs_review')", [transientTx]);
+    await db.query("update payment_events set outcome='paid' where transaction_id=$1", [transientTx]);
+    await flush();
+    assert.equal(await notice(`payment-review:${await scalar('select md5($1)', [transientTx])}`), 0);
+    const serializedNotices = JSON.stringify((await db.query("select * from notifications where user_id=$1 and id like 'admin:%'", [aid])).rows);
+    assert.ok(!serializedNotices.includes('PRIVATE_BANK_ACCOUNT'));
+    for (const role of ['anon', 'authenticated', 'service_role'])
+      for (const fn of ['notify_admin_business_event()', 'notify_admin_order(uuid)', 'notify_active_admins(text,text,text,text,timestamptz,uuid)'])
+        assert.equal(await scalar('select has_function_privilege($1,$2,$3)', [role, fn, 'EXECUTE']), false);
+
+    // Re-run just the deployment backfill: read receipts stay read and no row duplicates.
+    const migration = await readFile(new URL('../supabase/migrations/054_admin_event_notifications.sql', import.meta.url), 'utf8');
+    const backfill = migration.slice(migration.indexOf('do $$\ndeclare t public.tickets;')).replace(/commit;\s*$/, '');
+    await db.query("update tickets set status='open' where id=$1", [ticket]);
+    const newAdmin = randomUUID();
+    await db.query('insert into auth.users(id,email) values($1,$2)', [newAdmin, `${newAdmin}@backfill.test`]);
+    await db.query("update profiles set role='admin' where id=$1", [newAdmin]);
+    assert.equal(await scalar("select count(*)::int from notifications where user_id=$1", [newAdmin]), 0);
+    await db.exec(backfill);
+    for (const key of [`ticket:${ticket}`, `order-paid:${walletOrder}`, `product-review:${sp}:4`, `withdrawal:${wid}`, `dispute:${item}`, `payment-review:${txhash}`])
+      assert.equal(await scalar('select count(*)::int from notifications where id=$1', [`admin:${key}:${newAdmin}`]), 1, `backfill ${key}`);
+    const previousCount = await scalar("select count(*)::int from notifications where user_id=$1", [aid]);
+    await db.exec(backfill);
+    assert.equal(await scalar("select count(*)::int from notifications where user_id=$1", [aid]), previousCount);
+    assert.ok(await scalar('select read_at from notifications where id=$1', [`admin:ticket:${ticket}:${aid}`]));
+    await db.exec('savepoint rollback_notice');
+    const rolledBackTicket = await scalar("insert into tickets(user_id,subject,message) values($1,'Rolled back','This request must not persist') returning id", [buyer]);
+    assert.equal(await notice(`ticket:${rolledBackTicket}`), 1);
+    await db.exec('rollback to rollback_notice');
+    assert.equal(await notice(`ticket:${rolledBackTicket}`), 0);
+    await db.exec('rollback');
+    pass('admin events cover support/replies, paid and pending preorders, seller review/withdrawals, refunds and payment review; recipients, independent read receipts, deduplication, rollback and trigger privileges');
+  }
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

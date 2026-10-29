@@ -6,6 +6,7 @@ import { warrantyInfo } from "./warranty.js";
 import { calculateCoupon, couponStats } from "./coupons.js";
 import { defaultBanners, subcategories } from "../shared/storefront.js";
 import { writeDemoSnapshot } from "./demo-persistence.js";
+import { syncAdminNotifications } from './admin-notifications.js';
 import { searchCatalog } from "./catalog.js";
 import { sellerPublic, snapshotSeller, settleSellerRevenue, releaseSellerFunds } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, hashPassword } from "./security.js";
@@ -108,6 +109,7 @@ export class DemoStore {
     return existing || this.db.banners.at(-1);
   }
   save() {
+    syncAdminNotifications(this.db);
     writeDemoSnapshot(this.path, this.db);
   }
   publicUser(u) {
