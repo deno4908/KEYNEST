@@ -58,10 +58,12 @@ export function mediaRouter({ store, mode, auth, admin, limiter, cacheDirectory 
   const avatarBody = express.raw({
     type: ["image/jpeg", "image/png", "image/webp"],
     limit: "4mb",
+    inflate: false,
   });
   const adminBody = express.raw({
     type: ["image/jpeg", "image/png", "image/webp"],
     limit: "8mb",
+    inflate: false,
   });
   router.post(
     ["/admin/media", "/seller/media", "/me/avatar"],

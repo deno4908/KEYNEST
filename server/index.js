@@ -1,7 +1,7 @@
 import express from "express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-import { rateLimit, ipKeyGenerator } from "express-rate-limit";
+import { createApiLimits } from './rate-limits.js';
 import { z, ZodError } from "zod";
 import { existsSync, readFileSync } from "node:fs";
 import { socialMetadata, metadataHead, injectMetadata } from './social-preview.js';
@@ -137,75 +137,17 @@ app.use(
     },
   }),
 );
-app.use(express.json({ limit: "100kb" }));
-app.use(cookieParser());
 app.use("/api", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
   next();
 });
-let limiterNumber = 0;
-const limiter = (limit, windowMs = 60000, scope = `route-${limiterNumber++}`) =>
-  rateLimit({
-    store: infrastructure.rateStore(scope),
-    passOnStoreError: false,
-    // Only auth middleware may set req.user; never trust a client-supplied ID.
-    keyGenerator: (req) => req.user?.id ? `user:${req.user.id}` : `ip:${ipKeyGenerator(req.ip || 'unknown')}`,
-    windowMs,
-    limit,
-    standardHeaders: "draft-8",
-    legacyHeaders: false,
-    handler: (req, res) => {
-      const retryAfter = Math.max(
-        1,
-        Math.ceil(
-          ((req.rateLimit.resetTime?.getTime() || Date.now() + windowMs) -
-            Date.now()) /
-            1000,
-        ),
-      );
-      res.setHeader("Retry-After", String(retryAfter));
-      res.status(429).json({
-        error: `Bạn thao tác quá nhanh. Vui lòng thử lại sau ${retryAfter < 60 ? `${retryAfter} giây` : `${Math.ceil(retryAfter / 60)} phút`}.`,
-        code: "RATE_LIMITED",
-        retry_after: retryAfter,
-      });
-    },
-  });
-const generalLimit = limiter(240, 60000, "general");
-const webhookLimit = limiter(6000, 60000, "webhooks");
-const sessionControlLimit = limiter(60, 60000, "session-control");
-app.use("/api", (req, res, next) => {
-  // Keep session status/logout available when ordinary API traffic is limited.
-  if (
-    (req.method === "GET" && req.path === "/auth/mfa/status") ||
-    (req.method === "POST" && ["/auth/logout", "/auth/refresh"].includes(req.path))
-  ) {
-    return sessionControlLimit(req, res, next);
-  }
-  return ["/webhooks/pay2s", "/webhooks/sepay"].includes(req.path)
-    ? webhookLimit(req, res, next)
-    : generalLimit(req, res, next);
-});
-const loginLimit = limiter(20, 15 * 60000, "auth-login");
-app.use("/api/auth", (req, res, next) => {
-  // MFA reads must not consume the password/OAuth login budget. MFA writes
-  // have their own limits; logout must remain available to a blocked session.
-  if (
-    (req.method === "GET" &&
-      ["/mfa/status", "/admin-otp/status", "/password-key"].includes(req.path)) ||
-    (req.method === "POST" &&
-      [
-        "/mfa/enroll",
-        "/mfa/verify",
-        "/admin-otp/send",
-        "/admin-otp/verify",
-        "/logout",
-        "/refresh",
-      ].includes(req.path))
-  )
-    return next();
-  return loginLimit(req, res, next);
-});
+const apiLimits = createApiLimits({ rateStore: scope => infrastructure.rateStore(scope) });
+const { limiter } = apiLimits;
+app.use('/api', apiLimits.early);
+// This API accepts uncompressed request bodies. Reject compressed input rather
+// than allocating a decompression stream for it.
+app.use(express.json({ limit: '100kb', inflate: false }));
+app.use(cookieParser());
 app.use("/api", (req, res, next) => {
   try {
     if (
@@ -324,6 +266,7 @@ const admin = (req, res, next) =>
     : next(new AppError("Bạn không có quyền quản trị.", 403));
 const uuid = z.uuid();
 app.use('/api', apiAccessGuard({ auth, admin }));
+app.use('/api', apiLimits.authenticated);
 app.use('/api', passwordTransport.middleware.bind(passwordTransport));
 app.use("/api/auth/mfa", mfaRouter({ config, auth, limiter, setAuth }));
 app.use('/api', categoriesRouter({ categories: categoryStore, auth, admin, limiter, store }));
@@ -727,7 +670,7 @@ app.get('/api/payments/:id', auth, async (req, res) => {
   if (details) return res.json(await paymentInfo({ ...payment, status }));
   res.json({ id: payment.id, status });
 });
-app.post("/api/coupons/preview", auth, limiter(40), async (req, res) => {
+app.post("/api/coupons/preview", auth, async (req, res) => {
   const input = z
     .object({
       code: z
@@ -780,7 +723,7 @@ app.post(
       );
   },
 );
-app.post("/api/orders", auth, limiter(15), async (req, res) => {
+app.post("/api/orders", auth, async (req, res) => {
   const payload = orderSchema.parse(req.body);
   const idempotency = uuid.parse(req.headers["idempotency-key"]);
   if (payload.method === "sepay") bankPayments.assertReady();
@@ -804,7 +747,7 @@ app.get("/api/wallet", auth, async (req, res) => {
       .map(paymentInfo)),
   });
 });
-app.post("/api/wallet/topup", auth, limiter(10), async (req, res) => {
+app.post("/api/wallet/topup", auth, async (req, res) => {
   const { amount } = z
     .object({ amount: z.number().int().min(10000).max(50000000).multipleOf(1000) })
     .strict()
@@ -1251,6 +1194,8 @@ app.use((err, req, res, next) => {
     return res
       .status(400)
       .json({ error: err.issues.map((i) => i.message).join(" ") });
+  if (err.type === 'encoding.unsupported')
+    return res.status(415).json({ error: 'Không hỗ trợ request body nén.', code: 'UNSUPPORTED_ENCODING' });
   if (err.type === "entity.parse.failed")
     return res.status(400).json({ error: "JSON không hợp lệ." });
   if (err.type === "entity.too.large")

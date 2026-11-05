@@ -322,6 +322,9 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
   settleSellerRevenue(store, bankOrder, true);
   assert.equal(owner.balance, 0);
   assert.equal(owner.seller_debt, 92000);
+  // This sixth withdrawal attempt in the same window is throttled before the
+  // business handler. Check the debt rule directly as well, without weakening
+  // the production request budget or dropping coverage of the ledger rule.
   assert.equal(
     (
       await req(
@@ -330,7 +333,11 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
         login.cookie,
       )
     ).status,
-    409,
+    429,
+  );
+  await assert.rejects(
+    createSellers(store).command(seller.id, 'withdraw', { ...w, idempotency: randomUUID() }),
+    error => error.status === 409,
   );
   const next = await req("/orders", orderPayload, buyer.cookie);
   assert.equal(next.status, 201);

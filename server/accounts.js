@@ -50,7 +50,6 @@ export function accountRouter({
     "/me/password",
     auth,
     requirePasswordSession,
-    limiter(5, 15 * 60000),
     async (req, res) => {
       const input = z
         .object({
