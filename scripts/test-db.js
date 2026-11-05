@@ -1,4 +1,6 @@
 import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
+import { LEGAL_VERSION } from '../shared/legal-content.js';
+import { consentProof } from '../server/legal-consent.js';
 // Executes the exact Supabase migration in an ephemeral PostgreSQL (WASM) instance.
 // Supabase Auth is replaced only by a local users table and auth.uid() claim stub.
 // No network credentials, persistent files or live databases are used.
@@ -288,9 +290,13 @@ try {
   await db.exec('begin');
   const cartItems = [{ variant_id: variant, quantity: 3 }, { variant_id: manual, quantity: 2 }];
   await db.query('insert into account_carts(user_id,items) values($1,$3),($2,$3)', [user, other, JSON.stringify(cartItems)]);
-  const cartPayload = { items: [{ variant_id: variant, quantity: 1 }], method: 'wallet', coupon: '', customer_note: '' };
+  const cartPayload = { items: [{ variant_id: variant, quantity: 1 }], method: 'wallet', coupon: '', customer_note: '',
+    legal: consentProof({ version: LEGAL_VERSION, terms: true }, 'order') };
   const cartKey = randomUUID();
   const cartOrder = await scalar('select create_order($1,$2,$3)', [user, JSON.stringify(cartPayload), cartKey]);
+  assert.deepEqual(await scalar('select fingerprint->\'legal\' from orders where id=$1', [cartOrder]), cartPayload.legal);
+  assert.ok(await scalar('select created_at is not null from orders where id=$1', [cartOrder]));
+  pass('checkout persists exact policy version and hashes with database timestamp in the same transaction');
   const savedCart = uid => scalar('select items from account_carts where user_id=$1', [uid]);
   assert.deepEqual(await savedCart(user), [{ variant_id: variant, quantity: 2 }, cartItems[1]]);
   assert.deepEqual(await savedCart(other), cartItems);

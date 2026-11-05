@@ -6,6 +6,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { createOAuthRouter } from "../server/oauth.js";
 import { decrypt, encrypt, requireOrigin } from "../server/security.js";
+import { accountLegal } from './helpers/legal.js';
 
 test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens off redirects", async (t) => {
   const config = {
@@ -24,6 +25,8 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   const uid = randomUUID();
   let exchanges = 0;
   let expectedChallenge = "";
+  const receipts = [];
+  let receiptFailure = false;
   const used = new Set();
   const app = express();
   app.use(express.json());
@@ -47,6 +50,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
       config,
       store: {
         profile: async (id) => (id === uid ? { id, name: "OAuth User" } : null),
+        audit: async (...args) => { if (receiptFailure) throw new Error('unavailable'); receipts.push(args); },
       },
       setAuth: (res, session) => {
         sendSession(res, session, { httpOnly: true, path: '/api', sameSite: 'lax' });
@@ -86,7 +90,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   const base = `http://127.0.0.1:${server.address().port}/api/auth/oauth`;
   const headers = { Origin: config.origin, "X-App-Request": "keynest" };
   async function start(provider = "google") {
-    const res = await fetch(`${base}/${provider}`, { method: "POST", headers });
+    const res = await fetch(`${base}/${provider}`, { method: "POST", headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ legal: accountLegal }) });
     const body = await res.json();
     return {
       res,
@@ -99,6 +103,13 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   }
   assert.equal((await fetch(`${base}/google`, { method: "POST" })).status, 403);
   assert.equal((await start("unknown")).res.status, 400);
+  for (const legal of [undefined, { ...accountLegal, account_data: false }, { ...accountLegal, version: 'old' }]) {
+    const response = await fetch(`${base}/google`, { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ legal }),
+    });
+    assert.ok([400, 409].includes(response.status));
+    assert.equal(response.headers.getSetCookie().length, 0);
+  }
   const flow = await start();
   assert.equal(flow.res.status, 200);
   const url = new URL(flow.body.url);
@@ -148,6 +159,10 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   assert.equal(good.headers.get('X-Access-Token'), 'private-access-token');
   assert.doesNotMatch(good.headers.get('set-cookie'), /kn_access=private-access-token/);
   assert.equal(good.headers.get("referrer-policy"), "no-referrer");
+  assert.equal(receipts.length, 1);
+  assert.equal(receipts[0][0], uid);
+  assert.equal(receipts[0][1], 'account_legal_acceptance');
+  assert.equal(JSON.parse(receipts[0][2]).version, accountLegal.version);
   assert.equal(
     (await callback("?code=valid-code", flow.cookie)).headers.get("location"),
     `${config.origin}/auth/error`,
@@ -157,6 +172,14 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
     new URL(discord.body.url).searchParams.get("scopes"),
     "identify email",
   );
+  // A failed durable consent write must not issue an application session.
+  used.clear();
+  expectedChallenge = new URL(discord.body.url).searchParams.get('code_challenge');
+  receiptFailure = true;
+  const failedReceipt = await callback('?code=valid-code', discord.cookie);
+  assert.equal(failedReceipt.headers.get('location'), `${config.origin}/auth/error`);
+  assert.equal(failedReceipt.headers.get('X-Access-Token'), null);
+  assert.ok(!failedReceipt.headers.getSetCookie().some(c => c.startsWith('kn_refresh=')));
   config.oauthProviders.discord = false;
   assert.equal((await start("discord")).res.status, 503);
   config.mode = "demo";

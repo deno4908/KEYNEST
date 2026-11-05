@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { AppError, encrypt, decrypt } from "./security.js";
+import { accountConsentRecord, accountConsentSchema } from './legal-consent.js';
 
 // Supabase manages provider state. S256 PKCE binds the returned code to the
 // browser that started login; the verifier never leaves an HttpOnly cookie.
@@ -24,9 +25,11 @@ export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
     verifier: z.string().regex(/^[a-zA-Z0-9_-]{43,128}$/),
     provider: z.enum(["google", "discord"]),
     expires: z.number().int(),
+    legal: accountConsentSchema.extend({ accepted_at: z.iso.datetime() }).passthrough(),
   });
   router.post("/:provider", async (req, res) => {
     const provider = z.enum(["google", "discord"]).parse(req.params.provider);
+    const legal = accountConsentRecord(req.body?.legal, `oauth-${provider}`);
     if (config.mode !== "supabase")
       throw new AppError(
         "Đăng nhập Google và Discord chưa khả dụng trong bản demo. Bạn có thể dùng email hoặc tài khoản mẫu.",
@@ -55,6 +58,7 @@ export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
         JSON.stringify({
           verifier,
           provider,
+          legal,
           expires: Date.now() + 10 * 60000,
         }),
         encryptionKey(),
@@ -107,6 +111,8 @@ export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
         .parse(await response.json());
       const profile = await store.profile(session.user.id);
       if (!profile) return failure();
+      // Persist the browser's pre-provider consent before issuing our session.
+      await store.audit(session.user.id, 'account_legal_acceptance', JSON.stringify(transaction.legal));
       setAuth(res, session);
       return res.redirect(303, `${config.origin}/account?welcome=${transaction.provider}`);
     } catch {

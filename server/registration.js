@@ -1,8 +1,10 @@
 import { AppError } from './security.js';
+import { accountConsentRecord } from './legal-consent.js';
 
 // Admin Auth creates a real user or returns an error; it never returns the
 // obfuscated success response used by public signUp for existing accounts.
 export async function registerSupabase(store, authClient, input) {
+  const consent = accountConsentRecord(input.legal, 'email-registration');
   const conflicts = await store.query(store.client.rpc('registration_conflicts', {
     p_email: input.email, p_name: input.name,
   }));
@@ -13,6 +15,7 @@ export async function registerSupabase(store, authClient, input) {
     password: input.password,
     email_confirm: true,
     user_metadata: { name: input.name, registration_name: input.name },
+    app_metadata: { legal_acceptance: consent },
   });
   if (error || !data?.user) {
     if (['email_exists', 'user_already_exists'].includes(error?.code))

@@ -91,3 +91,19 @@ jobs:
           ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p /opt/keynest/incoming/$release_id"
           scp "${ssh_opts[@]}" -P "$VPS_PORT" release.tar.gz release.sha256 "$target:/opt/keynest/incoming/$release_id/"
           ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$target" "cd /opt/keynest/incoming/$release_id && sha256sum -c release.sha256 && tar -xzf release.tar.gz deploy/release.sh && bash deploy/release.sh $release_id"
+      - name: Verify public policy versions
+        shell: bash
+        run: |
+          tar -xzf release.tar.gz shared/legal-content.js
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { LEGAL_VERSION } from './shared/legal-content.js';
+          for (const path of ['/terms', '/privacy']) {
+            const response = await fetch('https://keynest.store' + path, {
+              headers: { 'Cache-Control': 'no-cache' }, signal: AbortSignal.timeout(20000),
+            });
+            assert.equal(response.status, 200, path);
+            assert.ok((await response.text()).includes(LEGAL_VERSION), `${path}: policy version differs from release; update the Cloudflare Worker`);
+            console.log(JSON.stringify({path, version: LEGAL_VERSION, worker: response.headers.get('X-Keynest-Region-Worker')}));
+          }
+          NODE

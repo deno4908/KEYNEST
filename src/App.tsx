@@ -71,6 +71,8 @@ import type {
 } from "./types";
 import { SellerContact } from './Seller';
 import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
+import { LEGAL_VERSION } from '../shared/legal-content.js';
+import { LegalConsent } from './LegalConsent';
 import { Home, PromotionsPage, GuidePage } from "./Storefront";
 import { HeaderSearch, StoreNavigation } from "./Navigation";
 import { Catalog } from "./Catalog";
@@ -1061,6 +1063,7 @@ function ProductPage() {
 function CartPage() {
   const { products, cart, setCart, add, adding, flushCart, cartReady, cartError, retryCart, user, login, refresh, notify } = useStore();
   const navigate = useNavigate();
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [method, setMethod] = useState("wallet"),
     [coupon, setCoupon] = useState(""),
     [note, setNote] = useState(""),
@@ -1074,6 +1077,15 @@ function CartPage() {
   const [couponError, setCouponError] = useState("");
   const [couponChecking, setCouponChecking] = useState(false);
   const couponSignature = JSON.stringify([cart, coupon.trim(), user?.id]);
+  const purchaseSignature = JSON.stringify([cart, method, coupon, user?.id, couponQuote?.total,
+    cart.map(item => {
+      const product = products.find(p => p.variants.some(v => v.id === item.variant_id));
+      const variant = product?.variants.find(v => v.id === item.variant_id);
+      return [product?.name, product?.platform, product?.usage_notes, variant?.name,
+        variant?.price, variant?.region, variant?.delivery, variant?.is_preorder,
+        variant?.warranty_days, variant?.expected_delivery];
+    })]);
+  useEffect(() => { setAcceptedTerms(false); }, [purchaseSignature]);
   useEffect(() => {
     setCouponError("");
     setCouponQuote(null);
@@ -1130,6 +1142,7 @@ function CartPage() {
   async function checkout() {
     if (!cartReady) return;
     if (!user) return login();
+    if (!acceptedTerms) return notify('Vui lòng đọc và tích đồng ý điều kiện giao dịch trước khi đặt hàng.', true);
     if (unavailable)
       return notify("Vui lòng cập nhật sản phẩm không đủ tồn kho.", true);
     setBusy(true);
@@ -1137,7 +1150,7 @@ function CartPage() {
       await flushCart();
       const o = await post<Order>(
         "/orders",
-        { items: cart, method, coupon, customer_note: note },
+        { items: cart, method, coupon, customer_note: note, legal: { version: LEGAL_VERSION, terms: acceptedTerms } },
         { "Idempotency-Key": key },
       );
       // The order transaction already consumed its items in the saved cart.
@@ -1350,9 +1363,10 @@ function CartPage() {
               </strong>
               <strong>{money(appliedCoupon?.total ?? total)}</strong>
             </div>
+            <LegalConsent terms={acceptedTerms} onTerms={setAcceptedTerms} />
             <button
               className="button full"
-              disabled={busy || adding || unavailable}
+              disabled={busy || adding || unavailable || (!!user && !acceptedTerms)}
               onClick={checkout}
             >
               {busy

@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowUpRight, Facebook, ShieldCheck, FileText, List, Chevron
 import { DiscordIcon } from "./AuthProviders";
 import "./legal.css";
 
-import { terms, privacy } from "../shared/legal-content.js";
+import { terms, privacy, LEGAL_VERSION, LEGAL_UPDATED_AT, LEGAL_UPDATED_LABEL, legalSources } from "../shared/legal-content.js";
 
 export function LegalPage({
   privacy: isPrivacy = false,
@@ -27,7 +27,8 @@ export function LegalPage({
             ? "Thông tin chúng tôi xử lý và cách bạn quản lý dữ liệu của mình."
             : "Những điều cần biết khi sử dụng tài khoản và mua sản phẩm tại KEYNEST."}
         </p>
-        <p className="legal-meta">Cập nhật lần cuối: <time dateTime="2026-10-11">11/10/2026</time></p>
+        <p className="legal-meta">Cập nhật lần cuối: <time dateTime={LEGAL_UPDATED_AT}>{LEGAL_UPDATED_LABEL}</time> · Phiên bản {LEGAL_VERSION}</p>
+        <button className="text-button legal-print" onClick={() => window.print()}>In / lưu chính sách</button>
       </header>
       <nav className="legal-tabs" aria-label="Chính sách cửa hàng">
         <Link to="/terms" aria-current={!isPrivacy ? 'page' : undefined}><FileText size={17} />Điều khoản dịch vụ</Link>
@@ -46,6 +47,9 @@ export function LegalPage({
               <div><h2>{title}</h2><p>{text}</p></div>
             </section>
           ))}
+          <section className="legal-sources"><h2>Văn bản pháp luật tham khảo</h2>
+            <ul>{legalSources.map(([title, url]) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{title}</a></li>)}</ul>
+          </section>
           <div className="legal-document-end"><ShieldCheck size={17} /><span>Cảm ơn bạn đã dành thời gian tìm hiểu chính sách của KEYNEST.</span></div>
         </article>
       </div>

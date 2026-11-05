@@ -34,6 +34,8 @@ test("authentication stays usable across modes, failed login, keyboard and small
   await expect(dialog.getByRole("alert")).toBeVisible();
   await expect(email).toHaveValue("missing@example.test");
   await dialog.getByRole("button", { name: "Đăng ký", exact: true }).click();
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
   await expect(dialog.getByLabel("Tên của bạn")).toBeVisible();
   for (const width of [320, 390, 768, 1440]) {
@@ -81,6 +83,8 @@ test("account handles empty history, profile edits, load errors and responsive s
   await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Đăng ký", exact: true }).click();
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
   await dialog.getByLabel("Tên của bạn").fill("Account UI Test");
   await dialog
     .getByLabel("Email", { exact: true })

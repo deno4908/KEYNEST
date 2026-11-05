@@ -102,6 +102,7 @@ test("admin creates a preorder without keys and buyer pays with a visible delive
     await expect(buyer.locator(".cart-item")).toContainText(
       "Đặt trước · Dự kiến giao",
     );
+    await buyer.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
     await buyer
       .getByRole("button", { name: "Đặt hàng & thanh toán", exact: true })
       .click();

@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock3,
   Copy,
+  Download,
   Headphones,
   KeyRound,
   Landmark,
@@ -506,6 +507,20 @@ function OrderDetails({ id }: { id: string }) {
   const { notify, refresh } = useStore();
   const [payment, setPayment] = useState<Payment | null>(null);
   const [copied, setCopied] = useState("");
+  const [downloading, setDownloading] = useState(false);
+  async function downloadContract() {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const result = await api<{ document: string }>(`/orders/${id}/contract`);
+      const url = URL.createObjectURL(new Blob(['\uFEFF', result.document], { type: 'text/plain;charset=utf-8' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = `KEYNEST-giao-dich-${id}.txt`;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { notify((error as Error).message, true); }
+    finally { setDownloading(false); }
+  }
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -572,6 +587,9 @@ function OrderDetails({ id }: { id: string }) {
             Đơn hàng của bạn
           </Link>
           <h1>Chi tiết đơn hàng</h1>
+          <button className="text-button" disabled={downloading} onClick={downloadContract}>
+            <Download size={15} /> {downloading ? 'Đang tải…' : 'Tải bản giao dịch'}
+          </button>
         </div>
         <Badge status={order.status} />
       </div>

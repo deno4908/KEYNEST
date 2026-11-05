@@ -1,3 +1,4 @@
+import { accountLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ request }) => {
@@ -49,7 +50,7 @@ test("account password form validates confirmation and keeps the updated session
   };
   const registered = await page.request.post("/api/auth/register", {
     headers,
-    data: {
+    data: { legal: accountLegal,
       email,
       password: "OriginalPassword123!",
       name: "Password Test",

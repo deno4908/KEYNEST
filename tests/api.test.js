@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -35,7 +36,7 @@ async function request(
       ...(key ? { "Idempotency-Key": key } : {}),
       ...(authorization ? { Authorization: authorization } : {}),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: JSON.stringify(withLegalConsent(path, body)) } : {}),
   });
   return {
     status: res.status,

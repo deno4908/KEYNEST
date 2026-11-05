@@ -1,3 +1,4 @@
+import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
 test("buyer reviews and product comments are persisted, isolated and rendered as text", async ({
@@ -19,7 +20,7 @@ test("buyer reviews and product comments are persisted, isolated and rendered as
   await page.goto("/");
   const registration = await page.request.post("/api/auth/register", {
     headers,
-    data: {
+    data: { legal: accountLegal,
       email: `feedback-ui-${Date.now()}@example.test`,
       password: "FeedbackPassword123!",
       name: "Feedback Buyer",
@@ -49,7 +50,7 @@ test("buyer reviews and product comments are persisted, isolated and rendered as
     (
       await page.request.post("/api/orders", {
         headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
-        data: {
+        data: { legal: orderLegal,
           items: [{ variant_id: product.variants[0].id, quantity: 1 }],
           method: "wallet",
           coupon: "",

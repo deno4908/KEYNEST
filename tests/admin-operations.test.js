@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -25,7 +26,7 @@ async function req(path, body, cookie = "", extra = {}) {
       ...extra,
     },
     ...(body
-      ? { body: Buffer.isBuffer(body) ? body : JSON.stringify(body) }
+      ? { body: Buffer.isBuffer(body) ? body : JSON.stringify(withLegalConsent(path, body)) }
       : {}),
   });
   return {

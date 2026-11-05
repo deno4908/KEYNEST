@@ -1,3 +1,4 @@
+import { accountLegal } from '../helpers/legal.js';
 ﻿import { test, expect } from "@playwright/test";
 
 test("account sessions/inbox and admin customer controls work on desktop and mobile", async ({
@@ -15,7 +16,7 @@ test("account sessions/inbox and admin customer controls work on desktop and mob
   const email = `operations-${Date.now()}@example.test`;
   const registered = await page.request.post("/api/auth/register", {
     headers,
-    data: { email, password: "OperationsTest123!", name: "Operations Test" },
+    data: { legal: accountLegal, email, password: "OperationsTest123!", name: "Operations Test" },
   });
   expect(registered.ok()).toBe(true);
   await page.goto("/account");

@@ -1,10 +1,11 @@
+import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { test, expect, type APIRequestContext } from '@playwright/test';
 
 const headers = { Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest' };
 async function register(request: APIRequestContext, label: string) {
   const suffix = crypto.randomUUID().slice(0, 8);
   const response = await request.post('/api/auth/register', {
-    headers, data: { email: `${label.toLowerCase().replaceAll(' ', '-')}-${suffix}@example.test`, name: `${label} ${suffix}`, password: 'StockBuyer123!' },
+    headers, data: { legal: accountLegal, email: `${label.toLowerCase().replaceAll(' ', '-')}-${suffix}@example.test`, name: `${label} ${suffix}`, password: 'StockBuyer123!' },
   });
   expect(response.ok()).toBeTruthy();
   return (await response.json()).user;
@@ -16,7 +17,7 @@ async function buyRemaining(request: APIRequestContext, variant: {id: string; st
   expect((await request.post(`/api/demo/pay/${payment.id}`, {headers})).ok()).toBeTruthy();
   const bought = await request.post('/api/orders', {
     headers: {...headers, 'Idempotency-Key':crypto.randomUUID()},
-    data: { items:[{variant_id:variant.id,quantity:variant.stock}], method:'wallet', coupon:'', customer_note:'' },
+    data: { legal: orderLegal, items:[{variant_id:variant.id,quantity:variant.stock}], method:'wallet', coupon:'', customer_note:'' },
   });
   expect(bought.ok()).toBeTruthy();
 }
@@ -43,6 +44,7 @@ test('another buyer selling out a variant updates open product, catalog and cart
   const cart = await context.newPage();
   await cart.goto('/cart');
   const checkout = cart.getByRole('button',{name:'Đặt hàng & thanh toán',exact:true});
+  await cart.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
   await expect(checkout).toBeEnabled();
   const buyer = await browser.newContext();
   try {

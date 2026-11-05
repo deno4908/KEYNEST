@@ -1,3 +1,4 @@
+import { accountLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
@@ -19,7 +20,7 @@ test("admin uploads images, configures a fixed single-use coupon and resolves wa
     (
       await request.post("/api/auth/register", {
         headers,
-        data: {
+        data: { legal: accountLegal,
           email,
           name: "Khách kiểm tra quản trị",
           password: "CustomerPassword123!",
@@ -129,6 +130,7 @@ test("admin uploads images, configures a fixed single-use coupon and resolves wa
     await customer.getByRole("textbox", { name: "Mã giảm giá" }).fill(code);
     await expect(customer.getByRole("status")).toContainText("Đã áp dụng mã");
     await expect(customer.locator(".summary-total")).toContainText("84.000");
+    await customer.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
     await customer
       .getByRole("button", { name: "Đặt hàng & thanh toán" })
       .click();

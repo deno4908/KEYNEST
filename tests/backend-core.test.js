@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -38,7 +39,7 @@ test("non-payment backend: catalog, account, inventory and ownership", async (t)
           ? { Origin: "http://127.0.0.1:5173", "X-App-Request": "keynest" }
           : {}),
       },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      ...(body ? { body: JSON.stringify(withLegalConsent(path, body)) } : {}),
     });
     return {
       status: response.status,

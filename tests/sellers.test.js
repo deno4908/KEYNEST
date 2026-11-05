@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 ﻿import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -25,7 +26,7 @@ async function req(path, body, cookie = "") {
       Cookie: cookie,
       "Idempotency-Key": randomUUID(),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: JSON.stringify(withLegalConsent(path, body)) } : {}),
   });
   return {
     status: r.status,

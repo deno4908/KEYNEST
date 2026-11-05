@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
@@ -19,7 +20,7 @@ async function req(path, cookie = '', body) {
   const response = await fetch(base + path, {
     method: body ? 'POST' : 'GET',
     headers: { 'Content-Type': 'application/json', Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest', Cookie: cookie },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(body ? { body: JSON.stringify(withLegalConsent(path, body)) } : {}),
   });
   return { status: response.status, body: await response.json(), cache: response.headers.get('cache-control'),
     cookie: response.headers.getSetCookie().map(v => v.split(';')[0]).join('; ') };

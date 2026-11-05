@@ -1,3 +1,4 @@
+import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { test, expect } from '@playwright/test';
 
 const headers = { Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest' };
@@ -16,7 +17,7 @@ test('admin avatar receives support and preorder alerts, links to the right reco
   const buyer = await browser.newContext();
   try {
     const suffix = crypto.randomUUID().slice(0, 8);
-    expect((await buyer.request.post('/api/auth/register', { headers, data: { email: `notice-${suffix}@example.test`, name: `Notification Buyer ${suffix}`, password: 'Buyer12345!' } })).ok()).toBeTruthy();
+    expect((await buyer.request.post('/api/auth/register', { headers, data: { legal: accountLegal, email: `notice-${suffix}@example.test`, name: `Notification Buyer ${suffix}`, password: 'Buyer12345!' } })).ok()).toBeTruthy();
     const subject = `Cần hỗ trợ ${suffix}`;
     const support = await buyer.request.post('/api/tickets', { headers, data: { subject, message: 'Cần hỗ trợ kiểm tra đơn hàng giúp tôi.' } });
     expect(support.ok()).toBeTruthy();
@@ -42,7 +43,7 @@ test('admin avatar receives support and preorder alerts, links to the right reco
     expect(variantResponse.ok()).toBeTruthy();
     const catalog = await (await buyer.request.get('/api/products')).json();
     const variant = catalog.find((p: { id: string }) => p.id === product.id).variants[0];
-    const ordered = await buyer.request.post('/api/orders', { headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() }, data: { items: [{ variant_id: variant.id, quantity: 1 }], method: 'sepay', coupon: '', customer_note: '' } });
+    const ordered = await buyer.request.post('/api/orders', { headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() }, data: { legal: orderLegal, items: [{ variant_id: variant.id, quantity: 1 }], method: 'sepay', coupon: '', customer_note: '' } });
     expect(ordered.ok()).toBeTruthy();
     const order = await ordered.json();
     await expect(badge).toHaveText('1', { timeout: 16000 });

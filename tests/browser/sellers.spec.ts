@@ -1,3 +1,4 @@
+import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 test("seller onboarding, product editor, contact and withdrawal screens", async ({
   page,
@@ -34,7 +35,7 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
     email = `seller-ui-${suffix}@example.test`;
   const register = await page.request.post("/api/auth/register", {
     headers: { Origin: baseURL!, "X-App-Request": "keynest" },
-    data: { email, password: "Seller123!", name: `Seller UI ${suffix}` },
+    data: { legal: accountLegal, email, password: "Seller123!", name: `Seller UI ${suffix}` },
   });
   expect(register.ok()).toBeTruthy();
   const customers = await (
@@ -186,7 +187,7 @@ test("seller onboarding, product editor, contact and withdrawal screens", async 
   ).json();
   const purchased = await buyerContext.request.post("/api/orders", {
     headers: { "Idempotency-Key": crypto.randomUUID() },
-    data: {
+    data: { legal: orderLegal,
       items: [
         {
           variant_id: product.variants.find(

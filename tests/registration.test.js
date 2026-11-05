@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { registerSupabase } from '../server/registration.js';
+import { accountLegal } from './helpers/legal.js';
 
-const input = { email: 'member@example.test', name: 'Member', password: 'ExamplePass123' };
+const input = { email: 'member@example.test', name: 'Member', password: 'ExamplePass123', legal: accountLegal };
 function fixture(conflicts = {}, creationError = null, loginError = null) {
   const calls = [];
   const store = {
@@ -32,10 +33,23 @@ test('registration creates confirmed customer without invoking signup/email deli
   const f = fixture();
   const result = await registerSupabase(f.store, f.auth, input);
   assert.equal(result.user.role, 'customer');
-  assert.deepEqual(f.calls[0], {
+  const { app_metadata, ...credentials } = f.calls[0];
+  assert.deepEqual(credentials, {
     email: input.email, password: input.password, email_confirm: true,
     user_metadata: { name: input.name, registration_name: input.name },
   });
+  assert.equal(app_metadata.legal_acceptance.version, accountLegal.version);
+  assert.equal(app_metadata.legal_acceptance.account_data, true);
+  assert.match(app_metadata.legal_acceptance.terms_sha256, /^[a-f0-9]{64}$/);
+  assert.ok(Number.isFinite(Date.parse(app_metadata.legal_acceptance.accepted_at)));
+});
+
+test('registration never creates an Auth user without explicit current consent', async () => {
+  for (const legal of [undefined, {}, { ...accountLegal, terms: false }, { ...accountLegal, account_data: false }, { ...accountLegal, version: 'old' }]) {
+    const f = fixture();
+    await assert.rejects(registerSupabase(f.store, f.auth, { ...input, legal }), error => [400, 409].includes(error.status));
+    assert.equal(f.calls.length, 0);
+  }
 });
 test('duplicate email returned by Auth is not reported as success', async () => {
   const f = fixture({}, { code: 'email_exists' });

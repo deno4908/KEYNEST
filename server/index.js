@@ -20,6 +20,8 @@ import { createPasswordTransport } from './password-transport.js';
 import { createSupabaseNonceStore } from './request-nonces.js';
 import { apiAccessGuard } from './api-access.js';
 import { registerSupabase } from "./registration.js";
+import { consentProof, accountConsentRecord } from './legal-consent.js';
+import { orderContract } from './order-contract.js';
 import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
@@ -300,6 +302,7 @@ const credentials = z
   .strict();
 const orderSchema = z
   .object({
+    legal: z.unknown(),
     items: z
       .array(
         z
@@ -541,11 +544,12 @@ app.post("/api/auth/login", async (req, res) => {
 });
 app.post("/api/auth/register", async (req, res) => {
   const input = z
-    .object({ email, password, name: z.string().trim().min(2).max(80) })
+    .object({ email, password, name: z.string().trim().min(2).max(80), legal: z.unknown() })
     .strict()
     .parse(req.body);
   if (config.mode === "demo") {
-    const u = store.register(input.email, input.password, input.name);
+    const consent = accountConsentRecord(input.legal, 'email-registration');
+    const u = store.register(input.email, input.password, input.name, consent);
     demoSession(res, u.id);
     return res.json({ user: u });
   }
@@ -725,11 +729,17 @@ app.post(
 );
 app.post("/api/orders", auth, async (req, res) => {
   const payload = orderSchema.parse(req.body);
+  payload.legal = consentProof(payload.legal, 'order');
   const idempotency = uuid.parse(req.headers["idempotency-key"]);
   if (payload.method === "sepay") bankPayments.assertReady();
   const o = await store.createOrder(req.user.id, payload, idempotency);
   const result = (await store.orders(req.user.id, false, o.id))[0];
   res.status(201).json(await orderInfo(result));
+});
+app.get('/api/orders/:id/contract', auth, limiter(10, 60000, 'order-contract'), async (req, res) => {
+  const order = (await store.orders(req.user.id, false, uuid.parse(req.params.id)))[0];
+  if (!order) throw new AppError('Không tìm thấy đơn hàng.', 404);
+  res.set('Cache-Control', 'private, no-store').json(orderContract(order, req.user));
 });
 app.post("/api/orders/:id/cancel", auth, async (req, res) => {
   await store.cancel(req.user.id, uuid.parse(req.params.id));

@@ -34,6 +34,8 @@ test('registration uses the same welcome with member greeting on mobile', async 
   await auth.getByLabel('Email', { exact: true }).fill(`welcome-${unique}@example.test`);
   await auth.getByLabel('Mật khẩu', { exact: true }).fill('NewAccount123!');
   await auth.getByLabel('Nhập lại mật khẩu', { exact: true }).fill('NewAccount123!');
+  await auth.getByRole('checkbox').nth(0).check();
+  await auth.getByRole('checkbox').nth(1).check();
   await auth.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click();
   const welcome = page.locator('.oauth-welcome');
   await expect(welcome).toBeVisible();

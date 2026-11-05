@@ -46,6 +46,8 @@ test("customer can register, top up, buy a key and submit a support request", as
   const dialog = page.locator(".auth-dialog");
   await dialog.getByRole("button", { name: "Đăng ký", exact: true }).click();
   await dialog.getByLabel("Tên của bạn").fill("Browser Customer");
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
   await dialog.getByLabel("Email", { exact: true }).fill(email);
   await dialog
     .getByLabel("Mật khẩu", { exact: true })
@@ -77,6 +79,7 @@ test("customer can register, top up, buy a key and submit a support request", as
   await page.goto("/cart");
   await expect(page.locator(".cart-item")).toHaveCount(1);
   await page.getByRole("textbox", { name: "Mã giảm giá" }).fill("WELCOME10");
+  await page.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
   await page.getByRole("button", { name: "Đặt hàng & thanh toán" }).click();
   await expect(page).toHaveURL(/\/orders$/);
   await expect(page.locator(".purchase-card").first()).toContainText(

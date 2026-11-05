@@ -18,12 +18,17 @@ import type { User } from "./types";
 import { GoogleIcon, DiscordIcon } from "./AuthProviders";
 import { Recaptcha } from './Recaptcha';
 import { showEmailWelcome } from './OAuthWelcome';
+import { LegalConsent } from './LegalConsent';
+import { LEGAL_VERSION } from '../shared/legal-content.js';
 
 export function AuthModal({ close }: { close: () => void }) {
   const { mode, setUser } = useStore();
   const [tab, setTab] = useState<"login" | "register" | "forgot">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedData, setAcceptedData] = useState(false);
+  const legal = { version: LEGAL_VERSION, terms: acceptedTerms, account_data: acceptedData };
   const [message, setMessage] = useState("");
   const [captcha, setCaptcha] = useState<{ enabled: boolean; site_key: string | null } | null>(null);
   const [captchaConfigError, setCaptchaConfigError] = useState('');
@@ -80,6 +85,8 @@ export function AuthModal({ close }: { close: () => void }) {
     if (busy || tab === next) return;
     setDirection(next === "login" ? "backward" : "forward");
     setTab(next);
+    setAcceptedTerms(false);
+    setAcceptedData(false);
     resetCaptcha();
     setError("");
     setMessage("");
@@ -93,6 +100,10 @@ export function AuthModal({ close }: { close: () => void }) {
     button: HTMLButtonElement,
   ) {
     if (busy || oauthRequest.current) return;
+    if (!acceptedTerms || !acceptedData) {
+      setError('Vui lòng xác nhận điều khoản và xử lý dữ liệu trước khi tiếp tục.');
+      return;
+    }
     const source = button.querySelector("svg")?.getBoundingClientRect();
     const target = layoutRef.current?.getBoundingClientRect();
     if (source && target)
@@ -113,7 +124,7 @@ export function AuthModal({ close }: { close: () => void }) {
       const [{ url }] = await Promise.all([
         api<{ url: string }>(`/auth/oauth/${provider}`, {
           method: "POST",
-          body: "{}",
+          body: JSON.stringify({ legal }),
           signal: controller.signal,
         }),
         new Promise((resolve) => window.setTimeout(resolve, duration)),
@@ -133,6 +144,10 @@ export function AuthModal({ close }: { close: () => void }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || captchaBlocked) return;
+    if (tab === 'register' && (!acceptedTerms || !acceptedData)) {
+      setError('Vui lòng xác nhận điều khoản và xử lý dữ liệu trước khi tạo tài khoản.');
+      return;
+    }
     if (tab === "register" && password !== confirmation) {
       setError('Mật khẩu nhập lại chưa khớp. Vui lòng nhập lại mật khẩu.');
       clearPasswords();
@@ -149,7 +164,7 @@ export function AuthModal({ close }: { close: () => void }) {
       } else if (tab === "register") {
         const result = await post<{ user?: User; message?: string }>(
           "/auth/register",
-          { email: email.trim(), password, name: name.trim() },
+          { email: email.trim(), password, name: name.trim(), legal },
           captchaToken ? { 'X-Captcha-Token': captchaToken } : {},
         );
         if (result.user) {
@@ -310,7 +325,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Google"
-                      disabled={busy}
+                      disabled={busy || !acceptedTerms || !acceptedData}
                       onClick={(e) => socialLogin("google", e.currentTarget)}
                     >
                       <GoogleIcon />
@@ -321,7 +336,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Discord"
-                      disabled={busy}
+                      disabled={busy || !acceptedTerms || !acceptedData}
                       onClick={(e) => socialLogin("discord", e.currentTarget)}
                     >
                       <DiscordIcon />
@@ -501,6 +516,10 @@ export function AuthModal({ close }: { close: () => void }) {
                         )}
                       </div>
                     )}
+                    {tab !== 'forgot' && <>
+                      <p className="auth-consent-intro">{registering ? 'Xác nhận trước khi tạo tài khoản:' : 'Nếu tiếp tục bằng Google/Discord, vui lòng xác nhận:'}</p>
+                      <LegalConsent terms={acceptedTerms} data={acceptedData} account onTerms={setAcceptedTerms} onData={setAcceptedData} />
+                    </>}
                     <>
                       {captchaConfigError && <p className="form-error" role="alert">{captchaConfigError}</p>}
                       {!captcha && !captchaConfigError && <p role="status">Đang tải cấu hình đăng nhập…</p>}
@@ -511,7 +530,7 @@ export function AuthModal({ close }: { close: () => void }) {
                         {error}
                       </p>
                     )}
-                    <button className="button full auth-submit" disabled={busy || captchaBlocked}>
+                    <button className="button full auth-submit" disabled={busy || captchaBlocked || (registering && (!acceptedTerms || !acceptedData))}>
                       {busy
                         ? "Đang xử lý…"
                         : tab === "register"

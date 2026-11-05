@@ -156,7 +156,7 @@ export class DemoStore {
   profile(id) {
     return this.publicUser(this.db.users.find((u) => u.id === id));
   }
-  register(email, password, name) {
+  register(email, password, name, legalAcceptance) {
     const normalizedName = name.trim().toLowerCase();
     if (this.db.users.some((u) => u.email.toLowerCase() === email.toLowerCase()))
       throw new AppError("Email đã được sử dụng.", 409);
@@ -170,6 +170,7 @@ export class DemoStore {
       role: "customer",
       balance: 0,
       password_hash: hashPassword(password),
+      ...(legalAcceptance ? { legal_acceptance: legalAcceptance } : {}),
     };
     this.db.users.push(u);
     this.save();

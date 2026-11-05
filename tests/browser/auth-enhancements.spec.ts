@@ -19,6 +19,8 @@ test("auth transition, password confirmation and social login feedback", async (
       body: JSON.stringify({ error: "Google chưa được cấu hình." }),
     }),
   );
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
   await dialog
     .getByRole("button", { name: "Đăng nhập bằng Google", exact: true })
     .click();
@@ -29,6 +31,8 @@ test("auth transition, password confirmation and social login feedback", async (
     dialog.getByRole("button", { name: "Đăng nhập bằng Discord", exact: true }),
   ).toBeEnabled();
   await dialog.getByRole("button", { name: "Đăng ký", exact: true }).click();
+  await dialog.getByRole('checkbox').nth(0).check();
+  await dialog.getByRole('checkbox').nth(1).check();
   await expect(dialog.locator(".auth-tabs")).toHaveAttribute(
     "data-active",
     "register",

@@ -1,3 +1,4 @@
+import { accountLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 
 const headers = { Origin: "http://127.0.0.1:5173", "X-App-Request": "keynest" };
@@ -15,7 +16,7 @@ test("checkout waits for queued cart saves and consumes the account cart without
   await page.goto("/");
   const registered = await page.request.post("/api/auth/register", {
     headers,
-    data: { email: `cart-checkout-${Date.now()}@example.test`, name: `Cart Buyer ${Date.now()}`, password: "CartBuyer123!" },
+    data: { legal: accountLegal, email: `cart-checkout-${Date.now()}@example.test`, name: `Cart Buyer ${Date.now()}`, password: "CartBuyer123!" },
   });
   expect(registered.ok()).toBeTruthy();
   const { user } = await registered.json();
@@ -47,6 +48,7 @@ test("checkout waits for queued cart saves and consumes the account cart without
   await page.goto("/cart");
   await expect(page.locator(".cart-item")).toHaveCount(1);
   await page.getByRole("button", { name: "Tăng", exact: true }).click();
+  await page.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
   await page.getByRole("button", { name: "Đặt hàng & thanh toán", exact: true }).click();
   await expect(page).toHaveURL(/\/orders$/);
   expect(orderBeforeSave).toBe(false);
@@ -66,7 +68,7 @@ test("failed checkout keeps saved cart items", async ({ page }) => {
   await page.goto("/");
   const registered = await page.request.post("/api/auth/register", {
     headers,
-    data: { email: `cart-no-balance-${Date.now()}@example.test`, name: `Cart Empty Wallet ${Date.now()}`, password: "CartBuyer123!" },
+    data: { legal: accountLegal, email: `cart-no-balance-${Date.now()}@example.test`, name: `Cart Empty Wallet ${Date.now()}`, password: "CartBuyer123!" },
   });
   expect(registered.ok()).toBeTruthy();
   const { user } = await registered.json();
@@ -77,6 +79,7 @@ test("failed checkout keeps saved cart items", async ({ page }) => {
   await page.goto("/cart");
   await expect(page.locator(".cart-item")).toHaveCount(1);
   const response = page.waitForResponse(r => r.request().method() === "POST" && new URL(r.url()).pathname === "/api/orders");
+  await page.getByRole('checkbox', { name: /Tôi đã kiểm tra sản phẩm/ }).check();
   await page.getByRole("button", { name: "Đặt hàng & thanh toán", exact: true }).click();
   expect((await response).status()).toBe(409);
   await expect(page.locator(".cart-item")).toHaveCount(1);

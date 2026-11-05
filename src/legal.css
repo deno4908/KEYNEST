@@ -86,3 +86,12 @@
   font-size: 12px;
   color: #b8bdc7;
 }
+.legal-sources { padding: 24px; border-top: 1px solid #dedee3; }
+.legal-sources ul { padding-left: 20px; line-height: 1.9; }
+.legal-sources a { text-decoration: underline; }
+@media print {
+  .legal-sidebar, .legal-tabs, .legal-back, .legal-print, .legal-document-end { display: none !important; }
+  .legal-layout { display: block !important; }
+  .legal-page, .legal-document, .legal-section { background: white !important; color: black !important; box-shadow: none !important; }
+  .legal-section { break-inside: avoid; }
+}

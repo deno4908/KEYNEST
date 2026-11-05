@@ -1,3 +1,4 @@
+import { withLegalConsent } from './helpers/legal.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -24,7 +25,7 @@ test('every registered admin endpoint rejects anonymous and customer access', as
       method,
       headers: { Origin: 'http://127.0.0.1:5173', 'X-App-Request': 'keynest',
         'Content-Type': 'application/json', Cookie: cookie },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body === undefined ? {} : { body: JSON.stringify(withLegalConsent(path, body)) }),
     });
   }
   const login = await request('/api/auth/login', 'POST', '', {
