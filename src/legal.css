@@ -86,9 +86,15 @@
   font-size: 12px;
   color: #b8bdc7;
 }
-.legal-sources { padding: 24px; border-top: 1px solid #dedee3; }
-.legal-sources ul { padding-left: 20px; line-height: 1.9; }
-.legal-sources a { text-decoration: underline; }
+.legal-sources { padding: 22px 0 22px 46px; border-top: 1px solid #2c2e34; color: #9fa3ae; font-size: 12px; line-height: 1.8; }
+.legal-sources summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; list-style: none; }
+.legal-sources summary::-webkit-details-marker { display: none; }
+.legal-sources summary::after { content: '+'; font-size: 16px; }
+.legal-sources[open] summary::after { content: '−'; }
+.legal-sources ul { display: grid; gap: 10px; padding: 14px 0 0; margin: 0; list-style: none; }
+.legal-sources a { color: #b8bdc7; text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.legal-sources a:hover { color: #f3a078; }
+@media (max-width: 760px) { .legal-sources { padding-left: 31px; font-size: 11px; } }
 @media print {
   .legal-sidebar, .legal-tabs, .legal-back, .legal-print, .legal-document-end { display: none !important; }
   .legal-layout { display: block !important; }

@@ -19,8 +19,6 @@ test("auth transition, password confirmation and social login feedback", async (
       body: JSON.stringify({ error: "Google chưa được cấu hình." }),
     }),
   );
-  await dialog.getByRole('checkbox').nth(0).check();
-  await dialog.getByRole('checkbox').nth(1).check();
   await dialog
     .getByRole("button", { name: "Đăng nhập bằng Google", exact: true })
     .click();

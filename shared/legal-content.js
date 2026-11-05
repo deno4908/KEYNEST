@@ -1,4 +1,4 @@
-export const LEGAL_VERSION = '2026-11-06-v1';
+export const LEGAL_VERSION = '2026-11-06-v2';
 export const LEGAL_UPDATED_AT = '2026-11-06';
 export const LEGAL_UPDATED_LABEL = '06/11/2026';
 export const legalSources = [
@@ -83,7 +83,7 @@ export const privacy = [
   ],
   [
     'Sự đồng ý, lựa chọn và rút lại sự đồng ý',
-    'Biểu mẫu đăng ký yêu cầu bạn chủ động xác nhận điều khoản và đồng ý xử lý dữ liệu cần thiết để cung cấp tài khoản; các ô mặc định chưa tích. Với Google/Discord, xác nhận phải được thực hiện trước khi chuyển đến nhà cung cấp. Nếu không đồng ý phần xử lý cần thiết, bạn có thể không tạo tài khoản và vẫn đọc nội dung công khai. Không có sự đồng ý quảng cáo bắt buộc kèm theo. Bạn có thể gửi yêu cầu rút lại sự đồng ý hoặc hạn chế xử lý tại Trung tâm hỗ trợ; nêu tài khoản, mục đích và phạm vi muốn dừng. Sau khi xác minh bằng thông tin phù hợp, KEYNEST trao đổi tác động đến tài khoản/đơn hàng và xử lý yêu cầu theo quy định. Rút lại sự đồng ý không tự xóa nghĩa vụ giao dịch đã phát sinh hoặc dữ liệu bắt buộc phải lưu theo căn cứ pháp luật khác; KEYNEST phải giải thích phần tiếp tục lưu và lý do, không suy diễn sự đồng ý mới từ việc tiếp tục truy cập.',
+    'Biểu mẫu đăng ký yêu cầu bạn chủ động xác nhận điều khoản và đồng ý xử lý dữ liệu cần thiết để cung cấp tài khoản; các ô mặc định chưa tích. Các ô xác nhận chỉ xuất hiện tại biểu mẫu đăng ký. Đăng nhập bằng email/mật khẩu hoặc Google/Discord không yêu cầu tích lại các ô này. Google/Discord xác thực tại nhà cung cấp và có thể tạo hồ sơ KEYNEST khi bạn chưa có tài khoản; hệ thống không ghi nhận bạn đã tích xác nhận nếu không có hành động đó. Nếu không đồng ý phần xử lý cần thiết, bạn có thể không tạo tài khoản và vẫn đọc nội dung công khai. Không có sự đồng ý quảng cáo bắt buộc kèm theo. Bạn có thể gửi yêu cầu rút lại sự đồng ý hoặc hạn chế xử lý tại Trung tâm hỗ trợ; nêu tài khoản, mục đích và phạm vi muốn dừng. Sau khi xác minh bằng thông tin phù hợp, KEYNEST trao đổi tác động đến tài khoản/đơn hàng và xử lý yêu cầu theo quy định. Rút lại sự đồng ý không tự xóa nghĩa vụ giao dịch đã phát sinh hoặc dữ liệu bắt buộc phải lưu theo căn cứ pháp luật khác; KEYNEST phải giải thích phần tiếp tục lưu và lý do, không suy diễn sự đồng ý mới từ việc tiếp tục truy cập.',
   ],
   [
     "Google, Discord và ảnh đại diện",

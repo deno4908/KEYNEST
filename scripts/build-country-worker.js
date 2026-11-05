@@ -1,10 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { publicInformation } from '../server/public-information.js';
 const style = 'body{margin:0;background:#101114;color:#eeeef0;font:16px/1.8 Arial,sans-serif}main{max-width:900px;margin:auto;padding:32px 24px 64px}a{color:#f3a078}nav{display:flex;flex-wrap:wrap;gap:20px;padding-bottom:24px;border-bottom:1px solid #34363e}h1{font-size:clamp(26px,5vw,36px);line-height:1.3}h2{font-size:20px;line-height:1.5}p{color:#bdc0c8;white-space:pre-line}.legal-section{padding:20px 0;border-top:1px solid #34363e}.legal-section-number{color:#f3a078}';
+const referenceStyle = '.legal-sources{padding:20px 0;border-top:1px solid #34363e;color:#9fa3ae;font-size:12px;line-height:1.8}.legal-sources summary{cursor:pointer}.legal-sources ul{display:grid;gap:10px;padding:14px 0 0;margin:0;list-style:none}.legal-sources a{color:#b8bdc7;text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}';
 const publicPages = Object.fromEntries(['/', '/privacy', '/terms'].map(path => [path,
   '<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'
   + (path === '/privacy' ? 'Chính sách bảo mật' : path === '/terms' ? 'Điều khoản dịch vụ' : 'Cửa hàng sản phẩm số')
-  + ' · KEYNEST</title><style>' + style + '</style></head><body>' + publicInformation(path) + '</body></html>',
+  + ' · KEYNEST</title><style>' + style + referenceStyle + '</style></head><body>' + publicInformation(path) + '</body></html>',
 ]));
 const html = await readFile(new URL('../public/vietnam-only.html', import.meta.url), 'utf8');
 const handler = await readFile(new URL('../deploy/cloudflare-country-handler.js', import.meta.url), 'utf8');

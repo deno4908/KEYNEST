@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { AppError } from './security.js';
 
-const archive = JSON.parse(readFileSync(new URL('../shared/legal-archive/2026-11-06-v1.json', import.meta.url), 'utf8'));
-const versions = new Map([[archive.version, archive]]);
+const versions = new Map(['2026-11-06-v1', '2026-11-06-v2'].map(version => {
+  const archive = JSON.parse(readFileSync(new URL(`../shared/legal-archive/${version}.json`, import.meta.url), 'utf8'));
+  return [archive.version, archive];
+}));
 const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
 export function orderContract(order, buyer) {

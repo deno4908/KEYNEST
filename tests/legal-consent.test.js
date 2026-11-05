@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, sep } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { accountLegal, orderLegal } from './helpers/legal.js';
 import { LEGAL_VERSION, terms, privacy } from '../shared/legal-content.js';
 import { consentProof } from '../server/legal-consent.js';
@@ -83,11 +83,15 @@ test('real registration/checkout reject missing, false or stale consent without 
 });
 
 test('published policy archive matches the accepted version and legacy/tampered orders never acquire invented consent', () => {
-  const archive = JSON.parse(readFileSync(new URL('../shared/legal-archive/2026-11-06-v1.json', import.meta.url), 'utf8'));
+  const archive = JSON.parse(readFileSync(new URL(`../shared/legal-archive/${LEGAL_VERSION}.json`, import.meta.url), 'utf8'));
   assert.equal(archive.version, LEGAL_VERSION);
   assert.deepEqual(archive.terms, terms);
   assert.deepEqual(archive.privacy, privacy);
   const order = { id: 'legacy', number: 'old', created_at: '2020-01-01', items: [] };
   assert.equal(orderContract(order, {}).version, null);
+  const previous = JSON.parse(readFileSync(new URL('../shared/legal-archive/2026-11-06-v1.json', import.meta.url), 'utf8'));
+  const hash = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const oldConsent = { version: previous.version, terms: true, terms_sha256: hash(previous.terms), privacy_sha256: hash(previous.privacy) };
+  assert.equal(orderContract({ ...order, fingerprint: { legal: oldConsent } }, {}).version, previous.version);
   assert.throws(() => orderContract({ ...order, fingerprint: { legal: { ...consentProof(orderLegal, 'order'), terms_sha256: 'forged' } } }, {}));
 });

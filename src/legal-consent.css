@@ -4,5 +4,6 @@
 .legal-consent-choice span { min-width: 0; }
 .legal-consent a { text-decoration: underline; text-underline-offset: 3px; }
 .legal-consent a:focus-visible, .legal-consent input:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
-.legal-consent > p { font-size: 11px; opacity: .8; margin: 8px 0 0; }
-.auth-consent-intro { font-size: 12px; line-height: 1.6; margin: 16px 0 0; }
+.auth-dialog .legal-consent { margin: 12px 0; }
+.auth-dialog .legal-consent-choice { gap: 8px; margin: 8px 0; font-size: 12px; font-weight: 400; line-height: 1.5; }
+.auth-dialog .legal-consent-choice input[type="checkbox"] { flex-basis: 15px; width: 15px; height: 15px; margin-top: 2px; }

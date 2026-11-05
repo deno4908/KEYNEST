@@ -1,4 +1,4 @@
-# Điều khoản và xác nhận điện tử — phiên bản 2026-11-06-v1
+# Điều khoản và xác nhận điện tử — phiên bản 2026-11-06-v2
 
 ## Nội dung và căn cứ
 
@@ -28,16 +28,15 @@ Việc thêm nội dung và checkbox không chứng nhận đã hoàn tất mọ
 lý của chủ thể kinh doanh, bao gồm nghĩa vụ công bố thông tin nhận diện bắt buộc,
 thông báo/đăng ký hoạt động, hồ sơ dữ liệu hoặc nghĩa vụ thuế nếu có áp dụng.
 
-## Đăng ký và OAuth
+## Đăng nhập, đăng ký và OAuth
 
 - Hai ô mặc định bỏ chọn: chấp nhận điều khoản/đọc chính sách; đồng ý xử lý dữ
-  liệu cần thiết cho tài khoản. Đăng nhập email hiện có không bắt buộc xác nhận
-  lại. Google/Discord cần xác nhận trước khi chuyển đến nhà cung cấp, vì luồng đó
-  có thể tạo tài khoản mới.
-- POST `/api/auth/register` và POST `/api/auth/oauth/:provider` bắt buộc có:
+  liệu cần thiết cho tài khoản. Chỉ form đăng ký hiển thị hai ô này; đăng nhập
+  email/mật khẩu hoặc Google/Discord không hiển thị hay yêu cầu tích lại.
+- POST `/api/auth/register` bắt buộc có:
 
 ```json
-{"legal":{"version":"2026-11-06-v1","terms":true,"account_data":true}}
+{"legal":{"version":"2026-11-06-v2","terms":true,"account_data":true}}
 ```
 
 - Thiếu/từ chối xác nhận trả 400; phiên bản cũ trả 409 để tải lại và đọc bản mới.
@@ -45,10 +44,14 @@ thông báo/đăng ký hoạt động, hồ sơ dữ liệu hoặc nghĩa vụ t
 - Đăng ký Supabase lưu xác nhận bằng `app_metadata.legal_acceptance` trong chính
   lệnh Admin Auth tạo tài khoản; người dùng không thể sửa app_metadata qua API
   sửa hồ sơ của website. Bản demo lưu trong user tại lần tạo.
-- OAuth giữ bản xác nhận trong cookie giao dịch mã hóa, gắn với PKCE. Callback
+- POST `/api/auth/oauth/:provider` nhận `intent: "register"` cùng `legal` khi
+  bấm từ form đăng ký. `intent: "login"` (mặc định) không yêu cầu `legal`.
+- OAuth đăng ký giữ bản xác nhận trong cookie giao dịch mã hóa, gắn với PKCE. Callback
   lưu `audit_logs` với action `account_legal_acceptance`, UID, phiên bản, hash và
   timestamp máy chủ trước khi phát phiên ứng dụng. Ghi nhận thất bại không phát
   phiên. Không ghi mật khẩu/token/mã OAuth vào log chấp thuận.
+- OAuth đăng nhập không tạo bản ghi chấp thuận checkbox. Nhà cung cấp có thể tạo
+  hồ sơ mới nếu tài khoản chưa tồn tại; không suy diễn việc đăng nhập thành tích ô.
 
 ## Đặt hàng và bản tải về
 
@@ -69,7 +72,7 @@ thông báo/đăng ký hoạt động, hồ sơ dữ liệu hoặc nghĩa vụ t
 
 ## Bảo toàn phiên bản và triển khai
 
-`shared/legal-archive/2026-11-06-v1.json` lưu bản cố định để xuất giao dịch cũ.
+`shared/legal-archive/` giữ các bản v1/v2 cố định để xuất đúng chính sách của từng giao dịch.
 Khi thay đổi nội dung sau phát hành, tăng `LEGAL_VERSION`, thêm archive mới,
 giữ archive cũ và cập nhật bảng phiên bản trong `server/order-contract.js`.
 Kiểm thử yêu cầu archive hiện hành khớp nội dung được công bố và hash chấp thuận.

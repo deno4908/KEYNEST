@@ -90,7 +90,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   const base = `http://127.0.0.1:${server.address().port}/api/auth/oauth`;
   const headers = { Origin: config.origin, "X-App-Request": "keynest" };
   async function start(provider = "google") {
-    const res = await fetch(`${base}/${provider}`, { method: "POST", headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ legal: accountLegal }) });
+    const res = await fetch(`${base}/${provider}`, { method: "POST", headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'register', legal: accountLegal }) });
     const body = await res.json();
     return {
       res,
@@ -105,7 +105,7 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   assert.equal((await start("unknown")).res.status, 400);
   for (const legal of [undefined, { ...accountLegal, account_data: false }, { ...accountLegal, version: 'old' }]) {
     const response = await fetch(`${base}/google`, { method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ legal }),
+      headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'register', legal }),
     });
     assert.ok([400, 409].includes(response.status));
     assert.equal(response.headers.getSetCookie().length, 0);
@@ -180,6 +180,22 @@ test("OAuth uses browser-bound PKCE, rejects invalid callbacks and keeps tokens 
   assert.equal(failedReceipt.headers.get('location'), `${config.origin}/auth/error`);
   assert.equal(failedReceipt.headers.get('X-Access-Token'), null);
   assert.ok(!failedReceipt.headers.getSetCookie().some(c => c.startsWith('kn_refresh=')));
+  // Both login providers work without confirmations or a fabricated receipt.
+  for (const provider of ['google', 'discord']) {
+    const login = await fetch(`${base}/${provider}`, { method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ intent: 'login' }),
+    });
+    assert.equal(login.status, 200);
+    expectedChallenge = new URL((await login.json()).url).searchParams.get('code_challenge');
+    const cookie = login.headers.getSetCookie().map(c => c.split(';')[0]).join('; ');
+    const state = JSON.parse(decrypt(decodeURIComponent(cookie.slice('kn_oauth='.length)), key));
+    assert.equal(state.legal, undefined);
+    used.clear();
+    const signedIn = await callback('?code=valid-code', cookie);
+    assert.equal(signedIn.headers.get('location'), `${config.origin}/account?welcome=${provider}`);
+    assert.equal(signedIn.headers.get('X-Access-Token'), 'private-access-token');
+    assert.equal(receipts.length, 1);
+  }
   config.oauthProviders.discord = false;
   assert.equal((await start("discord")).res.status, 503);
   config.mode = "demo";

@@ -11,15 +11,17 @@ test('mobile registration requires both unchecked confirmations; checkout resets
   await page.goto('/');
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   const auth = page.locator('.auth-dialog');
-  await expect(auth.getByRole('button', { name: 'Đăng nhập bằng Google' })).toBeDisabled();
-  const loginPassword = await auth.getByLabel('Mật khẩu', { exact: true }).boundingBox();
-  const loginConsent = await auth.locator('.legal-consent').boundingBox();
-  expect(loginConsent!.y).toBeGreaterThan(loginPassword!.y + loginPassword!.height);
+  await expect(auth.getByRole('checkbox')).toHaveCount(0);
+  await expect(auth.getByRole('button', { name: 'Đăng nhập bằng Google' })).toBeEnabled();
+  await expect(auth.getByRole('button', { name: 'Đăng nhập bằng Discord' })).toBeEnabled();
+  await expect(auth.locator('.auth-submit')).toBeEnabled();
   await auth.getByRole('button', { name: 'Đăng ký', exact: true }).click();
   const checks = auth.getByRole('checkbox');
   await expect(checks).toHaveCount(2);
   await expect(checks.nth(0)).not.toBeChecked();
   await expect(checks.nth(1)).not.toBeChecked();
+  await expect(auth.getByRole('button', { name: 'Đăng nhập bằng Google' })).toBeDisabled();
+  await expect(auth.locator('.legal-consent > p')).toHaveCount(0);
   const passwordPosition = await auth.getByLabel('Nhập lại mật khẩu', { exact: true }).boundingBox();
   const consentPosition = await auth.locator('.legal-consent').boundingBox();
   expect(consentPosition!.y).toBeGreaterThan(passwordPosition!.y + passwordPosition!.height);
@@ -82,6 +84,9 @@ test('legal pages show current version, rights, official sources and printable c
     await expect(page.locator('.legal-meta')).toContainText(LEGAL_VERSION);
     await expect(page.getByRole('button', { name: 'In / lưu chính sách' })).toBeVisible();
     expect(await page.locator('.legal-sources a').count()).toBe(3);
+    await expect(page.locator('.legal-sources')).not.toHaveAttribute('open', '');
+    await page.locator('.legal-sources summary').click();
+    await expect(page.locator('.legal-sources a').first()).toBeVisible();
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

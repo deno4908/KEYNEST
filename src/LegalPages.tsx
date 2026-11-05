@@ -47,9 +47,9 @@ export function LegalPage({
               <div><h2>{title}</h2><p>{text}</p></div>
             </section>
           ))}
-          <section className="legal-sources"><h2>Văn bản pháp luật tham khảo</h2>
+          <details className="legal-sources"><summary>Tham khảo căn cứ pháp lý</summary>
             <ul>{legalSources.map(([title, url]) => <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{title}</a></li>)}</ul>
-          </section>
+          </details>
           <div className="legal-document-end"><ShieldCheck size={17} /><span>Cảm ơn bạn đã dành thời gian tìm hiểu chính sách của KEYNEST.</span></div>
         </article>
       </div>

@@ -100,7 +100,7 @@ export function AuthModal({ close }: { close: () => void }) {
     button: HTMLButtonElement,
   ) {
     if (busy || oauthRequest.current) return;
-    if (!acceptedTerms || !acceptedData) {
+    if (tab === 'register' && (!acceptedTerms || !acceptedData)) {
       setError('Vui lòng xác nhận điều khoản và xử lý dữ liệu trước khi tiếp tục.');
       return;
     }
@@ -124,7 +124,7 @@ export function AuthModal({ close }: { close: () => void }) {
       const [{ url }] = await Promise.all([
         api<{ url: string }>(`/auth/oauth/${provider}`, {
           method: "POST",
-          body: JSON.stringify({ legal }),
+          body: JSON.stringify(tab === 'register' ? { intent: 'register', legal } : { intent: 'login' }),
           signal: controller.signal,
         }),
         new Promise((resolve) => window.setTimeout(resolve, duration)),
@@ -145,7 +145,7 @@ export function AuthModal({ close }: { close: () => void }) {
     event.preventDefault();
     if (busy || captchaBlocked) return;
     if (tab === 'register' && (!acceptedTerms || !acceptedData)) {
-      setError('Vui lòng xác nhận điều khoản và xử lý dữ liệu trước khi tạo tài khoản.');
+      setError('Vui lòng xác nhận điều khoản và xử lý dữ liệu trước khi tiếp tục.');
       return;
     }
     if (tab === "register" && password !== confirmation) {
@@ -325,7 +325,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Google"
-                      disabled={busy || !acceptedTerms || !acceptedData}
+                      disabled={busy || (registering && (!acceptedTerms || !acceptedData))}
                       onClick={(e) => socialLogin("google", e.currentTarget)}
                     >
                       <GoogleIcon />
@@ -336,7 +336,7 @@ export function AuthModal({ close }: { close: () => void }) {
                     <button
                       type="button"
                       aria-label="Đăng nhập bằng Discord"
-                      disabled={busy || !acceptedTerms || !acceptedData}
+                      disabled={busy || (registering && (!acceptedTerms || !acceptedData))}
                       onClick={(e) => socialLogin("discord", e.currentTarget)}
                     >
                       <DiscordIcon />
@@ -516,8 +516,7 @@ export function AuthModal({ close }: { close: () => void }) {
                         )}
                       </div>
                     )}
-                    {tab !== 'forgot' && <>
-                      <p className="auth-consent-intro">{registering ? 'Xác nhận trước khi tạo tài khoản:' : 'Nếu tiếp tục bằng Google/Discord, vui lòng xác nhận:'}</p>
+                    {registering && <>
                       <LegalConsent terms={acceptedTerms} data={acceptedData} account onTerms={setAcceptedTerms} onData={setAcceptedData} />
                     </>}
                     <>
