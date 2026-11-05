@@ -8,7 +8,7 @@
     "dev:api": "node --watch server/index.js",
     "setup": "node scripts/setup-env.js",
     "check:config": "node scripts/check-config.js",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && node scripts/build-production.js",
     "start": "node server/index.js",
     "worker:payments": "node server/payment-worker.js",
     "infra:topics": "node scripts/kafka-topics.js",

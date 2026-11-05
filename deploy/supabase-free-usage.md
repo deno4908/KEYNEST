@@ -34,9 +34,10 @@ Mức dùng thực tế phải theo dõi trong Usage, tính trên toàn bộ org
   Asset có fingerprint của Vite được browser cache một năm; HTML giữ chính
   sách riêng. Metadata chia sẻ sản phẩm và sitemap dùng cache công khai trên
   VPS để tránh đọc lại database cho mỗi lượt bot/trình duyệt.
-  Build so sánh tại máy phát triển: entry JS 1.205,09 → 867,16 kB (giảm 28%);
-  gzip 266,90 → 215,21 kB. Đây là kích thước bundle, không phải phép đo thời
-  gian tải mạng hoặc cam kết giảm tổng lượng log trên Supabase.
+  Kiểm tra trực tiếp hai release production: entry JS 606,63 → 459,02 kB
+  (giảm khoảng 24%). Build script ép NODE_ENV=production để .env phát triển
+  không vô tình tạo bundle chứa React development runtime. Đây là kích thước
+  bundle, không phải cam kết giảm tổng lượng log trên Supabase.
 
 Không có migration mới trong đợt bổ sung này. Database vẫn phải có đủ đến 056.
 Build và deploy bản mã mới bằng workflow GitHub hiện tại. Một tiến trình dev
