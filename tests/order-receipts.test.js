@@ -111,3 +111,26 @@ test("disabled receipts never claim or send queued jobs", async () => {
   });
   await worker.tick();
 });
+
+test('empty receipt queue is checked at most once per minute and database failures also back off', async () => {
+  let now = 0, claims = 0, fail = false;
+  const worker = createReceiptWorker({
+    store: {
+      query: async value => value,
+      client: { rpc: async () => { claims++; if (fail) throw new Error('offline'); return []; } },
+    },
+    config, monotonicNow: () => now, logger: { error() {} },
+  });
+  for (now = 0; now < 60000; now += 15000) await worker.tick();
+  assert.equal(claims, 1);
+  fail = true;
+  await worker.tick();
+  assert.equal(claims, 2);
+  now += 15000;
+  await worker.tick();
+  assert.equal(claims, 2);
+  now = 120000;
+  fail = false;
+  await worker.tick();
+  assert.equal(claims, 3);
+});

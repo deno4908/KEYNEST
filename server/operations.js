@@ -203,7 +203,9 @@ export function createOperations(store) {
     },
     async authorize(req, token) {
       const uid = req.user.id;
-      await this.checkAccess(uid);
+      // authorize_app_session checks suspension and revocation atomically.
+      // Keep the separate check only for the in-memory demo implementation.
+      if (demo) await this.checkAccess(uid);
       // Supabase token signature/user were already verified with getUser.
       // session_id survives access-token refresh, unlike the access-token hash.
       let identity = token;

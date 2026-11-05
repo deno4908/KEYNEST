@@ -12,13 +12,18 @@ test('dynamic QR appears after preparation and updates to paid without reload', 
   await page.route('**/api/wallet',route=>route.fulfill({json:{balance:100000,ledger:[],payments:[phase==='creating'?pending:{...pending,
     provider:'tingee',qr_state:'ready',bill_id:'BILL-DYNAMIC-TEST',qr_url:png,bank:'970418',account:'QR-ACCOUNT-TEST',account_name:'KEYNEST',status:phase==='paid'?'paid':'pending'}]}}));
   await page.route('**/api/wallet/topup',route=>route.fulfill({status:201,json:pending}));
+  await page.route('**/api/payments/dynamic-test*', route => route.fulfill({ json: phase === 'creating' ? pending : {
+    ...pending, provider: 'tingee', qr_state: 'ready', bill_id: 'BILL-DYNAMIC-TEST',
+    qr_url: png, bank: '970418', account: 'QR-ACCOUNT-TEST', account_name: 'KEYNEST',
+    status: phase === 'paid' ? 'paid' : 'pending',
+  } }));
   await page.clock.install({time:now});
   await page.goto('/wallet');
   await page.getByRole('button',{name:'Tạo mã nạp tiền'}).click();
   const modal=page.locator('.payment-modal');
   await expect(modal).toContainText('Đang tạo mã QR');
   phase='ready';
-  await page.clock.fastForward(4500);
+  await page.clock.fastForward(6000);
   await expect(modal.locator('.payment-qr')).toHaveAttribute('src',png);
   await expect(modal).toContainText('BILL-DYNAMIC-TEST');
   await expect(modal).toContainText('QR-ACCOUNT-TEST');
@@ -74,25 +79,28 @@ test('payment polling waits for slow responses and stops after payment', async (
   const wallet = await (await page.request.get('/api/wallet')).json();
   const pending = wallet.payments.find((p: { status: string }) => p.status === 'pending');
   expect(pending).toBeTruthy();
-  let requests = 0;
+  let requests = 0, walletRefreshes = 0;
   let release!: () => void;
   const slowResponse = new Promise<void>(resolve => { release = resolve; });
-  await page.route('**/api/wallet', async route => {
+  await page.route(`**/api/payments/${pending.id}`, async route => {
     requests++;
     if (requests === 1) await slowResponse;
-    await route.fulfill({ json: {
-      ...wallet,
-      payments: wallet.payments.map((p: { id: string }) => p.id === pending.id ? { ...p, status: 'paid' } : p),
-    } });
+    await route.fulfill({ json: { id: pending.id, status: 'paid' } });
   });
-  await page.clock.fastForward(4500);
+  await page.route('**/api/wallet', route => {
+    walletRefreshes++;
+    return route.fulfill({ json: { ...wallet, payments: wallet.payments.map((p: { id: string }) =>
+      p.id === pending.id ? { ...p, status: 'paid' } : p) } });
+  });
+  await page.clock.fastForward(6000);
   await expect.poll(() => requests).toBe(1);
   await page.clock.fastForward(16000);
   expect(requests).toBe(1);
   release();
   await expect(page.getByRole('heading', { name: 'Đã nhận thanh toán.' })).toBeVisible();
   // The success callback refreshes the shared wallet exactly once.
-  await expect.poll(() => requests).toBe(2);
+  await expect.poll(() => walletRefreshes).toBe(1);
   await page.clock.fastForward(16000);
-  expect(requests).toBe(2);
+  expect(requests).toBe(1);
+  expect(walletRefreshes).toBe(1);
 });

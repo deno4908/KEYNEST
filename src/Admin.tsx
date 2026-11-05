@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import './admin.css';
 import { useDataRefresh } from './useDataRefresh';
 import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";

@@ -363,6 +363,12 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
         body: { amount: 200000 },
       })
     ).body;
+    assert.equal((await request(`/payments/${p.id}`)).status, 401);
+    assert.equal((await request(`/payments/${p.id}`, { cookie: admin })).status, 404);
+    const pendingStatus = await request(`/payments/${p.id}`, { cookie: customer });
+    assert.equal(pendingStatus.status, 200);
+    assert.deepEqual(pendingStatus.body, { id: p.id, status: 'pending' });
+    assert.equal((await request(`/payments/${p.id}?details=1`, { cookie: customer })).body.code, p.code);
     for (let i = 0; i < 2; i++)
       assert.equal(
         (
@@ -373,6 +379,7 @@ test("store API: permissions, atomic orders, ownership, money and fulfillment", 
         ).status,
         200,
       );
+    assert.deepEqual((await request(`/payments/${p.id}`, { cookie: customer })).body, { id: p.id, status: 'paid' });
     assert.equal(
       (await request("/me", { cookie: customer })).body.balance,
       1500000 - 89100 + 200000,

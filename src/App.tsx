@@ -4,12 +4,13 @@ import { UnreadChatBadge } from './UnreadChatBadge';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
-import { AdminVerification } from "./AdminVerification";
 import { PreorderNote } from './PreorderNote';
 import { HomeAnnouncements } from "./Announcements";
 import { LegalPage, SocialLinks } from "./LegalPages";
 import {
   createContext,
+  lazy,
+  Suspense,
   useContext,
   useEffect,
   useId,
@@ -68,8 +69,7 @@ import type {
   User,
   Variant,
 } from "./types";
-import { Admin } from "./Admin";
-import { Seller, SellerContact } from './Seller';
+import { SellerContact } from './Seller';
 import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
 import { Home, PromotionsPage, GuidePage } from "./Storefront";
 import { HeaderSearch, StoreNavigation } from "./Navigation";
@@ -77,12 +77,17 @@ import { Catalog } from "./Catalog";
 import { rememberProduct } from "./discovery";
 import { AuthModal, OAuthErrorPage } from "./Auth";
 import { OAuthWelcome } from './OAuthWelcome';
-import { AccountPage } from "./Account";
 import { Avatar } from "./Avatar";
-import { OrdersPage, OrderDetailPage } from "./Orders";
 import { CustomerTicketCard } from "./AdminSupport";
 import { ProductFeedback, RatingLine } from "./ProductFeedback";
 import { productImages } from "../shared/product-images.js";
+
+const Admin = lazy(() => import('./Admin').then(module => ({ default: module.Admin })));
+const Seller = lazy(() => import('./SellerDashboard').then(module => ({ default: module.Seller })));
+const AccountPage = lazy(() => import('./Account').then(module => ({ default: module.AccountPage })));
+const OrdersPage = lazy(() => import('./Orders').then(module => ({ default: module.OrdersPage })));
+const OrderDetailPage = lazy(() => import('./Orders').then(module => ({ default: module.OrderDetailPage })));
+const AdminVerification = lazy(() => import('./AdminVerification').then(module => ({ default: module.AdminVerification })));
 
 type Context = {
   products: Product[];
@@ -370,7 +375,7 @@ export function App() {
     addingNow.current = true;
     setAdding(true);
     try {
-      const latest = await api<Product[]>('/products');
+      const latest = await api<Product[]>('/products?fresh=1');
       setProducts(latest);
       const snapshot = currentCart.current;
       if (snapshot.owner !== owner || !snapshot.ready) {
@@ -518,6 +523,7 @@ export function App() {
           </div>
         )}
         <main>
+          <Suspense fallback={<Loading />}>
           {location.pathname === '/reset-password' ? (
             <ResetPassword />
           ) : ['/privacy', '/privacy/', '/terms', '/terms/'].includes(location.pathname) ? (
@@ -619,6 +625,7 @@ export function App() {
               />
             </Routes>
           )}
+          </Suspense>
         </main>
         <footer>
           <div className="container footer-main">
@@ -1406,27 +1413,28 @@ export function PaymentModal({
     if (status !== 'pending') return;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
+    let needsDetails = payment.qr_state === 'creating' || payment.qr_state === 'unassigned';
     const check = async () => {
       let terminal = false;
       try {
         if (document.hidden) return;
         const options = { signal: controller.signal };
-        const p = payment.order_id
-          ? (await api<Order>(`/orders/${payment.order_id}`, options)).payment
-          : (await api<{ payments: Payment[] }>('/wallet', options)).payments.find(p => p.id === payment.id);
+        const p = await api<Partial<Payment> & Pick<Payment, 'id' | 'status'>>(
+          `/payments/${payment.id}${needsDetails ? '?details=1' : ''}`, options);
         if (controller.signal.aborted) return;
         if (p) {
-          setPayment(p);
+          setPayment(current => ({ ...current, ...p }));
+          if (p.qr_state) needsDetails = p.qr_state === 'creating' || p.qr_state === 'unassigned';
           terminal = p.status !== 'pending';
           setStatus(p.status);
           if (p.status === 'paid') onPaidRef.current();
         }
       } catch { /* Retry transient failures without overlapping requests. */ }
       finally {
-        if (!controller.signal.aborted && !terminal) timer = setTimeout(check, 2000);
+        if (!controller.signal.aborted && !terminal) timer = setTimeout(check, 5000);
       }
     };
-    timer = setTimeout(check, 2000);
+    timer = setTimeout(check, needsDetails ? 2000 : 5000);
     return () => { controller.abort(); clearTimeout(timer); };
   }, [payment.id, payment.order_id, status]);
   async function simulate() {
@@ -1680,7 +1688,7 @@ function WalletPage() {
   const hasPendingTopup = visiblePayments.some(p => p.status === 'pending');
   useEffect(() => {
     if (!hasPendingTopup || payment) return;
-    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 3000);
+    const timer = window.setInterval(() => { if (!document.hidden) void load(); }, 15000);
     return () => window.clearInterval(timer);
   }, [hasPendingTopup, payment, user?.id]);
   async function topup(e: FormEvent) {

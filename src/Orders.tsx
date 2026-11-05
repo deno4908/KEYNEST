@@ -57,9 +57,12 @@ function useOrderData<T>(path: string) {
   }, [path]);
   useEffect(() => {
     load();
-    const timer = setInterval(load, 15000);
+    const onVisible = () => { if (!document.hidden) void load(); };
+    const timer = setInterval(onVisible, 30000);
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
       controller.current?.abort();
     };
   }, [load]);

@@ -230,7 +230,6 @@ export function ProfileForm({
     </form>
   );
 }
-export { Seller } from "./SellerDashboard";
 
 export function WithdrawalList({
   withdrawals,

@@ -62,17 +62,23 @@ export function createReceiptWorker({
   config,
   fetcher = fetch,
   logger = console,
+  monotonicNow = () => performance.now(),
 }) {
-  let running = false;
+  let running = false, nextCheckAt = 0;
   async function tick() {
-    if (running || config.mode !== "supabase" || !config.receipts.enabled)
+    if (running || monotonicNow() < nextCheckAt || config.mode !== "supabase" || !config.receipts.enabled)
       return;
     running = true;
     try {
       for (let n = 0; n < 10; n++) {
         const rows = await store.query(store.client.rpc("claim_order_receipt"));
         const job = rows?.[0];
-        if (!job) break;
+        if (!job) {
+          // A receipt can wait up to one minute on an idle queue. Payment and
+          // delivery do not depend on sending this email.
+          nextCheckAt = monotonicNow() + 60000;
+          break;
+        }
         let sent = false,
           error = "";
         try {
@@ -111,6 +117,7 @@ export function createReceiptWorker({
         if (!sent) logger.error("Order receipt delivery deferred:", error);
       }
     } catch {
+      nextCheckAt = monotonicNow() + 60000;
       logger.error("Order receipt queue unavailable; will retry.");
     } finally {
       running = false;

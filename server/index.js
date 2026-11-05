@@ -25,6 +25,7 @@ import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
 import { createCatalogLive } from "./catalog-live.js";
+import { createPublicReadCache } from './read-budget.js';
 import { createSteamArt } from './steam-art.js';
 import { categoryId, createCategories, categoriesRouter } from './categories.js';
 import { deleteAdminRecord } from './admin-deletion.js';
@@ -79,13 +80,31 @@ const paymentIngress = createPaymentIngress({
 export const operations = createOperations(store);
 const categoryStore = createCategories(store);
 export const app = express();
-const catalogLive = createCatalogLive(() => store.products(), {
-  version: config.mode === 'supabase' ? () => store.catalogVersion() : undefined,
+const publicCache = createPublicReadCache();
+const publicRead = (key, load) => config.mode === 'supabase' ? publicCache.get(key, load) : load();
+const publicProducts = () => publicRead('products', async () => {
+  await store.expire();
+  return store.products();
+});
+const publicProduct = identifier => publicRead(`product:${identifier}`, async () => {
+  await store.expire();
+  return store.product(identifier);
+});
+let catalogRevision;
+const catalogLive = createCatalogLive(publicProducts, {
+  version: config.mode === 'supabase' ? async () => {
+    const revision = await store.catalogVersion();
+    if (revision === null || (catalogRevision !== undefined && revision !== catalogRevision)) publicCache.clear();
+    catalogRevision = revision;
+    return revision;
+  } : undefined,
 });
 app.use((req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
       /^\/api\/(?:orders|admin|seller|webhooks|demo\/pay)(?:\/|$)/.test(req.path)) {
-    res.on('finish', () => { if (res.statusCode < 400) void catalogLive.refresh(); });
+    res.on('finish', () => {
+      if (res.statusCode < 400) { publicCache.clear(); void catalogLive.refresh(); }
+    });
   }
   next();
 });
@@ -487,14 +506,19 @@ app.get("/api/config", (req, res) =>
 );
 app.get("/api/products", async (req, res) => {
   if (req.query.live === '1') return catalogLive.subscribe(req, res);
-  await store.expire();
   res.setHeader('Cache-Control', 'no-store');
-  res.json(await store.products());
+  if (req.query.fresh === '1') {
+    await store.expire({ force: true });
+    return res.json(await store.products());
+  }
+  res.json(await publicProducts());
 });
 app.get("/api/catalog", async (req, res) => {
   const filters = catalogQuery.parse(req.query);
-  await store.expire();
-  res.json(await store.catalog(filters));
+  res.json(await publicRead(`catalog:${JSON.stringify(filters)}`, async () => {
+    await store.expire();
+    return store.catalog(filters);
+  }));
 });
 app.get("/api/products/:identifier", async (req, res) => {
   const identifier = z
@@ -503,20 +527,19 @@ app.get("/api/products/:identifier", async (req, res) => {
     .max(120)
     .regex(/^[a-z0-9-]+$/)
     .parse(req.params.identifier);
-  await store.expire();
-  const product = await store.product(identifier);
+  const product = await publicProduct(identifier);
   if (!product) throw new AppError("Không tìm thấy sản phẩm.", 404);
   res.json(product);
 });
 app.get("/api/promotions", async (req, res) =>
   res.json(
-    (await store.promotions()).sort(
+    (await publicRead('promotions', () => store.promotions())).sort(
       (a, b) =>
         Number(!!b.pinned) - Number(!!a.pinned) || a.code.localeCompare(b.code),
     ),
   ),
 );
-app.get("/api/banners", async (req, res) => res.json(await store.banners()));
+app.get("/api/banners", async (req, res) => res.json(await publicRead('banners', () => store.banners())));
 app.get("/api/products/:id/reviews", async (req, res) =>
   res.json(
     await store.reviews(
@@ -653,7 +676,7 @@ app.put('/api/cart', auth, limiter(120), async (req, res) => {
   const current = new Map((await store.cart(req.user.id)).map(item => [item.variant_id, item.quantity]));
   const added = input.items.filter(item => item.quantity > (current.get(item.variant_id) || 0));
   if (added.length) {
-    await store.expire();
+    await store.expire({ force: true });
     const available = new Map((await store.products()).flatMap(product => product.variants.map(variant => [variant.id, variant])));
     if (added.some(item => !available.has(item.variant_id) || available.get(item.variant_id).stock < item.quantity))
       throw new AppError('Sản phẩm đã hết hoặc không còn đủ số lượng. Vui lòng cập nhật giỏ hàng.', 409);
@@ -692,6 +715,18 @@ app.post("/api/auth/logout", async (req, res) => {
 app.get("/api/orders", auth, async (req, res) =>
   res.json(await Promise.all((await store.orders(req.user.id)).map(orderInfo))),
 );
+app.get('/api/payments/:id', auth, async (req, res) => {
+  const details = req.query.details === '1';
+  const payment = await store.paymentStatus(req.user.id, uuid.parse(req.params.id), details);
+  if (!payment) throw new AppError('Không tìm thấy giao dịch.', 404);
+  res.setHeader('Cache-Control', 'private, no-store');
+  // Expiration is safe to display immediately. Settlement still checks database
+  // time transactionally; a browser can never promote a payment to paid.
+  const status = payment.status === 'pending' && Date.parse(payment.expires_at) <= Date.now()
+    ? 'expired' : payment.status;
+  if (details) return res.json(await paymentInfo({ ...payment, status }));
+  res.json({ id: payment.id, status });
+});
 app.post("/api/coupons/preview", auth, limiter(40), async (req, res) => {
   const input = z
     .object({
@@ -750,7 +785,7 @@ app.post("/api/orders", auth, limiter(15), async (req, res) => {
   const idempotency = uuid.parse(req.headers["idempotency-key"]);
   if (payload.method === "sepay") bankPayments.assertReady();
   const o = await store.createOrder(req.user.id, payload, idempotency);
-  const result = (await store.orders(req.user.id)).find((x) => x.id === o.id);
+  const result = (await store.orders(req.user.id, false, o.id))[0];
   res.status(201).json(await orderInfo(result));
 });
 app.post("/api/orders/:id/cancel", auth, async (req, res) => {
@@ -1182,7 +1217,7 @@ if (existsSync(resolve("dist/index.html"))) {
     'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nDisallow: /orders\nDisallow: /wallet\nDisallow: /seller\nDisallow: /checkout\nDisallow: /share-preview\nSitemap: ' + new URL('/sitemap.xml', config.origin).href + '\n',
   ));
   app.get('/sitemap.xml', async (req, res) => {
-    const products = await store.products();
+    const products = await publicProducts();
     const paths = ['/', '/catalog', '/privacy', '/terms', '/guide', ...products.filter(p => p.active !== false).map(p => '/products/' + encodeURIComponent(p.slug))];
     const xml = value => value.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' }[c]));
     res.type('application/xml').send('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + paths.map(path => '<url><loc>' + xml(new URL(path, config.origin).href) + '</loc></url>').join('') + '</urlset>');
@@ -1190,15 +1225,18 @@ if (existsSync(resolve("dist/index.html"))) {
   app.get(['/share-preview', '/share-preview/products/:slug'], async (req, res) => {
     const path = req.params.slug ? `/products/${req.params.slug}` : '/';
     if (req.params.slug && !/^[a-z0-9-]{1,120}$/.test(req.params.slug)) return res.sendStatus(404);
-    const meta = await socialMetadata(path, config.origin, store);
+    const meta = await socialMetadata(path, config.origin, { product: publicProduct });
     if (!meta) return res.sendStatus(404);
     res.type('html').send(`<!doctype html><html lang="vi"><head><meta charset="utf-8">${metadataHead(meta)}</head><body></body></html>`);
   });
   app.use(express.static(resolve("dist"), { index: false, setHeaders(res, path) {
+    // Vite fingerprints every asset in this directory. HTML and private API
+    // responses retain their separate cache policies.
+    if (/[\\/]dist[\\/]assets[\\/]/.test(path)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     if (/[\\/]images[\\/](share|products)[\\/]/.test(path)) res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   } }));
   app.get("/{*path}", async (req, res) => {
-    const meta = await socialMetadata(req.path, config.origin, store);
+    const meta = await socialMetadata(req.path, config.origin, { product: publicProduct });
     if (!meta) return res.status(404).type('html').send(pageTemplate);
     res.type('html').send(injectPublicInformation(injectMetadata(pageTemplate, meta), req.path));
   });

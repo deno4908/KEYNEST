@@ -15,7 +15,6 @@ import "./payments.css";
 import "./feedback.css";
 import "./product-images.css";
 import "./orders.css";
-import "./admin.css";
 import "./mobile-layout.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

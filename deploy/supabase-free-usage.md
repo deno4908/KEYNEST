@@ -3,6 +3,58 @@
 Thay đổi này giảm các lần đọc lặp; không xóa hoặc đặt lại egress đã phát sinh.
 Mức dùng thực tế phải theo dõi trong Usage, tính trên toàn bộ organization.
 
+## Bổ sung ngày 06/11/2026
+
+- API kiểm tra thanh toán `GET /api/payments/:id` chỉ trả `id` và `status`,
+  truy vấn đúng payment của tài khoản hiện tại. Hộp QR kiểm tra mỗi 5 giây sau
+  khi có QR, thay vì tải cả đơn hàng, khóa đã giao, yêu cầu bảo hành hoặc lịch sử
+  ví mỗi 2 giây. Chỉ dùng `?details=1` khi QR còn đang tạo; sau đó giữ ảnh đã có.
+  Khi nhận thanh toán thành công, tải lại đơn/ví như trước. Endpoint riêng không
+  cache trạng thái thanh toán và không bỏ kiểm tra xác thực/thu hồi phiên.
+- Danh mục, tìm kiếm, chi tiết sản phẩm, banner và khuyến mãi công khai dùng
+  cache trong tiến trình tối đa 10 giây; gộp các lượt đọc cùng lúc. Giới hạn 64
+  mục và 8 MiB dữ liệu JSON được giữ, không lưu vô hạn theo từ khóa tìm kiếm.
+  Thay đổi qua API đơn hàng, quản trị, người bán và webhook xóa cache sau khi
+  thành công. SSE và lượt đọc danh mục dùng cùng cache; fingerprint thay đổi
+  cũng xóa cache. Cache chỉ chứa dữ liệu hiển thị công khai.
+- Tác vụ hết hạn thanh toán/giải phóng doanh thu gộp lượt chạy đồng thời và
+  có khoảng nghỉ 30 giây sau thành công. Thêm giỏ hàng và kiểm tra coupon yêu
+  cầu chạy mới; checkout và đối soát vẫn kiểm tra hạn/thực hiện giao dịch ở DB.
+  Đơn chờ có thể mất tối đa khoảng 30 giây để cập nhật trong danh sách; hộp QR
+  có endpoint hiển thị hết hạn ngay theo thời hạn thanh toán.
+- Bỏ lượt đọc `account_controls` bị trùng trong xác thực: RPC
+  `authorize_app_session` vốn đã kiểm tra khóa tài khoản và thu hồi phiên.
+  RPC vẫn chạy mỗi yêu cầu; không cache quyết định phân quyền.
+- Queue email rỗng hoặc không truy cập được DB nghỉ 60 giây trước khi hỏi lại,
+  thay vì hỏi mỗi 15 giây. Email mới có thể chờ khoảng một phút khi queue đang
+  nghỉ; giao hàng và thanh toán không phải chờ email. Đối soát Tingee giữ nguyên.
+- Danh sách đơn chỉ tự tải mỗi 30 giây khi tab hiển thị và khi quay lại tab.
+  Danh sách nạp ví chờ thanh toán tải mỗi 15 giây; hộp QR dùng luồng nhỏ riêng.
+- Tách JavaScript quản trị, người bán, tài khoản và đơn hàng theo trang.
+  Asset có fingerprint của Vite được browser cache một năm; HTML giữ chính
+  sách riêng. Metadata chia sẻ sản phẩm và sitemap dùng cache công khai trên
+  VPS để tránh đọc lại database cho mỗi lượt bot/trình duyệt.
+  Build so sánh tại máy phát triển: entry JS 1.205,09 → 867,16 kB (giảm 28%);
+  gzip 266,90 → 215,21 kB. Đây là kích thước bundle, không phải phép đo thời
+  gian tải mạng hoặc cam kết giảm tổng lượng log trên Supabase.
+
+Không có migration mới trong đợt bổ sung này. Database vẫn phải có đủ đến 056.
+Build và deploy bản mã mới bằng workflow GitHub hiện tại. Một tiến trình dev
+hoặc worker cũ còn trỏ production vẫn có thể tạo thêm request; phải kiểm tra
+toàn bộ các tiến trình đang dùng cùng project khi đánh giá Usage.
+
+Ngân sách vận hành đề xuất có dự phòng, **không phải kết quả đã đo**:
+
+| Chỉ số | Mục tiêu mỗi kỳ | Trung bình tối đa cho kỳ 31 ngày |
+| --- | --- | --- |
+| Log Ingestion | Dưới 0,8 GB | Khoảng 25,8 MB/ngày |
+| Uncached Egress | Dưới 4 GB | Khoảng 129 MB/ngày |
+
+Lấy mức tăng giữa hai mốc cùng giờ hoặc số từng ngày trong Usage sau khi dữ
+liệu cập nhật. Tổng 5,982 GB đã ghi nhận không giảm khi deploy hay xóa bảng/log.
+Hạn mức tính trên cả organization và kỳ billing thực tế, không mặc định ngày 1.
+Chưa thể khẳng định an toàn gói Free nếu chưa có số phát sinh thực tế sau deploy.
+
 ## Những chỗ đã sửa
 
 - Catalog SSE dùng chung trong mỗi tiến trình Node: kiểm tra dấu vân tay dữ liệu

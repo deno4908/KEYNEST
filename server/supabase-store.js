@@ -3,6 +3,7 @@ import { config } from "./config.js";
 import { productImages } from "../shared/product-images.js";
 import { sellerPublic } from './seller-accounting.js';
 import { AppError, encrypt, decrypt, digest } from "./security.js";
+import { createMaintenanceBudget } from './read-budget.js';
 export const makeAuthClient = ({ timeoutMs } = {}) =>
   createClient(config.url, config.anon, {
     ...(timeoutMs ? { global: { fetch: (url, options) => fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) }) } } : {}),
@@ -132,9 +133,17 @@ export class SupabaseStore {
       this.client.from("audit_logs").insert({ user_id, action, target }),
     );
   }
-  async expire() {
-    await this.query(this.client.rpc("expire_payments"));
-    return this.query(this.client.rpc("release_seller_funds"));
+  async expire(options) {
+    this.maintenance ||= createMaintenanceBudget(async () => {
+      await this.query(this.client.rpc("expire_payments"));
+      return this.query(this.client.rpc("release_seller_funds"));
+    });
+    return this.maintenance(options);
+  }
+  async paymentStatus(uid, id, details = false) {
+    return this.query(this.client.from('payments')
+      .select(details ? '*,route:payment_routes(*)' : 'id,status,expires_at')
+      .eq('user_id', uid).eq('id', id).maybeSingle());
   }
   async createOrder(uid, payload, idempotency) {
     const id = await this.query(
@@ -547,7 +556,7 @@ export class SupabaseStore {
       );
   }
   async quoteCoupon(uid, code, items) {
-    await this.expire();
+    await this.expire({ force: true });
     return this.query(
       this.client.rpc("quote_coupon", {
         p_user: uid,

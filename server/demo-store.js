@@ -461,6 +461,10 @@ export class DemoStore {
           })),
       }));
   }
+  paymentStatus(uid, id) {
+    this.expire();
+    return this.db.payments.find(p => p.user_id === uid && p.id === id) || null;
+  }
   payments(uid) {
     this.expire();
     return this.db.payments.filter((p) => p.user_id === uid);
