@@ -201,16 +201,25 @@ function NoticeCard({
           <h4>
             <Link to={safeHref}>{notice.title}</Link>
           </h4>
-          {!notice.read_at && (
+          {!compact && !notice.read_at && (
             <span className="inbox-unread-label">Chưa đọc</span>
           )}
         </div>
-        {!compact && notice.body && (
-          <p className="inbox-message">{notice.body}</p>
-        )}
+        {!compact &&
+          notice.body &&
+          (notice.body.length > 160 ? (
+            <details className="inbox-message-details">
+              <summary>
+                {notice.body.slice(0, 160)}… <span>Đọc tiếp</span>
+              </summary>
+              <p className="inbox-message">{notice.body}</p>
+            </details>
+          ) : (
+            <p className="inbox-message">{notice.body}</p>
+          ))}
         <div className="inbox-item-footer">
           <span>
-            {notice.category_label || "Thông báo"} ·{" "}
+            {!compact && <>{notice.category_label || "Thông báo"} · </>}
             <time dateTime={notice.created_at} title={date(notice.created_at)}>
               {relativeTime(notice.created_at)}
             </time>
@@ -310,12 +319,10 @@ export function NotificationBell() {
         >
           <div className="notification-popover-heading">
             <div>
-              <strong>Thông báo</strong>
-              <p>
-                {data
-                  ? `${data.unread_count} chưa đọc · mọi loại thông báo`
-                  : "Đang tải hộp thư…"}
-              </p>
+              <strong>
+                Thông báo
+                {data && data.unread_count > 0 ? ` (${data.unread_count})` : ""}
+              </strong>
             </div>
             <button
               className="icon-button"
@@ -339,15 +346,13 @@ export function NotificationBell() {
               <NoticeCard key={n.id} notice={n} compact />
             ))}
             {data?.items.length === 0 && (
-              <div className="inbox-empty">
-                <CheckCheck />
-                <strong>Bạn đã xem hết thông báo mới</strong>
-                <p>Hộp thư vẫn lưu các thông báo đã đọc.</p>
-              </div>
+              <p className="muted inbox-empty-compact">
+                Bạn đã xem hết thông báo mới
+              </p>
             )}
           </div>
           <div className="notification-popover-footer">
-            <Link to="/notifications">Mở hộp thư đầy đủ</Link>
+            <Link to="/notifications">Xem tất cả thông báo</Link>
             <button
               disabled={busy || loading || !data?.unread_count}
               onClick={async () => {
@@ -446,36 +451,44 @@ export function NotificationInbox({
   ]);
   return (
     <section
-      className="member-panel account-operations notification-inbox"
+      className={`member-panel account-operations notification-inbox${compact ? " notification-preview" : ""}`}
       aria-busy={loading}
     >
       <div className="operations-heading">
         <div>
           <h3>
             <Bell size={19} /> {compact ? "Thông báo mới" : "Hộp thông báo"}
+            {compact &&
+              !!notifications.data?.unread_count &&
+              ` (${notifications.data.unread_count})`}
           </h3>
-          <p className="muted">
-            {notifications.data
-              ? `${notifications.data.unread_count} thông báo chưa đọc`
-              : "Thông tin về đơn hàng, thanh toán và tài khoản"}
-          </p>
+          {!compact && (
+            <p className="muted">
+              {notifications.data
+                ? `${notifications.data.unread_count} thông báo chưa đọc`
+                : "Thông tin về đơn hàng, thanh toán và tài khoản"}
+            </p>
+          )}
         </div>
         <div className="inbox-heading-actions">
-          <button
-            type="button"
-            className="icon-button"
-            aria-label="Làm mới thông báo"
-            disabled={loading}
-            onClick={() => {
-              setRevision((v) => v + 1);
-              void notifications.refresh();
-            }}
-          >
-            <RefreshCw size={16} />
-          </button>
+          {!compact && (
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Làm mới thông báo"
+              disabled={loading}
+              onClick={() => {
+                setRevision((v) => v + 1);
+                void notifications.refresh();
+              }}
+            >
+              <RefreshCw size={16} />
+            </button>
+          )}
           <button
             type="button"
             className="button button-outline button-small"
+            aria-label="Đánh dấu tất cả đã đọc"
             disabled={busy || !notifications.data?.unread_count}
             onClick={async () => {
               setBusy(true);
@@ -489,7 +502,8 @@ export function NotificationInbox({
               }
             }}
           >
-            <CheckCheck size={16} /> Đánh dấu tất cả đã đọc
+            <CheckCheck size={16} />{" "}
+            {compact ? "Đọc tất cả" : "Đánh dấu tất cả đã đọc"}
           </button>
         </div>
       </div>
@@ -551,7 +565,7 @@ export function NotificationInbox({
           Đang tải thông báo…
         </p>
       )}
-      {data && (
+      {!compact && data && (
         <p className="inbox-result-count" role="status">
           {data.total} thông báo
           {search || category !== "all"
@@ -564,23 +578,28 @@ export function NotificationInbox({
           {loading ? " · Đang cập nhật…" : ""}
         </p>
       )}
-      {data?.items.length === 0 && (
-        <div className="inbox-empty">
-          <CheckCheck size={28} />
-          <strong>
-            {search || category !== "all"
-              ? "Không tìm thấy thông báo phù hợp"
-              : status === "unread"
-                ? "Bạn đã xem hết thông báo mới"
-                : "Chưa có thông báo"}
-          </strong>
-          <p>
-            {search || category !== "all"
-              ? "Thử từ khóa khác hoặc chọn tất cả loại."
-              : "Các cập nhật mới sẽ xuất hiện tại đây."}
+      {data?.items.length === 0 &&
+        (compact ? (
+          <p className="muted inbox-empty-compact">
+            Bạn đã xem hết thông báo mới
           </p>
-        </div>
-      )}
+        ) : (
+          <div className="inbox-empty">
+            <CheckCheck size={28} />
+            <strong>
+              {search || category !== "all"
+                ? "Không tìm thấy thông báo phù hợp"
+                : status === "unread"
+                  ? "Bạn đã xem hết thông báo mới"
+                  : "Chưa có thông báo"}
+            </strong>
+            <p>
+              {search || category !== "all"
+                ? "Thử từ khóa khác hoặc chọn tất cả loại."
+                : "Các cập nhật mới sẽ xuất hiện tại đây."}
+            </p>
+          </div>
+        ))}
       <div className="inbox-list">
         {data?.items.map((n) => (
           <NoticeCard key={n.id} notice={n} />
@@ -607,13 +626,9 @@ export function NotificationInbox({
       )}
       {compact && (
         <Link className="inbox-view-all" to="/notifications">
-          Xem tất cả và thông báo đã đọc <ChevronRight size={15} />
+          Xem thông báo cũ và tất cả thông báo <ChevronRight size={15} />
         </Link>
       )}
-      <p className="inbox-help">
-        Chưa đọc là trạng thái xem thông báo, không phải trạng thái xử lý giao
-        dịch. Mở tiêu đề để xem thông tin liên quan.
-      </p>
     </section>
   );
 }

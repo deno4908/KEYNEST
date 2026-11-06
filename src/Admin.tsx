@@ -186,9 +186,7 @@ export function Admin() {
     <div className="container page admin-page">
       <div className="page-heading">
         <div>
-          <span className="eyebrow orange">KEYNEST / BACK OFFICE</span>
-          <h1>Quản trị cửa hàng.</h1>
-          <p>Theo dõi hoạt động, xử lý công việc và quản lý cửa hàng.</p>
+          <h1>Quản trị cửa hàng</h1>
           {updatedAt && (
             <small className="admin-updated">
               Cập nhật {date(updatedAt)} · tự động mỗi 30 giây
