@@ -1,4 +1,5 @@
 import { rejectRegion } from './region';
+import { publishDataChange } from './dataChanges';
 let accessToken: string | null = null;
 let initialized = false;
 let refreshing: Promise<boolean> | null = null;
@@ -90,7 +91,7 @@ export async function api<T>(
     typeof window !== 'undefined' &&
     typeof CustomEvent !== 'undefined'
   ) {
-    window.dispatchEvent(new CustomEvent('keynest:data-changed', { detail: path }));
+    publishDataChange(path);
   }
   return body;
 }

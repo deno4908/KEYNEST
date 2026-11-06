@@ -22,11 +22,15 @@ import { Empty, ProductCard, useStore } from "./App";
 import type { Category, Coupon } from "./types";
 import { BannerSlider } from "./Banners";
 import { catalogHref, productGroup, readRecent } from "./discovery";
+import { useDataRefresh } from "./useDataRefresh";
 
 export function Home() {
   const { products, notify } = useStore();
   const [category, setCategory] = useState<Category>("all");
   const [promotions, setPromotions] = useState<Coupon[]>([]);
+  useDataRefresh(async () => {
+    setPromotions(await api<Coupon[]>("/promotions"));
+  }, ["/admin/coupons", "/orders", "/payments"], { intervalMs: 15000 });
   const [offerIndex, setOfferIndex] = useState(0);
   const [offerFocused, setOfferFocused] = useState(false);
   const [offerHidden, setOfferHidden] = useState(document.hidden);
@@ -314,13 +318,14 @@ export function PromotionsPage() {
   const [error, setError] = useState("");
   const load = () => {
     setError("");
-    api<Coupon[]>("/promotions")
+    return api<Coupon[]>("/promotions")
       .then(setPromotions)
       .catch((e) => setError(e.message));
   };
   useEffect(() => {
     load();
   }, []);
+  useDataRefresh(load, ["/admin/coupons", "/orders", "/payments"], { intervalMs: 15000 });
   return (
     <div className="container page promotions-page">
       <div className="breadcrumb">

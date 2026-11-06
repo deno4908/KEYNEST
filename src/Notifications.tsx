@@ -258,7 +258,6 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [actionError, setActionError] = useState("");
   const [busy, setBusy] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const location = useLocation();
   useEffect(() => {
@@ -266,24 +265,19 @@ export function NotificationBell() {
   }, [location.key]);
   useEffect(() => {
     if (!open) return;
-    const outside = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
-    };
     const escape = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpen(false);
         trigger.current?.focus();
       }
     };
-    document.addEventListener("pointerdown", outside);
     document.addEventListener("keydown", escape);
     return () => {
-      document.removeEventListener("pointerdown", outside);
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
   return (
-    <div className="notification-bell" ref={root}>
+    <div className="notification-bell">
       <button
         type="button"
         ref={trigger}

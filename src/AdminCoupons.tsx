@@ -256,6 +256,8 @@ export function CouponManager({
           close={() => setEditing(null)}
           saved={async () => {
             await saved();
+            setQuery("");
+            setFilter("all");
             setEditing(null);
           }}
         />

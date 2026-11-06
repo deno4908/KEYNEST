@@ -211,7 +211,7 @@ export function Modal({
     };
   }, []);
   return (
-    <div className="modal-backdrop" onClick={close}>
+    <div className="modal-backdrop">
       <section
         ref={dialogRef}
         className={`modal ${wide ? "modal-wide" : ""} ${className}`}

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { connectDataChanges } from "./dataChanges";
 
 // Refresh mounted views after a successful write, without resetting their forms.
 export function useDataRefresh(
@@ -13,6 +14,11 @@ export function useDataRefresh(
   latest.current = { refresh, prefixes };
   useEffect(() => {
     if (!enabled) return;
+    try {
+      connectDataChanges();
+    } catch {
+      /* Same-tab updates and polling remain available. */
+    }
     let stopped = false,
       running = false,
       pending = false,

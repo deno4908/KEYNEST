@@ -50,9 +50,9 @@ export function BannerSlider() {
   const active = banners.length ? banners[index % banners.length] : undefined;
   const imageReady = !!active && readyImage === active.image;
   useDataRefresh(async () => {
-    try { setBanners(await api<Banner[]>("/banners")); setIndex(0); }
+    try { setBanners(await api<Banner[]>("/banners")); }
     catch { /* Keep the current banner on a temporary connection failure. */ }
-  }, ['/admin/banners']);
+  }, ['/admin/banners'], { intervalMs: 30000 });
   useEffect(() => {
     const controller = new AbortController();
     api<Banner[]>("/banners", { signal: controller.signal })
@@ -211,7 +211,7 @@ export function BannerManager() {
     api<Banner[]>("/admin/banners")
       .then(setBanners)
       .catch((e) => setError(e.message));
-  useDataRefresh(load, ['/admin/banners']);
+  useDataRefresh(load, ['/admin/banners'], { intervalMs: 30000 });
   useEffect(() => {
     load();
   }, []);

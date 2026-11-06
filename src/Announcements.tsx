@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Bell, ChevronDown } from "lucide-react";
 import { api, post, date } from "./api";
 import "./announcements.css";
+import { useDataRefresh } from "./useDataRefresh";
 type Announcement = {
   id: string;
   title: string;
@@ -11,6 +12,9 @@ type Announcement = {
 };
 export function HomeAnnouncements() {
   const [items, setItems] = useState<Announcement[]>([]);
+  useDataRefresh(async () => {
+    setItems(await api<Announcement[]>("/announcements"));
+  }, ["/admin/announcements"], { intervalMs: 30000 });
   useEffect(() => {
     const c = new AbortController();
     void api<Announcement[]>("/announcements", { signal: c.signal })
@@ -56,6 +60,7 @@ export function AnnouncementManager() {
   async function load() {
     setItems(await api<Announcement[]>("/admin/announcements"));
   }
+  useDataRefresh(() => load().catch(e => setError(e.message)), ["/admin/announcements"], { intervalMs: 30000 });
   useEffect(() => {
     void load().catch((e) => setError(e.message));
   }, []);

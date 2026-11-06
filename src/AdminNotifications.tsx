@@ -4,6 +4,7 @@ import { api, post, date } from "./api";
 import "./admin-notifications.css";
 import { AnnouncementManager } from "./Announcements";
 import { NotificationInbox } from './Notifications';
+import { useDataRefresh } from './useDataRefresh';
 type Campaign = {
   id: string;
   title: string;
@@ -30,6 +31,7 @@ function CampaignManager() {
   async function load() {
     setItems(await api<Campaign[]>("/admin/notifications"));
   }
+  useDataRefresh(() => load().catch(e => setError(e.message)), ["/admin/notifications"], { intervalMs: 30000 });
   useEffect(() => {
     void load().catch((e) => setError(e.message));
   }, []);

@@ -55,7 +55,7 @@ export function AdminCategories({
   useDataRefresh(async () => {
     try { setRows(await api<CategoryRow[]>("/categories")); }
     catch (e) { setError((e as Error).message); }
-  }, ['/admin/categories']);
+  }, ['/admin/categories'], { intervalMs: 30000 });
   useEffect(() => {
     let active = true;
     api<CategoryRow[]>("/categories")
