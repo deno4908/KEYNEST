@@ -7,20 +7,33 @@ function request(path = '/', country, method = 'GET') {
   if (country) Object.defineProperty(req, 'cf', { value: { country } });
   return req;
 }
-test('public storefront is globally readable without credentials, private routes stay blocked', async t => {
-  t.mock.method(globalThis, 'fetch', async req => {
-    assert.equal(req.headers.get('Cookie'), null);
-    assert.equal(req.headers.get('Authorization'), null);
-    return new Response('public');
-  });
+test('foreign storefront visits show the region screen without reaching origin or offering registration', async t => {
+  const origin = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected origin request'); });
   for (const path of ['/', '/catalog', '/products/steam', '/robots.txt', '/sitemap.xml', '/assets/index.js', '/api/products', '/api/products?live=1']) {
     const req = request(path, 'US');
     req.headers.set('Cookie', 'session=secret');
     req.headers.set('Authorization', 'Bearer secret');
-    assert.equal((await worker.fetch(req)).status, 200);
+    const response = await worker.fetch(req);
+    assert.equal(response.status, 403);
+    if (!path.startsWith('/api')) assert.match(await response.text(), /KEYNEST hiện chỉ hoạt động tại Việt Nam/);
     assert.equal((await worker.fetch(request(path, 'US', 'POST'))).status, 403);
   }
   assert.equal((await worker.fetch(request('/api/me', 'US'))).status, 403);
+  assert.equal(origin.mock.callCount(), 0);
+});
+
+test('region status comes from edge country metadata, never spoofed headers, query or cached origin', async t => {
+  const origin = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unexpected origin request'); });
+  for (const country of ['VN', 'US', 'SG', 'XX', undefined]) {
+    const response = await worker.fetch(request('/api/region?country=VN', country));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { allowed: country === 'VN' });
+    assert.match(response.headers.get('Cache-Control'), /no-store/);
+    assert.equal(response.headers.get('X-Keynest-Region-Worker'), 'vietnam-region-v6');
+  }
+  assert.equal(await (await worker.fetch(request('/api/region', 'US', 'HEAD'))).text(), '');
+  assert.equal((await worker.fetch(request('/api/region', 'US', 'POST'))).status, 403);
+  assert.equal(origin.mock.callCount(), 0);
 });
 
 test('foreign and unknown countries receive standalone 403; spoofed country header is ignored', async () => {

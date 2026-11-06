@@ -1,3 +1,4 @@
+import { rejectRegion } from './region';
 let accessToken: string | null = null;
 let initialized = false;
 let refreshing: Promise<boolean> | null = null;
@@ -20,6 +21,10 @@ async function refreshAccess(): Promise<boolean> {
       method: 'POST', credentials: 'same-origin',
       headers: { 'X-App-Request': 'keynest' },
     });
+    if (res.status === 403 && (await res.clone().json().catch(() => ({}))).code === 'REGION_RESTRICTED') {
+      accessToken = null;
+      throw rejectRegion();
+    }
     if (!res.ok && res.status !== 401) throw new Error('Không thể khôi phục phiên đăng nhập. Vui lòng thử lại.');
     accessToken = null;
     receiveToken(res);
@@ -55,9 +60,11 @@ export async function api<T>(
   };
   let res = await send();
   let body = await res.json();
+  if (body.code === 'REGION_RESTRICTED') { accessToken = null; throw rejectRegion(); }
   if (!recovery && res.status === 401 && body.code === 'AUTH_REQUIRED' && await refreshAccess()) {
     res = await send();
     body = await res.json();
+    if (body.code === 'REGION_RESTRICTED') { accessToken = null; throw rejectRegion(); }
   }
   receiveToken(res);
   if (path === '/auth/logout' && res.ok) accessToken = null;

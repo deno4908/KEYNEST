@@ -1,0 +1,64 @@
+.verification-layout { width: min(460px, 100%); color: #eeeef2; border-radius: 18px; border: 1px solid #34363e; background: #191a1f; overflow: hidden; box-shadow: 0 22px 80px #0003; animation: verification-enter .4s ease both; }
+.verification-layout.has-aside { display: grid; grid-template-columns: .86fr 1fr; width: min(900px, 100%); }
+.verification-card.mfa-login-card { max-width: none; padding: 32px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.verification-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.verification-wordmark { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 800; letter-spacing: -.4px; }
+.verification-wordmark b { color: #ff794d; font-size: 23px; letter-spacing: -4px; margin-right: 5px; }
+.verification-kicker { font-size: 9px; font-weight: 600; letter-spacing: 1.4px; color: #9397a3; line-height: 1.6; }
+.verification-progress { display: flex; align-items: center; gap: 12px; font-size: 10px; color: #9299a6; margin: 24px 0 4px; }
+.verification-progress > span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.verification-progress > span:last-child { color: #efaf8c; }
+.verification-progress > span:first-child svg { color: #a6c2b2; }
+.verification-progress > i { height: 1px; background: #393b43; flex: 1; }
+.verification-step-number { display: grid; place-items: center; width: 18px; height: 18px; border: 1px solid #7f5b47; border-radius: 50%; font-size: 9px; }
+.verification-emblem { position: relative; display: grid; place-items: center; width: 112px; height: 112px; margin: 24px auto 20px; isolation: isolate; }
+.verification-orbit { position: absolute; inset: 0; border: 1px solid #e8a17a25; border-radius: 50%; }
+.verification-signal { position: absolute; inset: 9px; border: 1px dashed #e8a17a45; border-radius: 50%; }
+.verification-emblem-icon, .verification-check { display: grid; place-items: center; width: 68px; height: 68px; border: 1px solid #8e5b3f; border-radius: 19px; background: linear-gradient(145deg, #443027, #2b2320); color: #f2b38f; z-index: 2; transition: transform .3s, opacity .3s; box-shadow: 0 8px 24px #0003, inset 0 1px 0 #ffffff0a; }
+.verification-badge { position: absolute; right: 14px; bottom: 18px; display: grid; place-items: center; width: 26px; height: 26px; border: 3px solid #191a1f; border-radius: 50%; background: #bf724c; color: #fff1e4; z-index: 3; }
+.verification-paper { position: absolute; width: 28px; height: 34px; top: 24px; border-radius: 4px; background: #f4c8a7; padding: 9px 6px; opacity: 0; z-index: 1; }
+.verification-paper i { display: block; height: 2px; background: #a06d51; margin: 3px 0; }
+.verification-check { position: absolute; opacity: 0; transform: scale(.7); color: #b6e1c4; background: #263c30; border-color: #4b8060; }
+.verification-layout[data-stage="sending"] .verification-paper { animation: verification-mail 1.2s ease-in-out infinite; }
+.verification-layout[data-stage="sending"] .verification-emblem-icon { animation: verification-float 1.2s ease-in-out infinite; }
+.verification-layout[data-stage="verifying"] .verification-signal, .verification-layout[data-stage="loading"] .verification-signal { border-style: solid; border-color: #edaa8830; border-top-color: #edaa88; animation: verification-spin 1.1s linear infinite; }
+.verification-layout[data-stage="success"] .verification-emblem-icon { opacity: 0; transform: scale(.8); }
+.verification-layout[data-stage="success"] .verification-check { opacity: 1; transform: scale(1); }
+.verification-layout[data-stage="success"] .verification-check path { stroke-dasharray: 34; stroke-dashoffset: 34; animation: verification-draw .45s .15s ease forwards; }
+.verification-layout[data-stage="success"] .verification-orbit { border-color: #7baa8750; }
+.verification-layout[data-stage="success"] .verification-badge { background: #548363; }
+.verification-copy { text-align: center; }
+.verification-card.mfa-login-card h1 { font-size: 25px; line-height: 1.35; letter-spacing: -.65px; margin: 0 0 12px; }
+.verification-card .mfa-login-description { font-size: 12px; line-height: 1.85; color: #a5aab7; margin: 0 0 24px; }
+.verification-card .mfa-login-description strong { display: inline-block; color: #e9d3c4; font-weight: 500; }
+.verification-content { min-width: 0; }
+.verification-content .mfa-login-form { gap: 11px; }
+.verification-content .form-error { margin: 14px 0 0; font-size: 12px; line-height: 1.7; }
+.verification-code-field { position: relative; }
+.verification-code-field .mfa-login-code { width: 100%; height: 58px; padding: 0 12px 0 18px; font: 500 25px ui-monospace, Consolas, monospace; letter-spacing: 7px; text-align: center; background: #111216; color: #f6f4f1; border: 1px solid #43454e; border-radius: 9px; transition: border-color .2s, box-shadow .2s; }
+.verification-code-field > span { position: absolute; bottom: 0; left: 25%; right: 25%; height: 2px; background: #f2ad86; transform: scaleX(0); transition: transform .25s; }
+.verification-code-field:focus-within > span { transform: scaleX(1); }
+.verification-code-field .mfa-login-code:focus { outline: none; border-color: #b78061; box-shadow: 0 0 0 3px #cb8c6012; }
+.verification-code-field[data-invalid="true"] { animation: verification-reject .25s ease; }
+.verification-code-field[data-invalid="true"] .mfa-login-code { border-color: #cf8181; }
+.verification-card .mfa-login-hint { color: #9299a6; font-size: 11px; line-height: 1.7; margin-bottom: 7px; }
+.verification-card .button { min-height: 44px; border-radius: 8px; font-size: 12px; }
+.verification-resend { margin-top: 12px; }
+.verification-spinner { animation: verification-spin .8s linear infinite; }
+.verification-footer { margin-top: 24px; padding-top: 18px; }
+.verification-footer button { justify-content: center; margin: auto; }
+.verification-card .mfa-login-help { color: #9399a6; font-size: 11px; }
+.verification-aside { position: relative; isolation: isolate; overflow: hidden; padding: 32px; background: #242b24; border-right: 1px solid #30323a; display: flex; flex-direction: column; gap: 28px; }
+.verification-aside::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, #10121036 0%, #10121015 20%, #101210db 57%, #101210 100%); }
+.verification-aside-copy { margin-top: auto; }
+.verification-aside h2 { font-size: 29px; font-weight: 500; line-height: 1.4; letter-spacing: -.8px; margin: 12px 0; }
+.verification-aside p { margin: 0; font-size: 12px; color: #9fa4b0; line-height: 1.9; }
+.verification-aside-note { display: flex; align-items: center; gap: 8px; color: #9d9c96; font-size: 10px; }
+@keyframes verification-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes verification-spin { to { transform: rotate(360deg); } }
+@keyframes verification-float { 50% { transform: translateY(3px); } }
+@keyframes verification-mail { 0% { opacity: 0; transform: translateY(12px); } 35%, 65% { opacity: 1; transform: translateY(-28px); } 100% { opacity: 0; transform: translate(28px, -44px) rotate(15deg); } }
+@keyframes verification-draw { to { stroke-dashoffset: 0; } }
+@keyframes verification-reject { 25%, 75% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+@media(max-width: 700px) { .verification-layout.has-aside { grid-template-columns: 1fr; max-width: 460px; } .verification-aside { display: none; } .verification-card.mfa-login-card { padding: 26px 24px; } .verification-top > .verification-kicker { font-size: 8px; letter-spacing: 1px; } .verification-emblem { margin-top: 20px; } .verification-card.mfa-login-card h1 { font-size: 23px; } }
+@media(prefers-reduced-motion: reduce) { .verification-layout, .verification-layout *, .verification-layout *::after { animation: none !important; transition: none !important; } .verification-layout[data-stage="success"] .verification-check path { stroke-dashoffset: 0; } }

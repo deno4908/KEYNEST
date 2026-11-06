@@ -4,6 +4,7 @@ import "./two-factor.css";
 import { api, post } from "./api";
 import { Modal, useStore } from "./App";
 import "./oauth-transition.css";
+import { VerificationCard, VerificationCodeInput } from './VerificationCard';
 type Status = { required: boolean; factors: { id: string; name: string }[] };
 export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
   const { mode } = useStore();
@@ -93,20 +94,10 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
   if (challenge)
     return (
       <Modal title="Xác thực hai bước" close={() => void cancelChallenge()} className="mfa-challenge-dialog">
-        <section className="mfa-login-card" aria-labelledby={`${codeId}-title`}>
-          <div className="mfa-login-icon" aria-hidden="true">
-            <ShieldCheck size={32} strokeWidth={1.8} />
-          </div>
-          <h1 id={`${codeId}-title`}>
-            {status && !status.required
-              ? "Bạn đã được xác minh"
-              : "Xác minh đó là bạn"}
-          </h1>
-          <p className="mfa-login-description">
-            {status && !status.required
-              ? "Phiên đăng nhập đã sẵn sàng. Tiếp tục để truy cập tài khoản của bạn."
-              : "Mở ứng dụng Authenticator và nhập mã xác thực để tiếp tục đăng nhập."}
-          </p>
+        <VerificationCard kind="authenticator" stage={status && !status.required ? 'success' : busy ? 'verifying' : status ? 'sent' : 'loading'}
+          title={status && !status.required ? 'Bạn đã được xác minh' : 'Xác minh đó là bạn'}
+          description={status && !status.required ? 'Phiên đăng nhập đã sẵn sàng. Tiếp tục để truy cập tài khoản của bạn.' : 'Mở ứng dụng Authenticator và nhập mã xác thực để tiếp tục đăng nhập.'}
+          footer={<button type="button" disabled={busy} onClick={() => void cancelChallenge()}>Đăng nhập bằng tài khoản khác</button>}>
           {!status && !error && (
             <p role="status" className="mfa-login-description">
               Đang kiểm tra phiên đăng nhập…
@@ -147,10 +138,9 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
                 </div>
               )}
               <label htmlFor={codeId}>Mã xác thực</label>
-              <input
+              <VerificationCodeInput
                 id={codeId}
                 ref={codeRef}
-                className="mfa-login-code"
                 type="text"
                 autoComplete="one-time-code"
                 inputMode="numeric"
@@ -206,16 +196,7 @@ export function TwoFactor({ challenge = false }: { challenge?: boolean }) {
               thêm thiết bị dự phòng, hãy chọn thiết bị đó để xác minh.
             </p>
           </details>
-          <div className="mfa-login-footer">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void cancelChallenge()}
-            >
-              Đăng nhập bằng tài khoản khác
-            </button>
-          </div>
-        </section>
+        </VerificationCard>
       </Modal>
     );
   return (

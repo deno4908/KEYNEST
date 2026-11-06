@@ -2,6 +2,7 @@ import { Router } from "express";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { AppError, encrypt, decrypt } from "./security.js";
+import { sessionMaxAge } from './bearer.js';
 
 export function createAdminOtp({
   config,
@@ -58,6 +59,18 @@ export function createAdminOtp({
     }
   }
   const verified = (req) => !!read(req, proofName);
+  function writeProof(res, own) {
+    res.cookie(proofName, encrypt(JSON.stringify({ ...own, expires: clock() + sessionMaxAge }), key(proofName)),
+      { ...options, maxAge: sessionMaxAge });
+  }
+  // Renew only an existing proof for the very same server-validated session.
+  // Reloads/token rotation must not create another email challenge. A fresh
+  // login (different session_id), logout or revoked session still requires OTP.
+  function renew(req, res) {
+    if (req.user?.role !== 'admin' || !verified(req)) return false;
+    writeProof(res, identity(req));
+    return true;
+  }
   function clear(res) {
     res.clearCookie(proofName, options);
     res.clearCookie(challengeName, options);
@@ -170,19 +183,12 @@ export function createAdminOtp({
             "Chưa hoàn tất xác minh. Vui lòng gửi lại mã.",
             503,
           );
-        res.cookie(
-          proofName,
-          encrypt(
-            JSON.stringify({ ...own, expires: clock() + 12 * 3600000 }),
-            key(proofName),
-          ),
-          { ...options, maxAge: 12 * 3600000 },
-        );
+        writeProof(res, own);
         res.clearCookie(challengeName, options);
         res.json({ verified: true });
       },
     );
     return r;
   }
-  return { guard, verified, router, clear };
+  return { guard, verified, router, clear, renew };
 }

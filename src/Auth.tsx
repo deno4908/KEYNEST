@@ -20,6 +20,7 @@ import { Recaptcha } from './Recaptcha';
 import { showEmailWelcome } from './OAuthWelcome';
 import { LegalConsent } from './LegalConsent';
 import { LEGAL_VERSION } from '../shared/legal-content.js';
+import { checkRegion } from './region';
 
 export function AuthModal({ close }: { close: () => void }) {
   const { mode, setUser } = useStore();
@@ -121,6 +122,7 @@ export function AuthModal({ close }: { close: () => void }) {
     setOAuthBusy(provider);
     setError("");
     try {
+      if (!await checkRegion()) return;
       const [{ url }] = await Promise.all([
         api<{ url: string }>(`/auth/oauth/${provider}`, {
           method: "POST",
@@ -156,6 +158,7 @@ export function AuthModal({ close }: { close: () => void }) {
     setBusy(true);
     setError("");
     try {
+      if (!await checkRegion()) return;
       if (tab === "forgot") {
         const result = await post<{ message: string }>("/auth/forgot", {
           email: email.trim(),

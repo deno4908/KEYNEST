@@ -23,7 +23,8 @@ test('2FA popup focuses the code, handles rejection and logs out on dismissal', 
   await expect(dialog).toBeVisible();
   const code = dialog.getByLabel('Mã xác thực', { exact: true });
   await expect(code).toBeFocused();
-  await expect(dialog.locator('.mfa-login-icon svg')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/shared-verification-authenticator.png', fullPage: true });
+  await expect(dialog.locator('.verification-emblem-icon svg')).toHaveCount(1);
   await expect.poll(() => dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   await code.fill('123456');
   await dialog.getByRole('button', { name: 'Xác minh và tiếp tục' }).click();

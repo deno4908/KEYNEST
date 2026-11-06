@@ -91,7 +91,7 @@ jobs:
           ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$target" "mkdir -p /opt/keynest/incoming/$release_id"
           scp "${ssh_opts[@]}" -P "$VPS_PORT" release.tar.gz release.sha256 "$target:/opt/keynest/incoming/$release_id/"
           ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$target" "cd /opt/keynest/incoming/$release_id && sha256sum -c release.sha256 && tar -xzf release.tar.gz deploy/release.sh && bash deploy/release.sh $release_id"
-      - name: Verify public policy versions
+      - name: Verify policies and regional access
         shell: bash
         run: |
           tar -xzf release.tar.gz shared/legal-content.js
@@ -106,4 +106,15 @@ jobs:
             assert.ok((await response.text()).includes(LEGAL_VERSION), `${path}: policy version differs from release; update the Cloudflare Worker`);
             console.log(JSON.stringify({path, version: LEGAL_VERSION, worker: response.headers.get('X-Keynest-Region-Worker')}));
           }
+          const region = await fetch('https://keynest.store/api/region', { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+          assert.equal(region.status, 200);
+          assert.equal(region.headers.get('X-Keynest-Region-Worker'), 'vietnam-region-v6', 'Deploy the updated country Worker');
+          const { allowed } = await region.json();
+          assert.equal(typeof allowed, 'boolean');
+          if (!allowed) {
+            const home = await fetch('https://keynest.store/', { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+            assert.equal(home.status, 403, 'Foreign homepage must show region restriction');
+            assert.ok((await home.text()).includes('KEYNEST hiện chỉ hoạt động tại Việt Nam.'));
+          }
+          console.log(JSON.stringify({regionAllowed: allowed, worker: 'vietnam-region-v6'}));
           NODE

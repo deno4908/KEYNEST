@@ -1,3 +1,4 @@
+import { sessionRefreshHandler } from './session-refresh.js';
 import express from "express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -22,7 +23,7 @@ import { apiAccessGuard } from './api-access.js';
 import { registerSupabase } from "./registration.js";
 import { consentProof, accountConsentRecord } from './legal-consent.js';
 import { orderContract } from './order-contract.js';
-import { bearerToken, verifyBearer, sendSession } from "./bearer.js";
+import { bearerToken, verifyBearer, sendSession, sessionMaxAge } from "./bearer.js";
 import { captchaGuard } from './captcha.js';
 import { accountRouter, strongPassword } from "./accounts.js";
 import { catalogQuery } from "./catalog.js";
@@ -172,7 +173,7 @@ const cookieOpts = {
   secure: config.production,
   sameSite: "lax",
   path: "/api",
-  maxAge: 7 * 86400000,
+  maxAge: sessionMaxAge,
 };
 function setAuth(res, s) {
   sendSession(res, s, cookieOpts);
@@ -183,7 +184,11 @@ const passwordTransport = createPasswordTransport(config.encryption, undefined, 
   ...(config.mode === 'supabase' ? { nonceStore: createSupabaseNonceStore(store), requireEncrypted: true } : {}),
 });
 app.get('/api/auth/password-key', (req, res) => res.json(passwordTransport.publicKey()));
-app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth }));
+// Cloudflare Worker answers this at the edge using request.cf.country. The
+// origin fallback keeps local development usable; origin access stays restricted
+// by the deployment's Cloudflare ingress, not by a client-supplied country header.
+app.get('/api/region', (req, res) => res.set('Cache-Control', 'private, no-store').json({ allowed: true }));
+app.use("/api/auth/oauth", createOAuthRouter({ config, store, setAuth, clearVerification: res => adminOtp.clear(res) }));
 function clearAuth(res) {
   adminOtp.clear(res);
   for (const name of ["kn_session", "kn_access", "kn_refresh"])
@@ -202,25 +207,7 @@ function demoSession(res, id) {
 }
 const adminOtp = createAdminOtp({ config, makeAuthClient });
 const passwordRecovery = createPasswordRecovery({ config, makeAuthClient, store });
-app.post('/api/auth/refresh', async (req, res) => {
-  if (config.mode === 'demo') return res.json({ ok: true });
-  if (!req.cookies.kn_refresh) return res.status(401).json({ error: 'Vui lòng đăng nhập.' });
-  const client = makeAuthClient();
-  const { data, error } = await client.auth.refreshSession({ refresh_token: req.cookies.kn_refresh });
-  if (error || !data.session || !data.user) {
-    clearAuth(res);
-    return res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn.' });
-  }
-  req.user = await store.profile(data.user.id);
-  try {
-    await operations.authorize(req, data.session.access_token);
-  } catch (error) {
-    if ([401, 403].includes(error.status)) clearAuth(res);
-    throw error;
-  }
-  setAuth(res, data.session);
-  res.json({ ok: true });
-});
+app.post('/api/auth/refresh', sessionRefreshHandler({ config, makeAuthClient, store, operations, adminOtp, setAuth, clearAuth }));
 const authorized = Symbol('authorized-request');
 const auth = async (req, res, next) => {
   try {
@@ -522,6 +509,7 @@ app.post("/api/auth/login", async (req, res) => {
     if (!u || !verifyPassword(input.password, u.password_hash))
       throw new AppError("Email hoặc mật khẩu không đúng.", 401);
     await operations.checkAccess(u.id);
+    adminOtp.clear(res);
     demoSession(res, u.id);
     user = store.profile(u.id);
   } else {
@@ -533,6 +521,7 @@ app.post("/api/auth/login", async (req, res) => {
         401,
       );
     await operations.checkAccess(data.user.id);
+    adminOtp.clear(res);
     setAuth(res, data.session);
     user = await store.profile(data.user.id);
     if (needsMfa(data.user, data.session.access_token))
@@ -604,6 +593,7 @@ app.post("/api/auth/reset", async (req, res) => {
     .strict()
     .parse(req.body);
   const session = await passwordRecovery.complete(input);
+  adminOtp.clear(res);
   setAuth(res, session);
   res.json({ message: "Mật khẩu đã được cập nhật." });
 });

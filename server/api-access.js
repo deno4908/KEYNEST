@@ -3,7 +3,7 @@
 export function isPublicApi(method, path) {
   path = path.toLowerCase().replace(/\/+$/, '') || '/';
   if (['GET', 'HEAD'].includes(method)) {
-    return ['/health', '/config', '/steam-art', '/products', '/catalog', '/promotions',
+    return ['/health', '/config', '/region', '/steam-art', '/products', '/catalog', '/promotions',
       '/banners', '/categories', '/announcements', '/auth/password-key'].includes(path)
       || /^\/products\/[^/]+(?:\/(?:reviews|comments))?$/.test(path)
       || /^\/media\/[^/]+$/.test(path);

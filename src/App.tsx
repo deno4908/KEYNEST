@@ -79,6 +79,8 @@ import { Catalog } from "./Catalog";
 import { rememberProduct } from "./discovery";
 import { AuthModal, OAuthErrorPage } from "./Auth";
 import { OAuthWelcome } from './OAuthWelcome';
+import { checkRegion, isRegionRestricted } from './region';
+import { RegionRestricted } from './RegionRestricted';
 import { Avatar } from "./Avatar";
 import { CustomerTicketCard } from "./AdminSupport";
 import { ProductFeedback, RatingLine } from "./ProductFeedback";
@@ -327,6 +329,25 @@ export function App() {
   const { cart, setCart, cartReady, cartError, retryCart, flushCart } = useAccountCart(user?.id, ready, notify);
   useLiveProducts(catalogReady, setProducts);
   const [adding, setAdding] = useState(false);
+  const [regionRestricted, setRegionRestricted] = useState(isRegionRestricted);
+  useEffect(() => {
+    const blocked = () => { setAuthOpen(false); setRegionRestricted(true); };
+    const check = () => { if (document.visibilityState !== 'hidden') void checkRegion().catch(() => {}); };
+    window.addEventListener('keynest:region-restricted', blocked);
+    window.addEventListener('focus', check);
+    window.addEventListener('pageshow', check);
+    document.addEventListener('visibilitychange', check);
+    check();
+    return () => {
+      window.removeEventListener('keynest:region-restricted', blocked);
+      window.removeEventListener('focus', check);
+      window.removeEventListener('pageshow', check);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, []);
+  const openLogin = () => {
+    void checkRegion().then(allowed => { if (allowed) setAuthOpen(true); }).catch(e => notify(e.message, true));
+  };
   const addingNow = useRef(false);
   const currentCart = useRef({ items: cart, owner: user?.id || '', ready: cartReady });
   currentCart.current = { items: cart, owner: user?.id || '', ready: cartReady };
@@ -415,6 +436,7 @@ export function App() {
       notify((e as Error).message, true);
     }
   };
+  if (regionRestricted) return <RegionRestricted />;
   return (
     <StoreContext.Provider
       value={{
@@ -432,7 +454,7 @@ export function App() {
         flushCart,
         refresh,
         notify,
-        login: () => setAuthOpen(true),
+        login: openLogin,
         setUser,
       }}
     >
@@ -469,7 +491,7 @@ export function App() {
                 disabled={!ready}
                 aria-label={user ? `Tài khoản của ${user.name}` : "Đăng nhập"}
                 onClick={() =>
-                  user ? navigate("/account") : setAuthOpen(true)
+                  user ? navigate("/account") : openLogin()
                 }
               >
                 {user ? (
@@ -519,7 +541,7 @@ export function App() {
         {mode === "demo" && (
           <div className="demo-strip">
             Chế độ thử nghiệm · Tiền và mã sản phẩm là dữ liệu mô phỏng.
-            <button onClick={() => setAuthOpen(true)}>
+            <button onClick={openLogin}>
               Dùng tài khoản mẫu <ArrowRight size={13} />
             </button>
           </div>

@@ -42,10 +42,13 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
   });
   const app = express();
   app.use(express.json(), cookieParser());
+  function bindIdentity(req) {
+    req.user = { id: req.headers['x-user'] || uid, role: req.headers["x-role"] || "admin" };
+    req.authUser = { email: req.headers['x-email'] || "admin@example.test" };
+    req.authToken = `h.${Buffer.from(JSON.stringify({ sub: req.user.id, session_id: req.headers["x-session"] || "original", iat: time })).toString("base64url")}.s`;
+  }
   function auth(req, res, next) {
-    req.user = { id: uid, role: req.headers["x-role"] || "admin" };
-    req.authUser = { email: "admin@example.test" };
-    req.authToken = `h.${Buffer.from(JSON.stringify({ sub: uid, session_id: req.headers["x-session"] || "original" })).toString("base64url")}.s`;
+    bindIdentity(req);
     return service.guard(req, res, next);
   }
   app.use(
@@ -53,6 +56,10 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
     service.router({ auth, limiter: () => (req, res, next) => next() }),
   );
   app.get("/api/private", auth, (req, res) => res.json({ ok: true }));
+  // Simulates refresh after the auth provider and operations authorize the session.
+  app.post('/api/refresh-proof', (req, res) => {
+    bindIdentity(req); res.json({ renewed: service.renew(req, res) });
+  });
   app.use((err, req, res, next) =>
     res.status(err.status || 400).json({ error: err.message }),
   );
@@ -136,5 +143,24 @@ test("admin email OTP binds proof to a session and rejects wrong codes, reuse an
     400,
   );
   time += 13 * 3600000;
-  assert.equal((await req("/private", null, proof)).status, 403);
+  assert.equal((await req("/private", null, proof)).status, 200, 'same session must survive the old 12-hour boundary and JWT rotation');
+  for (const [cookie, headers] of [['', {}], [renamedChallenge, {}], [proof, { 'x-session': 'new-login' }],
+    [proof, { 'x-email': 'changed@example.test' }], [proof, { 'x-user': 'another-user' }]]) {
+    const denied = await req('/refresh-proof', {}, cookie, headers);
+    assert.equal((await denied.json()).renewed, false);
+    assert.equal(denied.headers.getSetCookie().length, 0);
+  }
+  time += 5 * 86400000;
+  const refreshed = await req('/refresh-proof', {}, proof);
+  assert.equal((await refreshed.json()).renewed, true);
+  const renewedProof = refreshed.headers.getSetCookie()[0].split(';')[0];
+  assert.match(refreshed.headers.getSetCookie()[0], /Max-Age=604800/);
+  time += 5 * 86400000;
+  assert.equal((await req('/private', null, proof)).status, 403, 'expired original receipt cannot be replayed');
+  assert.equal((await req('/private', null, renewedProof)).status, 200, 'active same session keeps its renewed receipt');
+  assert.equal((await req('/private', null, renewedProof, { 'x-session': 'new-login' })).status, 403);
+  assert.equal((await req('/private')).status, 403);
+  assert.equal((await (await req('/refresh-proof', {}, proof)).json()).renewed, false);
+  time += 8 * 86400000;
+  assert.equal((await req('/private', null, renewedProof)).status, 403);
 });

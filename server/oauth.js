@@ -6,7 +6,7 @@ import { accountConsentRecord, accountConsentSchema } from './legal-consent.js';
 
 // Supabase manages provider state. S256 PKCE binds the returned code to the
 // browser that started login; the verifier never leaves an HttpOnly cookie.
-export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
+export function createOAuthRouter({ config, store, setAuth, clearVerification = () => {}, fetcher = fetch }) {
   const router = Router();
   const cookieName = "kn_oauth";
   const cookieOptions = {
@@ -115,6 +115,7 @@ export function createOAuthRouter({ config, store, setAuth, fetcher = fetch }) {
       // Only registration carries a checkbox receipt. Login must never invent one.
       if (transaction.legal)
         await store.audit(session.user.id, 'account_legal_acceptance', JSON.stringify(transaction.legal));
+      clearVerification(res);
       setAuth(res, session);
       return res.redirect(303, `${config.origin}/account?welcome=${transaction.provider}`);
     } catch {

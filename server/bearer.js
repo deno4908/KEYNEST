@@ -1,4 +1,5 @@
 import { AppError } from './security.js';
+export const sessionMaxAge = 7 * 86400000;
 
 export function bearerToken(req) {
   const value = req.headers.authorization;

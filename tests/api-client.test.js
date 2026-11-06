@@ -5,7 +5,10 @@ import ts from 'typescript';
 
 async function client() {
   const source = await readFile(new URL('../src/api.ts', import.meta.url), 'utf8');
-  const js = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } }).outputText;
+  const options = { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } };
+  const region = ts.transpileModule(await readFile(new URL('../src/region.ts', import.meta.url), 'utf8'), options).outputText;
+  const regionUrl = `data:text/javascript;base64,${Buffer.from(region).toString('base64')}#${Math.random()}`;
+  const js = ts.transpileModule(source, options).outputText.replace("'./region'", JSON.stringify(regionUrl));
   return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}#${Math.random()}`);
 }
 const response = (body, status = 200, token) => new Response(JSON.stringify(body), {

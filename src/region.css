@@ -1,0 +1,21 @@
+.region-screen { min-height: 100svh; background: #101114; color: #eeeef0; display: flex; flex-direction: column; }
+.region-screen > header { width: min(1120px, 100%); padding: 28px 32px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.region-brand { font-size: 24px; font-weight: 800; letter-spacing: -1px; }
+.region-brand span { color: #ff7045; margin-right: 8px; }
+.region-screen > header > span { font-size: 12px; color: #9296a2; }
+.region-screen > main { flex: 1; width: min(850px, 100%); align-content: center; margin: 0 auto; padding: 30px 20px; }
+.region-card { display: grid; grid-template-columns: 230px 1fr; border: 1px solid #303136; border-radius: 14px; overflow: hidden; background: #191a1e; }
+.region-visual { background: #15161a; border-right: 1px solid #303136; display: grid; place-items: center; position: relative; }
+.region-visual > svg { position: absolute; color: #37393f; }
+.region-country { position: relative; display: grid; justify-items: center; gap: 18px; padding: 26px; background: #202126; border: 1px solid #414047; border-radius: 10px; transform: rotate(-5deg); }
+.region-country strong { font-size: 13px; letter-spacing: 2px; }
+.region-content { padding: 36px; }
+.region-caption { color: #d99c79; display: flex; gap: 7px; align-items: center; font-size: 11px; }
+.region-content h1 { font-size: clamp(24px, 4vw, 29px); line-height: 1.35; margin: 16px 0; letter-spacing: -.6px; }
+.region-content p { color: #a2a6b0; font-size: 13px; line-height: 1.8; margin: 0; }
+.region-help { border-top: 1px solid #303137; padding-top: 20px; margin: 24px 0; }
+.region-help strong { font-size: 13px; display: block; margin-bottom: 8px; }
+.region-content .button { width: 100%; justify-content: center; }
+.region-note { color: #9296a2; font-size: 11px; line-height: 1.6; padding: 12px 4px; }
+.region-screen > footer { padding: 20px; display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; color: #9296a2; font-size: 11px; }
+@media(max-width: 650px) { .region-screen > header { padding: 20px; } .region-screen > header > span { display: none; } .region-card { grid-template-columns: 1fr; } .region-visual { min-height: 110px; border-right: 0; border-bottom: 1px solid #303136; } .region-visual > svg { display: none; } .region-country { display: flex; transform: none; border: 0; background: none; padding: 18px; } .region-content { padding: 26px 24px; } }
