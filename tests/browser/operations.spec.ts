@@ -16,14 +16,14 @@ test("account sessions/inbox and admin customer controls work on desktop and mob
   const email = `operations-${Date.now()}@example.test`;
   const registered = await page.request.post("/api/auth/register", {
     headers,
-    data: { legal: accountLegal, email, password: "OperationsTest123!", name: "Operations Test" },
+    data: { legal: accountLegal, email, password: "OperationsTest123!", name: `Operations Test ${Date.now()}` },
   });
   expect(registered.ok()).toBe(true);
   await page.goto("/account");
   await expect(
-    page.getByRole("heading", { name: "Thông báo", exact: true }),
+    page.getByRole("heading", { name: "Thông báo mới", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Chưa có thông báo mới.")).toBeVisible();
+  await expect(page.getByText("Bạn đã xem hết thông báo mới", { exact: true })).toBeVisible();
   await page.goto("/account?section=security");
   await expect(
     page.getByRole("heading", { name: "Phiên đăng nhập", exact: true }),

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError, digest } from "./security.js";
+import { enrichNotice, filterNoticeQuery, noticeCategory, notificationGroups } from './notification-feed.js';
 
 const paging = z.object({
   page: z.coerce.number().int().min(1).max(10000).default(1),
@@ -511,11 +512,13 @@ export function createOperations(store) {
           ...slice(
             all
               .filter((n) => (!f.unread || !n.read_at) && (!f.read || !!n.read_at))
+              .filter(n => !f.category || f.category === 'all' || noticeCategory(n.id) === f.category)
+              .filter(n => !f.q || n.title.toLocaleLowerCase().includes(f.q.toLocaleLowerCase()))
               .sort(
                 (a, b) =>
                   b.created_at.localeCompare(a.created_at) ||
                   a.id.localeCompare(b.id),
-              ),
+              ).map(enrichNotice),
             f,
           ),
           unread_count: all.filter((n) => !n.read_at).length,
@@ -529,6 +532,8 @@ export function createOperations(store) {
         .eq("user_id", uid);
       if (f.unread) q = q.is("read_at", null);
       if (f.read) q = q.not("read_at", "is", null);
+      q = filterNoticeQuery(q, f.category);
+      if (f.q) q = q.ilike('title', `%${f.q.replace(/[\\%_]/g, '\\$&')}%`);
       const [result, unread, unreadChat, unreadOrder] = await Promise.all([
         q
           .order("created_at", { ascending: false })
@@ -549,7 +554,7 @@ export function createOperations(store) {
       if (result.error || unread.error || unreadChat.error || unreadOrder.error)
         throw new AppError("Không thể tải thông báo.", 503);
       return {
-        ...shape(result.data, result.count, f),
+        ...shape(result.data.map(enrichNotice), result.count, f),
         unread_count: unread.count,
         unread_chat_count: unreadChat.count,
         unread_order_count: unreadOrder.count,
@@ -574,6 +579,17 @@ export function createOperations(store) {
         const result = await query(q.select("id"));
         if (id && !result.length)
           throw new AppError("Không tìm thấy thông báo.", 404);
+      }
+    },
+    async unreadNotification(uid, id) {
+      if (demo) {
+        const notice = rows('notifications').find(n => n.user_id === uid && n.id === id);
+        if (!notice) throw new AppError('Không tìm thấy thông báo.', 404);
+        notice.read_at = null;
+        store.save();
+      } else {
+        const result = await query(store.client.from('notifications').update({ read_at: null }).eq('user_id', uid).eq('id', id).select('id'));
+        if (!result.length) throw new AppError('Không tìm thấy thông báo.', 404);
       }
     },
   };
@@ -602,6 +618,8 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
         req.user.id,
         paging
           .extend({
+            category: z.enum(['all', ...Object.keys(notificationGroups), 'system']).default('all'),
+            q: z.string().trim().max(120).default(''),
             read: z.enum(["0", "1"]).default("0").transform(v => v === "1"),
             unread: z
               .enum(["0", "1"])
@@ -623,6 +641,11 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
       .refine((v) => !!v.id !== !!v.all)
       .parse(req.body);
     await ops.readNotification(req.user.id, id);
+    res.json({ success: true });
+  });
+  router.post('/notifications/unread', auth, limiter(60), async (req, res) => {
+    const { id } = z.object({ id: z.string().min(1).max(150) }).strict().parse(req.body);
+    await ops.unreadNotification(req.user.id, id);
     res.json({ success: true });
   });
   router.use("/admin", auth, admin);

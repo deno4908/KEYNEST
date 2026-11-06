@@ -97,4 +97,19 @@ test('admin operational inbox persists events, counts all unread and isolates re
   const persisted = JSON.parse(readFileSync(store.path, 'utf8'));
   assert.ok(persisted.notifications.filter(n => n.user_id === adminId).every(n => n.read_at));
   assert.ok((await req('/notifications', secondLogin.cookie)).body.unread_count > 0);
+  // Filters describe the entire inbox, independent of page size and receipts.
+  const filtered = await req('/notifications?category=payments&page_size=1&read=1', admin.cookie);
+  assert.ok(filtered.body.total >= 2);
+  assert.equal(filtered.body.items.length, 1);
+  assert.equal(filtered.body.items[0].category, 'payments');
+  assert.equal(filtered.body.unread_count, 0);
+  const matching = await req('/notifications?category=support&q=Purchase%20support', admin.cookie);
+  assert.ok(matching.body.total >= 1);
+  assert.ok(matching.body.items.every(n => n.category === 'support' && n.title.includes('Purchase support')));
+  const receipt = filtered.body.items[0].id;
+  assert.equal((await req('/notifications/unread', buyer.cookie, { id: receipt })).status, 404);
+  assert.equal((await req('/notifications/unread', admin.cookie, { id: receipt })).status, 200);
+  assert.equal((await req('/notifications?unread=1&category=payments', admin.cookie)).body.total, 1);
+  assert.equal((await req('/notifications?category=invalid', admin.cookie)).status, 400);
+  assert.equal((await req('/notifications/unread', admin.cookie, { all: true })).status, 400);
 });

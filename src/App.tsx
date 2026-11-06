@@ -1,6 +1,6 @@
 import { useAccountCart } from "./useAccountCart";
 import { useLiveProducts } from "./useLiveProducts";
-import { UnreadChatBadge } from './UnreadChatBadge';
+import { NotificationProvider, NotificationBell, NotificationsPage } from './Notifications';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
@@ -458,6 +458,7 @@ export function App() {
         setUser,
       }}
     >
+      <NotificationProvider key={user?.id || 'guest'} userId={user?.id}>
       <div className="app-shell">
         <div className="topline">
           <div className="container">
@@ -501,7 +502,6 @@ export function App() {
                     url={user.avatar_url}
                     className="header-avatar signed-in"
                   />
-                  <UnreadChatBadge key={user.id} admin={user.role === 'admin'} />
                   </span>
                 ) : (
                   <span className="header-avatar">
@@ -515,6 +515,7 @@ export function App() {
                   </strong>
                 </span>
               </button>
+              {user && <NotificationBell />}
               <Link
                 className="cart-link icon-button"
                 to="/cart"
@@ -620,6 +621,7 @@ export function App() {
                 }
               />
               <Route path="/support" element={<SupportPage />} />
+              <Route path="/notifications" element={<Protected><NotificationsPage /></Protected>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/two-factor" element={<TwoFactor challenge />} />
               <Route
@@ -725,6 +727,7 @@ export function App() {
           </div>
         )}
       </div>
+      </NotificationProvider>
     </StoreContext.Provider>
   );
 }

@@ -35,6 +35,17 @@ export class SupabaseStore {
     }
     return data;
   }
+  // Administrative lists feed counts and charts: do not silently stop at the
+  // PostgREST default row limit. Every caller supplies a stable unique order.
+  async completeQuery(q) {
+    const rows = [];
+    const size = 500;
+    for (let offset = 0; ; offset += size) {
+      const page = await this.query(q.range(offset, offset + size - 1));
+      rows.push(...page);
+      if (page.length < size) return rows;
+    }
+  }
   async catalogVersion() {
     if (this.catalogVersionUnavailable) return null;
     const { data, error } = await this.client.rpc('catalog_live_version');
@@ -50,14 +61,14 @@ export class SupabaseStore {
     let q = this.client
       .from("products")
       .select("*,variants(*)")
-      .order("sort_order");
+      .order("sort_order").order('id');
     if (!admin) q = q.eq("active", true);
     if (identifier)
       q = q.eq(
         /^[a-f0-9]{8}-[a-f0-9-]{27}$/i.test(identifier) ? "id" : "slug",
         identifier,
       );
-    const products = await this.query(q);
+    const products = await (admin && !identifier ? this.completeQuery(q) : this.query(q));
     if (!products.length) return [];
     let statsQuery = this.client.from("product_review_stats").select("*");
     if (identifier) statsQuery = statsQuery.eq('product_id', products[0].id);
@@ -181,22 +192,21 @@ export class SupabaseStore {
     let q = this.client
       .from("orders")
       .select("*,items:order_items(*),payment:payments(*,route:payment_routes(*))")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }).order('id');
     if (!admin) q = q.eq("user_id", uid);
     if (id) q = q.eq("id", id);
-    const orders = await this.query(q);
+    const orders = await (admin && !id ? this.completeQuery(q) : this.query(q));
     const paid = orders
       .filter((o) => ["completed", "processing"].includes(o.status))
       .map((o) => o.id);
-    const inv = paid.length
-      ? await this.query(
-          this.client
-            .from("inventory")
-            .select("id,order_id,item_id,secret")
-            .in("order_id", paid)
-            .order("id"),
-        )
-      : [];
+    const inv = [];
+    // Bound URL length as the administrative order list grows, and preserve
+    // delivery details past the API row cap for large multi-key orders.
+    for (let offset = 0; offset < paid.length; offset += 100) {
+      const q = this.client.from('inventory').select('id,order_id,item_id,secret')
+        .in('order_id', paid.slice(offset, offset + 100)).order('id');
+      inv.push(...await (admin ? this.completeQuery(q) : this.query(q)));
+    }
     return orders.map((o) => ({
       ...o,
       payment: Array.isArray(o.payment) ? o.payment[0] : o.payment,
@@ -237,10 +247,10 @@ export class SupabaseStore {
       .from("tickets")
       .select("*,messages:ticket_messages(*)")
       .is("deleted_at", null)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }).order('id');
     if (!admin) q = q.eq("user_id", uid);
     if (id) q = q.eq("id", id);
-    const rows = await this.query(q);
+    const rows = await (admin && !id ? this.completeQuery(q) : this.query(q));
     return rows.map((t) => ({
       ...t,
       messages: t.messages.sort(
@@ -493,14 +503,14 @@ export class SupabaseStore {
   async overview() {
     const [users, orders, tickets, payments, audit, events, coupons] =
       await Promise.all([
-        this.query(this.client.from("profiles").select("*")),
+        this.completeQuery(this.client.from("profiles").select("*").order('id')),
         this.orders(null, true),
         this.tickets(null, true),
-        this.query(
+        this.completeQuery(
           this.client
             .from("payments")
             .select("*")
-            .order("created_at", { ascending: false }),
+            .order("created_at", { ascending: false }).order('id'),
         ),
         this.query(
           this.client
@@ -518,6 +528,7 @@ export class SupabaseStore {
         ),
         this.query(this.client.from("coupons").select("*").order("code")),
       ]);
+    const pendingEvents = await this.completeQuery(this.client.from('payment_events').select('*').eq('outcome', 'needs_review').order('created_at', { ascending: false }).order('transaction_id'));
     const stats = await this.query(
       this.client.from("coupon_usage_stats").select("*"),
     );
@@ -527,7 +538,7 @@ export class SupabaseStore {
       tickets,
       payments,
       audit,
-      events,
+      events: [...new Map([...pendingEvents, ...events].map(e => [e.transaction_id, e])).values()],
       coupons: coupons.map((c) => ({
         ...c,
         ...stats.find((s) => s.code === c.code),

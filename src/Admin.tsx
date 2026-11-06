@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import './admin.css';
-import { useDataRefresh } from './useDataRefresh';
+import "./admin.css";
+import { useDataRefresh } from "./useDataRefresh";
 import type { FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -14,7 +14,6 @@ import {
   Package,
   Pencil,
   Plus,
-  ShieldCheck,
   Ticket as TicketIcon,
   Trash2,
   Upload,
@@ -22,7 +21,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { api, categories, date, money, post } from "./api";
-import { Badge, Empty, Loading, Modal, useStore } from "./App";
+import { Badge, Loading, Modal, useStore } from "./App";
 import type { Overview, Product, Variant } from "./types";
 import { BannerManager } from "./Banners";
 import { ImageUpload } from "./ImageUpload";
@@ -31,10 +30,12 @@ import { AdminOrderList, AdminOrderDialog } from "./AdminOrders";
 import { SupportManager, TicketDialog } from "./AdminSupport";
 import { BankPaymentStatus } from "./BankPaymentStatus";
 import { AdminCustomers } from "./AdminCustomers";
-import { AdminSellers } from './Seller';
+import { AdminSellers } from "./Seller";
 import { AdminNotifications } from "./AdminNotifications";
-import { AdminCategories } from './AdminCategories';
+import { AdminCategories } from "./AdminCategories";
 import { Bell } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
+import { AdminOverview, needsStock } from "./AdminOverview";
 
 const blankProduct = {
   slug: "",
@@ -74,26 +75,72 @@ export function Admin() {
     [busy, setBusy] = useState(false),
     [orderFilter, setOrderFilter] = useState("all");
   const loadVersion = useRef(0);
+  const [updatedAt, setUpdatedAt] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [productQuery, setProductQuery] = useState("");
+  const productFilter = searchParams.get("filter") || "all";
+  const visibleProducts =
+    data?.products.filter(
+      (p) =>
+        `${p.name} ${p.platform} ${p.slug}`
+          .toLocaleLowerCase()
+          .includes(productQuery.trim().toLocaleLowerCase()) &&
+        (productFilter === "all" ||
+          (productFilter === "review" &&
+            p.seller_id &&
+            p.review_status === "pending") ||
+          (productFilter === "low" && needsStock(p)) ||
+          (productFilter === "hidden" && !p.active)),
+    ) || [];
   useEffect(() => {
-    const requestedTab = searchParams.get('tab') || 'overview';
-    setTab(['overview', 'products', 'categories', 'orders', 'tickets', 'users', 'sellers', 'notifications', 'payments', 'coupons', 'banners', 'audit'].includes(requestedTab) ? requestedTab : 'overview');
-    setOrderId(requestedTab === 'orders' ? searchParams.get('order') : null);
-    setTicketId(requestedTab === 'tickets' ? searchParams.get('ticket') : null);
+    const requestedTab = searchParams.get("tab") || "overview";
+    setTab(
+      [
+        "overview",
+        "products",
+        "categories",
+        "orders",
+        "tickets",
+        "users",
+        "sellers",
+        "notifications",
+        "payments",
+        "coupons",
+        "banners",
+        "audit",
+      ].includes(requestedTab)
+        ? requestedTab
+        : "overview",
+    );
+    setOrderId(requestedTab === "orders" ? searchParams.get("order") : null);
+    setTicketId(requestedTab === "tickets" ? searchParams.get("ticket") : null);
+    setOrderFilter(
+      requestedTab === "orders" ? searchParams.get("filter") || "all" : "all",
+    );
   }, [searchParams]);
   const selectTab = (value: string) => setSearchParams({ tab: value });
   const load = () => {
     const version = ++loadVersion.current;
+    setSyncing(true);
     return api<Overview>("/admin/overview")
       .then((result) => {
         if (version !== loadVersion.current) return;
         setData(result);
+        setUpdatedAt(new Date().toISOString());
         setError("");
       })
-      .catch((e) => { if (version === loadVersion.current) setError(e.message); });
+      .catch((e) => {
+        if (version === loadVersion.current) setError(e.message);
+      })
+      .finally(() => {
+        if (version === loadVersion.current) setSyncing(false);
+      });
   };
   useEffect(() => {
     load();
-    const update = () => { if (!document.hidden) void load(); };
+    const update = () => {
+      if (!document.hidden) void load();
+    };
     const timer = window.setInterval(update, 30000);
     window.addEventListener("focus", update);
     document.addEventListener("visibilitychange", update);
@@ -108,7 +155,7 @@ export function Admin() {
     await load();
     await refresh();
   };
-  useDataRefresh(load, ['/admin/', '/seller/', '/tickets']);
+  useDataRefresh(load, ["/admin/", "/seller/", "/tickets"]);
   async function doAction(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -135,20 +182,26 @@ export function Admin() {
       setBusy(false);
     }
   }
-  const paid =
-    data?.orders.filter((o) =>
-      ["completed", "processing"].includes(o.status),
-    ) || [];
   return (
     <div className="container page admin-page">
       <div className="page-heading">
         <div>
           <span className="eyebrow orange">KEYNEST / BACK OFFICE</span>
           <h1>Quản trị cửa hàng.</h1>
-          <p>Sản phẩm, kho mã và khách hàng trong một nơi.</p>
+          <p>Theo dõi hoạt động, xử lý công việc và quản lý cửa hàng.</p>
+          {updatedAt && (
+            <small className="admin-updated">
+              Cập nhật {date(updatedAt)} · tự động mỗi 30 giây
+            </small>
+          )}
         </div>
-        <button className="button button-outline" onClick={load}>
-          Làm mới
+        <button
+          className="button button-outline"
+          disabled={syncing}
+          onClick={load}
+        >
+          <RefreshCw size={16} className={syncing ? "admin-syncing" : ""} />{" "}
+          {syncing ? "Đang cập nhật…" : "Làm mới"}
         </button>
       </div>
       <div className="admin-layout">
@@ -176,10 +229,27 @@ export function Admin() {
               >
                 <I size={18} />
                 {String(label)}
-                {id === "tickets" && <span aria-label="Tổng số yêu cầu hỗ trợ" title="Tổng số yêu cầu hỗ trợ">{data ? data.tickets.length : "—"}</span>}
+                {id === "tickets" && (
+                  <span
+                    aria-label="Yêu cầu hỗ trợ chưa đóng"
+                    title="Yêu cầu hỗ trợ chưa đóng"
+                  >
+                    {data
+                      ? data.tickets.filter((t) =>
+                          ["open", "in_progress"].includes(t.status),
+                        ).length
+                      : "—"}
+                  </span>
+                )}
                 {id === "orders" && (
-                  <span aria-label="Tổng số đơn hàng" title="Tổng số đơn hàng">
-                    {data ? data.orders.length : "—"}
+                  <span
+                    aria-label="Đơn hàng chờ giao"
+                    title="Đơn hàng chờ giao"
+                  >
+                    {data
+                      ? data.orders.filter((o) => o.status === "processing")
+                          .length
+                      : "—"}
                   </span>
                 )}
               </button>
@@ -191,100 +261,36 @@ export function Admin() {
           </Link>
         </aside>
         <section className="admin-content">
-          {error ? (
-            <p className="form-error">{error}</p>
-          ) : !data ? (
-            <Loading />
+          {error && (
+            <p className="form-error" role="alert">
+              {error} {data && "Đang hiển thị dữ liệu lần cập nhật gần nhất."}{" "}
+              <button onClick={load}>Thử lại</button>
+            </p>
+          )}
+          {!data ? (
+            !error && <Loading />
           ) : (
             <>
               {tab === "banners" && <BannerManager />}
-              {tab === 'sellers' && <AdminSellers />}
-              {tab === 'categories' && <AdminCategories products={data.products} onEditProduct={setEditing} />}
+              {tab === "sellers" && <AdminSellers />}
+              {tab === "categories" && (
+                <AdminCategories
+                  products={data.products}
+                  onEditProduct={setEditing}
+                />
+              )}
               {tab === "overview" && (
-                <>
-                  <div className="stat-grid">
-                    <div className="panel">
-                      <span>
-                        <Wallet size={18} />
-                        Giá trị đơn đã thanh toán
-                      </span>
-                      <strong>
-                        {money(paid.reduce((n, o) => n + o.total, 0))}
-                      </strong>
-                      <small>Không gồm đơn hoàn tiền</small>
-                    </div>
-                    <div className="panel">
-                      <span>
-                        <ClipboardList size={18} />
-                        Chờ giao dịch vụ
-                      </span>
-                      <strong>
-                        {
-                          data.orders.filter((o) => o.status === "processing")
-                            .length
-                        }
-                      </strong>
-                      <small>Đơn đã thanh toán</small>
-                    </div>
-                    <div className="panel">
-                      <span>
-                        <Users size={18} />
-                        Khách hàng
-                      </span>
-                      <strong>
-                        {data.users.filter((u) => u.role === "customer").length}
-                      </strong>
-                      <small>Tài khoản đăng ký</small>
-                    </div>
-                    <div className="panel">
-                      <span>
-                        <Headphones size={18} />
-                        Yêu cầu hỗ trợ
-                      </span>
-                      <strong>
-                        {data.tickets.filter((t) => t.status === "open").length}
-                      </strong>
-                      <small>Đang chờ phản hồi</small>
-                    </div>
-                  </div>
-                  <div className="panel">
-                    <div className="section-title">
-                      <h2>Đơn cần xử lý</h2>
-                      <button
-                        className="text-button"
-                        onClick={() => selectTab("orders")}
-                      >
-                        Xem tất cả <ArrowUpRight size={16} />
-                      </button>
-                    </div>
-                    {data.orders.some((o) => o.status === "processing") ? (
-                      <AdminOrderList
-                        orders={data.orders.filter(
-                          (o) => o.status === "processing",
-                        )}
-                        data={data}
-                        onOpen={setOrderId}
-                      />
-                    ) : (
-                      <Empty
-                        icon={Check}
-                        title="Mọi thứ đang ổn."
-                        description="Không có đơn chờ giao dịch vụ."
-                      />
-                    )}
-                  </div>
-                  <div className="panel admin-note">
-                    <ShieldCheck />
-                    <div>
-                      <strong>Giao key tự động. Dịch vụ có hàng đợi.</strong>
-                      <p>
-                        Mã được nhập trong “Sản phẩm & kho”. Nạp game và proxy
-                        giao kết quả ở “Đơn hàng”. Các lần thao tác đều được lưu
-                        nhật ký.
-                      </p>
-                    </div>
-                  </div>
-                </>
+                <AdminOverview
+                  data={data}
+                  go={(value, filter) =>
+                    setSearchParams({
+                      tab: value,
+                      ...(filter ? { filter } : {}),
+                    })
+                  }
+                  openOrder={setOrderId}
+                  openTicket={setTicketId}
+                />
               )}
               {tab === "products" && (
                 <>
@@ -298,6 +304,35 @@ export function Admin() {
                       Thêm sản phẩm
                     </button>
                   </div>
+                  <div className="admin-tools">
+                    <label>
+                      <Search size={16} />
+                      <input
+                        aria-label="Tìm sản phẩm quản trị"
+                        placeholder="Tên sản phẩm, nền tảng, đường dẫn…"
+                        value={productQuery}
+                        onChange={(e) => setProductQuery(e.target.value)}
+                      />
+                    </label>
+                    <select
+                      aria-label="Lọc sản phẩm quản trị"
+                      value={productFilter}
+                      onChange={(e) =>
+                        setSearchParams({
+                          tab: "products",
+                          filter: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="all">Tất cả sản phẩm</option>
+                      <option value="review">Chờ kiểm duyệt</option>
+                      <option value="low">Sắp hết mã (≤ 5)</option>
+                      <option value="hidden">Đã ẩn</option>
+                    </select>
+                    <small>
+                      {visibleProducts.length} / {data.products.length} sản phẩm
+                    </small>
+                  </div>
                   <div className="table-scroll panel">
                     <table>
                       <thead>
@@ -310,7 +345,7 @@ export function Admin() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.products.map((p) => (
+                        {visibleProducts.map((p) => (
                           <tr key={p.id}>
                             <td>
                               <strong>{p.name}</strong>
@@ -319,42 +354,107 @@ export function Admin() {
                             <td>{categories[p.category]}</td>
                             <td>
                               {p.variants.length} gói ·{" "}
-                              {p.variants.some(v => v.unlimited) ? 'Không giới hạn' : `${p.variants.reduce((n, v) => n + v.stock, 0)} đơn vị`}
+                              {p.variants.some((v) => v.unlimited)
+                                ? "Không giới hạn"
+                                : `${p.variants.reduce((n, v) => n + v.stock, 0)} đơn vị`}
                             </td>
                             <td>
                               <Badge status={p.active ? "Đang bán" : "Đã ẩn"} />
-                              {p.seller_id && <small>{p.review_status === 'approved' ? 'Đã duyệt' : p.review_status === 'rejected' ? 'Từ chối' : 'Chờ admin kiểm hàng'}{p.review_reason && ` · ${p.review_reason}`}</small>}
+                              {p.seller_id && (
+                                <small>
+                                  {p.review_status === "approved"
+                                    ? "Đã duyệt"
+                                    : p.review_status === "rejected"
+                                      ? "Từ chối"
+                                      : "Chờ admin kiểm hàng"}
+                                  {p.review_reason && ` · ${p.review_reason}`}
+                                </small>
+                              )}
                             </td>
                             <td>
                               <div className="admin-product-actions">
-                              <button
-                                className="button button-outline button-small"
-                                onClick={() => setEditing(p)}
-                              >
-                                <Pencil size={14} />
-                                Quản lý
-                              </button>
-                              {p.seller_id && p.review_status === 'pending' && <div className="admin-product-review-actions">
-                                <button className="button button-outline button-small admin-product-approve" disabled={busy} onClick={async () => {
-                                  if (!window.confirm(`Đã kiểm tra thông tin, gói bán và hàng của “${p.name}”? Duyệt sẽ mở bán sản phẩm.`)) return;
-                                  setBusy(true);
-                                  try { await post(`/admin/products/${p.id}/review`, { version: p.review_version || 1, approve: true }); await afterSave(); notify('Đã duyệt mở bán.'); }
-                                  catch (e) { notify((e as Error).message, true); } finally { setBusy(false); }
-                                }}>Duyệt mở bán</button>
-                                <button className="button button-outline button-small admin-product-reject" disabled={busy} onClick={async () => {
-                                  const reason = window.prompt('Lý do từ chối (ít nhất 10 ký tự):');
-                                  if (reason === null) return;
-                                  setBusy(true);
-                                  try { await post(`/admin/products/${p.id}/review`, { version: p.review_version || 1, approve: false, reason }); await afterSave(); notify('Đã từ chối sản phẩm.'); }
-                                  catch (e) { notify((e as Error).message, true); } finally { setBusy(false); }
-                                }}>Từ chối</button>
-                              </div>}
+                                <button
+                                  className="button button-outline button-small"
+                                  onClick={() => setEditing(p)}
+                                >
+                                  <Pencil size={14} />
+                                  Quản lý
+                                </button>
+                                {p.seller_id &&
+                                  p.review_status === "pending" && (
+                                    <div className="admin-product-review-actions">
+                                      <button
+                                        className="button button-outline button-small admin-product-approve"
+                                        disabled={busy}
+                                        onClick={async () => {
+                                          if (
+                                            !window.confirm(
+                                              `Đã kiểm tra thông tin, gói bán và hàng của “${p.name}”? Duyệt sẽ mở bán sản phẩm.`,
+                                            )
+                                          )
+                                            return;
+                                          setBusy(true);
+                                          try {
+                                            await post(
+                                              `/admin/products/${p.id}/review`,
+                                              {
+                                                version: p.review_version || 1,
+                                                approve: true,
+                                              },
+                                            );
+                                            await afterSave();
+                                            notify("Đã duyệt mở bán.");
+                                          } catch (e) {
+                                            notify((e as Error).message, true);
+                                          } finally {
+                                            setBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Duyệt mở bán
+                                      </button>
+                                      <button
+                                        className="button button-outline button-small admin-product-reject"
+                                        disabled={busy}
+                                        onClick={async () => {
+                                          const reason = window.prompt(
+                                            "Lý do từ chối (ít nhất 10 ký tự):",
+                                          );
+                                          if (reason === null) return;
+                                          setBusy(true);
+                                          try {
+                                            await post(
+                                              `/admin/products/${p.id}/review`,
+                                              {
+                                                version: p.review_version || 1,
+                                                approve: false,
+                                                reason,
+                                              },
+                                            );
+                                            await afterSave();
+                                            notify("Đã từ chối sản phẩm.");
+                                          } catch (e) {
+                                            notify((e as Error).message, true);
+                                          } finally {
+                                            setBusy(false);
+                                          }
+                                        }}
+                                      >
+                                        Từ chối
+                                      </button>
+                                    </div>
+                                  )}
                               </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    {!visibleProducts.length && (
+                      <p className="admin-empty-line">
+                        Không có sản phẩm phù hợp bộ lọc.
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -365,13 +465,20 @@ export function Admin() {
                     <select
                       aria-label="Lọc trạng thái đơn"
                       value={orderFilter}
-                      onChange={(e) => setOrderFilter(e.target.value)}
+                      onChange={(e) =>
+                        setSearchParams({
+                          tab: "orders",
+                          filter: e.target.value,
+                        })
+                      }
                     >
                       <option value="all">Tất cả trạng thái</option>
                       <option value="processing">Chờ giao dịch vụ</option>
                       <option value="pending">Chờ thanh toán</option>
                       <option value="completed">Hoàn thành</option>
                       <option value="refunded">Đã hoàn</option>
+                      <option value="cancelled">Đã hủy</option>
+                      <option value="expired">Hết hạn</option>
                     </select>
                   </div>
                   <div className="panel">
@@ -637,14 +744,21 @@ export function ProductEditor({
     [busy, setBusy] = useState(false),
     [uploading, setUploading] = useState(false),
     [variant, setVariant] = useState<Partial<Variant> | null>(null);
-  useDataRefresh(async () => {
-    if (!product.id) return;
-    try {
-      const data = await api<{ products: Product[] }>(`/${scope}/overview`);
-      const updated = data.products.find(p => p.id === product.id);
-      if (updated) setProduct(current => ({ ...current, variants: updated.variants }));
-    } catch (e) { notify((e as Error).message, true); }
-  }, [`/${scope}/inventory/`], { intervalMs: scope === 'seller' ? 10000 : 0 });
+  useDataRefresh(
+    async () => {
+      if (!product.id) return;
+      try {
+        const data = await api<{ products: Product[] }>(`/${scope}/overview`);
+        const updated = data.products.find((p) => p.id === product.id);
+        if (updated)
+          setProduct((current) => ({ ...current, variants: updated.variants }));
+      } catch (e) {
+        notify((e as Error).message, true);
+      }
+    },
+    [`/${scope}/inventory/`],
+    { intervalMs: scope === "seller" ? 10000 : 0 },
+  );
   async function saveProduct(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setBusy(true);
@@ -666,7 +780,11 @@ export function ProductEditor({
         active: f.get("active") === "on",
       });
       setProduct({ ...p, variants: product.variants || [] });
-      notify(scope === 'seller' ? 'Đã gửi sản phẩm để admin kiểm hàng. Sửa gói hoặc nhập hàng mới cần được duyệt lại.' : "Đã lưu sản phẩm.");
+      notify(
+        scope === "seller"
+          ? "Đã gửi sản phẩm để admin kiểm hàng. Sửa gói hoặc nhập hàng mới cần được duyệt lại."
+          : "Đã lưu sản phẩm.",
+      );
       await changed();
     } catch (e) {
       notify((e as Error).message, true);
@@ -685,11 +803,19 @@ export function ProductEditor({
         name: f.get("name"),
         price: Number(f.get("price")),
         original_price: Number(f.get("original_price")),
-        delivery: f.get("delivery") === 'unlimited' ? 'key' : f.get("delivery") === 'preorder' ? 'manual' : f.get("delivery"),
-        unlimited: f.get('delivery') === 'unlimited',
-        ...(f.get('delivery') === 'unlimited' && f.get('shared_key') ? { shared_key: String(f.get('shared_key')) } : {}),
-        is_preorder: f.get('delivery') === 'preorder',
-        expected_delivery: f.get('delivery') === 'preorder' ? f.get('expected_delivery') : null,
+        delivery:
+          f.get("delivery") === "unlimited"
+            ? "key"
+            : f.get("delivery") === "preorder"
+              ? "manual"
+              : f.get("delivery"),
+        unlimited: f.get("delivery") === "unlimited",
+        ...(f.get("delivery") === "unlimited" && f.get("shared_key")
+          ? { shared_key: String(f.get("shared_key")) }
+          : {}),
+        is_preorder: f.get("delivery") === "preorder",
+        expected_delivery:
+          f.get("delivery") === "preorder" ? f.get("expected_delivery") : null,
         stock: Number(f.get("stock")),
         region: f.get("region"),
         warranty_days: Number(f.get("warranty_days")),
@@ -710,13 +836,44 @@ export function ProductEditor({
   async function toggleVariant(v: Variant) {
     setBusy(true);
     try {
-      const { id, name, price, original_price, delivery, stock, region, warranty_days, is_preorder, expected_delivery } = v;
-      await post(`/${scope}/products/${product.id}/variants`, { id, name, price, original_price, delivery, stock, region, warranty_days, is_preorder: !!is_preorder, expected_delivery: expected_delivery || null, active: v.active === false });
-      setProduct(p => ({ ...p, variants: p.variants?.map(x => x.id === v.id ? { ...x, active: v.active === false } : x) }));
+      const {
+        id,
+        name,
+        price,
+        original_price,
+        delivery,
+        stock,
+        region,
+        warranty_days,
+        is_preorder,
+        expected_delivery,
+      } = v;
+      await post(`/${scope}/products/${product.id}/variants`, {
+        id,
+        name,
+        price,
+        original_price,
+        delivery,
+        stock,
+        region,
+        warranty_days,
+        is_preorder: !!is_preorder,
+        expected_delivery: expected_delivery || null,
+        active: v.active === false,
+      });
+      setProduct((p) => ({
+        ...p,
+        variants: p.variants?.map((x) =>
+          x.id === v.id ? { ...x, active: v.active === false } : x,
+        ),
+      }));
       await changed();
       notify(v.active === false ? "Đã hiện gói." : "Đã ẩn gói.");
-    } catch (e) { notify((e as Error).message, true); }
-    finally { setBusy(false); }
+    } catch (e) {
+      notify((e as Error).message, true);
+    } finally {
+      setBusy(false);
+    }
   }
   async function deleteProduct() {
     if (!product.id) return;
@@ -830,14 +987,20 @@ export function ProductEditor({
         </label>
         <label>
           Loại sản phẩm giao cho khách
-          <select name="product_kind" defaultValue={product.product_kind || "key"}>
+          <select
+            name="product_kind"
+            defaultValue={product.product_kind || "key"}
+          >
             <option value="key">Key / Mã kích hoạt</option>
             <option value="account">Tài khoản</option>
             <option value="source">Source code</option>
             <option value="product">Sản phẩm / Dữ liệu khác</option>
             <option value="service">Dịch vụ</option>
           </select>
-          <small className="muted">Dùng để hiển thị nút xem hàng sau mua. Cách giao hàng được chọn riêng trong từng gói.</small>
+          <small className="muted">
+            Dùng để hiển thị nút xem hàng sau mua. Cách giao hàng được chọn
+            riêng trong từng gói.
+          </small>
         </label>
         <ImageUpload
           endpoint={`/${scope}/media`}
@@ -856,9 +1019,19 @@ export function ProductEditor({
         </label>
         <label>
           Hướng dẫn sử dụng / lưu ý (không bắt buộc)
-          <textarea name="usage_notes" defaultValue={product.usage_notes || ''} rows={6} maxLength={10000}
-            placeholder={'Ví dụ:\n1. Đăng nhập đúng khu vực tài khoản.\n2. Mở trang kích hoạt và nhập mã.\nLưu ý: Chỉ dùng cho tài khoản đáp ứng điều kiện của gói.'} />
-          <small className="muted">Hiển thị công khai trên trang sản phẩm. Không nhập key hoặc mật khẩu khách hàng.</small>
+          <textarea
+            name="usage_notes"
+            defaultValue={product.usage_notes || ""}
+            rows={6}
+            maxLength={10000}
+            placeholder={
+              "Ví dụ:\n1. Đăng nhập đúng khu vực tài khoản.\n2. Mở trang kích hoạt và nhập mã.\nLưu ý: Chỉ dùng cho tài khoản đáp ứng điều kiện của gói."
+            }
+          />
+          <small className="muted">
+            Hiển thị công khai trên trang sản phẩm. Không nhập key hoặc mật khẩu
+            khách hàng.
+          </small>
         </label>
         <div className="button-row">
           <label className="checkbox">
@@ -899,11 +1072,32 @@ export function ProductEditor({
           {product.variants?.map((v) => (
             <div className="admin-variant" key={v.id}>
               <span>
-                <strong>{v.name}{v.active === false ? " · Đã ẩn" : ""}</strong>
+                <strong>
+                  {v.name}
+                  {v.active === false ? " · Đã ẩn" : ""}
+                </strong>
                 <small>
-                  {v.is_preorder && <>Dự kiến giao {v.expected_delivery?.split("-").reverse().join("/") || "chưa cập nhật"} · </>}
+                  {v.is_preorder && (
+                    <>
+                      Dự kiến giao{" "}
+                      {v.expected_delivery?.split("-").reverse().join("/") ||
+                        "chưa cập nhật"}{" "}
+                      ·{" "}
+                    </>
+                  )}
                   {money(v.price)} ·{" "}
-                  {v.unlimited ? 'Key dùng chung · Không giới hạn' : <>{v.is_preorder ? "Đặt trước · Còn lượt đặt" : v.delivery === "key" ? "Kho mã · Tồn" : "Dịch vụ · Tồn"} {v.stock}</>}
+                  {v.unlimited ? (
+                    "Key dùng chung · Không giới hạn"
+                  ) : (
+                    <>
+                      {v.is_preorder
+                        ? "Đặt trước · Còn lượt đặt"
+                        : v.delivery === "key"
+                          ? "Kho mã · Tồn"
+                          : "Dịch vụ · Tồn"}{" "}
+                      {v.stock}
+                    </>
+                  )}
                   {" · "}
                   {v.warranty_days
                     ? `Bảo hành ${v.warranty_days} ngày`
@@ -1003,15 +1197,75 @@ export function ProductEditor({
                 </label>
                 <label>
                   Cách giao
-                  <select name="delivery" value={variant.unlimited ? 'unlimited' : variant.is_preorder ? 'preorder' : variant.delivery} onChange={e => setVariant(current => ({ ...current, delivery: ['key','unlimited'].includes(e.target.value) ? 'key' : 'manual', unlimited: e.target.value === 'unlimited', is_preorder: e.target.value === 'preorder', stock: e.target.value === 'preorder' && !current?.stock ? 100 : current?.stock }))}>
+                  <select
+                    name="delivery"
+                    value={
+                      variant.unlimited
+                        ? "unlimited"
+                        : variant.is_preorder
+                          ? "preorder"
+                          : variant.delivery
+                    }
+                    onChange={(e) =>
+                      setVariant((current) => ({
+                        ...current,
+                        delivery: ["key", "unlimited"].includes(e.target.value)
+                          ? "key"
+                          : "manual",
+                        unlimited: e.target.value === "unlimited",
+                        is_preorder: e.target.value === "preorder",
+                        stock:
+                          e.target.value === "preorder" && !current?.stock
+                            ? 100
+                            : current?.stock,
+                      }))
+                    }
+                  >
                     <option value="key">Giao mã tự động</option>
-                    <option value="unlimited">Giao cùng một key · Không giới hạn</option>
+                    <option value="unlimited">
+                      Giao cùng một key · Không giới hạn
+                    </option>
                     <option value="manual">Giao dịch vụ thủ công</option>
-                    <option value="preorder">Đặt trước · Giao khi có hàng</option>
+                    <option value="preorder">
+                      Đặt trước · Giao khi có hàng
+                    </option>
                   </select>
                 </label>
-                {variant.is_preorder && <label>Ngày giao dự kiến<input name="expected_delivery" type="date" defaultValue={variant.expected_delivery || ''} required /><small>Ngày dự kiến được lưu riêng cho mỗi đơn; đổi ngày ở đây chỉ áp dụng cho đơn mới.</small></label>}
-                {variant.unlimited && <label>Key / dữ liệu dùng chung<textarea name="shared_key" rows={4} maxLength={2000} required={!variant.id} placeholder={variant.id ? 'Để trống để giữ key hiện tại' : 'Nhập dữ liệu sẽ giao cho mọi lượt mua'} /><small>Thay key chỉ áp dụng cho đơn mới. Dữ liệu của đơn đã tạo được giữ nguyên.</small></label>}
+                {variant.is_preorder && (
+                  <label>
+                    Ngày giao dự kiến
+                    <input
+                      name="expected_delivery"
+                      type="date"
+                      defaultValue={variant.expected_delivery || ""}
+                      required
+                    />
+                    <small>
+                      Ngày dự kiến được lưu riêng cho mỗi đơn; đổi ngày ở đây
+                      chỉ áp dụng cho đơn mới.
+                    </small>
+                  </label>
+                )}
+                {variant.unlimited && (
+                  <label>
+                    Key / dữ liệu dùng chung
+                    <textarea
+                      name="shared_key"
+                      rows={4}
+                      maxLength={2000}
+                      required={!variant.id}
+                      placeholder={
+                        variant.id
+                          ? "Để trống để giữ key hiện tại"
+                          : "Nhập dữ liệu sẽ giao cho mọi lượt mua"
+                      }
+                    />
+                    <small>
+                      Thay key chỉ áp dụng cho đơn mới. Dữ liệu của đơn đã tạo
+                      được giữ nguyên.
+                    </small>
+                  </label>
+                )}
                 <label>
                   Khu vực
                   <input
@@ -1022,18 +1276,33 @@ export function ProductEditor({
                   />
                 </label>
                 <label>
-                  {variant.unlimited ? 'Không giới hạn số lượng' : variant.is_preorder ? 'Số lượt đặt trước còn nhận' : 'Số lượng dịch vụ có thể bán'}
+                  {variant.unlimited
+                    ? "Không giới hạn số lượng"
+                    : variant.is_preorder
+                      ? "Số lượt đặt trước còn nhận"
+                      : "Số lượng dịch vụ có thể bán"}
                   <input
                     name="stock"
                     disabled={variant.unlimited}
                     type="number"
                     value={variant.stock ?? 0}
-                    onChange={e => setVariant(current => ({ ...current, stock: Number(e.target.value) }))}
+                    onChange={(e) =>
+                      setVariant((current) => ({
+                        ...current,
+                        stock: Number(e.target.value),
+                      }))
+                    }
                     min={0}
                     max={100000}
                     required
                   />
-                  <small>{variant.unlimited ? 'Mỗi lượt mua nhận cùng dữ liệu; không trừ tồn kho.' : variant.is_preorder ? 'Không cần nhập kho mã. Mỗi sản phẩm đặt mua sẽ trừ một lượt; đặt 0 để ngừng nhận đơn.' : 'Gói giao mã: tồn kho chỉ tăng khi nhập mã.'}</small>
+                  <small>
+                    {variant.unlimited
+                      ? "Mỗi lượt mua nhận cùng dữ liệu; không trừ tồn kho."
+                      : variant.is_preorder
+                        ? "Không cần nhập kho mã. Mỗi sản phẩm đặt mua sẽ trừ một lượt; đặt 0 để ngừng nhận đơn."
+                        : "Gói giao mã: tồn kho chỉ tăng khi nhập mã."}
+                  </small>
                 </label>
               </div>
               <div className="button-row">

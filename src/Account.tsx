@@ -15,11 +15,13 @@ import {
   ShieldCheck,
   UserRound,
   Wallet,
+  Bell,
 } from "lucide-react";
 import { Badge, useStore } from "./App";
 import { api, date, money, post } from "./api";
 import type { Ledger, Order, User } from "./types";
 import { ChangePassword } from "./ChangePassword";
+import { SecurityDisclosure } from "./SecurityDisclosure";
 import { Avatar } from "./Avatar";
 import { AvatarUpload } from "./AvatarUpload";
 import { TwoFactor } from "./TwoFactor";
@@ -174,6 +176,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
               </button>
             ))}
             <span className="member-nav-label">MUA SẮM</span>
+            <Link to="/notifications"><Bell size={18} /> Hộp thông báo <ChevronRight size={14} /></Link>
             <Link to="/orders">
               <Package size={18} />
               Đơn hàng của tôi
@@ -227,7 +230,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
           </header>
           {section === "overview" && (
             <>
-              <NotificationInbox />
+              <NotificationInbox compact />
               <div className="member-stats">
                 <section className="member-balance">
                   <div>
@@ -509,12 +512,8 @@ export function AccountPage({ logout }: { logout: () => void }) {
                   <small>Sử dụng email này để đăng nhập vào KEYNEST.</small>
                 </div>
               </div>
-              <div className="member-security-row">
-                <span className="member-security-icon">
-                  <ShieldCheck size={22} />
-                </span>
-                <div>
-                  <h3>Khôi phục qua email</h3>
+              <SecurityDisclosure title="Khôi phục qua email" description="Nhận liên kết đặt lại mật khẩu qua email" icon={<ShieldCheck size={21} />} disabled={busy} onClose={() => setCaptchaToken('')}>
+                {(open) => <div className="member-recovery-content">
                   <p>
                     {passwordLocked
                       ? "Phiên đăng nhập Google/Discord không sử dụng chức năng này. Hãy khôi phục mật khẩu tại nhà cung cấp đăng nhập."
@@ -522,7 +521,7 @@ export function AccountPage({ logout }: { logout: () => void }) {
                         ? "Bản demo chưa gửi email khôi phục. Tính năng này hoạt động khi cửa hàng kết nối Supabase."
                         : "Nhận liên kết qua email để thiết lập mật khẩu mới cho tài khoản."}
                   </p>
-                  {!passwordLocked && mode !== 'demo' && !recovery && <>
+                  {open && !passwordLocked && mode !== 'demo' && !recovery && <>
                     {captchaError && <p className="form-error" role="alert">{captchaError}</p>}
                     {captcha?.enabled && captcha.site_key && <Recaptcha key={captchaVersion} siteKey={captcha.site_key} onToken={setCaptchaToken} />}
                   </>}
@@ -552,8 +551,8 @@ export function AccountPage({ logout }: { logout: () => void }) {
                       {error}
                     </p>
                   )}
-                </div>
-              </div>
+                </div>}
+              </SecurityDisclosure>
               <ChangePassword locked={passwordLocked} />
               <TwoFactor />
               <SessionManager />

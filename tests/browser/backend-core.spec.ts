@@ -53,11 +53,12 @@ test("account password form validates confirmation and keeps the updated session
     data: { legal: accountLegal,
       email,
       password: "OriginalPassword123!",
-      name: "Password Test",
+      name: `Password Test ${Date.now()}`,
     },
   });
   expect(registered.ok()).toBe(true);
   await page.goto("/account?section=security");
+  await page.getByRole('button', { name: /Đổi mật khẩu/ }).click();
   await page
     .getByLabel("Mật khẩu hiện tại", { exact: true })
     .fill("OriginalPassword123!");

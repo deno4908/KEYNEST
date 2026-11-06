@@ -3,6 +3,7 @@ import { Send, Bell } from "lucide-react";
 import { api, post, date } from "./api";
 import "./admin-notifications.css";
 import { AnnouncementManager } from "./Announcements";
+import { NotificationInbox } from './Notifications';
 type Campaign = {
   id: string;
   title: string;
@@ -12,6 +13,10 @@ type Campaign = {
   created_at: string;
 };
 export function AdminNotifications() {
+  const [view, setView] = useState('inbox');
+  return <div><div className="inbox-tabs" style={{ marginBottom: 20 }}><button aria-pressed={view === 'inbox'} onClick={() => setView('inbox')}>Hộp thư quản trị</button><button aria-pressed={view === 'send'} onClick={() => setView('send')}>Gửi tin & lịch sử</button></div>{view === 'inbox' ? <NotificationInbox /> : <CampaignManager />}</div>;
+}
+function CampaignManager() {
   const [items, setItems] = useState<Campaign[]>([]);
   const [target, setTarget] = useState("one");
   const [email, setEmail] = useState("");
@@ -33,7 +38,7 @@ export function AdminNotifications() {
       <AnnouncementManager />
       <header>
         <h2>Thông báo</h2>
-        <p>Gửi thông tin đến hộp thông báo trong tài khoản của khách hàng.</p>
+        <p>Gửi thông tin đến hộp thông báo của một tài khoản, hoặc toàn bộ khách hàng và người bán.</p>
       </header>
       <form
         className="panel notification-composer"
@@ -79,13 +84,13 @@ export function AdminNotifications() {
                 setConfirmed(false);
               }}
             >
-              <option value="one">Một khách hàng</option>
-              <option value="all">Toàn bộ khách hàng hiện có</option>
+              <option value="one">Một tài khoản</option>
+              <option value="all">Toàn bộ khách hàng & người bán hiện có</option>
             </select>
           </label>
           {target === "one" && (
             <label>
-              Email khách hàng
+              Email tài khoản
               <input
                 type="email"
                 required
@@ -126,7 +131,7 @@ export function AdminNotifications() {
                 checked={confirmed}
                 onChange={(e) => setConfirmed(e.target.checked)}
               />
-              Tôi xác nhận gửi đến toàn bộ tài khoản khách hàng hiện có.
+              Tôi xác nhận gửi đến toàn bộ tài khoản khách hàng và người bán hiện có.
             </label>
           )}
           <button
@@ -142,6 +147,7 @@ export function AdminNotifications() {
             {busy ? "Đang gửi…" : "Gửi thông báo"}
           </button>
         </fieldset>
+        {(title.trim() || body.trim()) && <aside className="notification-send-preview"><small>XEM TRƯỚC · {title.length}/150 ký tự tiêu đề · {body.length}/3000 ký tự nội dung</small><strong>{title || 'Tiêu đề thông báo'}</strong><p>{body || 'Nội dung thông báo'}</p><small>Người nhận: {target === 'all' ? 'Tất cả khách hàng và người bán' : email || 'Chưa nhập email'}</small></aside>}
       </form>
       {error && (
         <p role="alert" className="form-error">
@@ -165,7 +171,7 @@ export function AdminNotifications() {
         <article className="panel notification-history" key={item.id}>
           <strong>{item.title}</strong>
           <small>
-            {item.email || "Toàn bộ khách hàng"} · {item.recipients} người nhận
+            {item.email || "Toàn bộ khách hàng & người bán"} · {item.recipients} người nhận
             · {date(item.created_at)}
           </small>
           <p>{item.body}</p>

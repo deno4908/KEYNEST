@@ -2,7 +2,7 @@ import { OrderChat, OrderChatButton, type SellerDispute } from "./OrderChat";
 import { PreorderNote } from './PreorderNote';
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Package,
   Plus,
@@ -91,6 +91,7 @@ type Support = Ticket & { order_number: string; refund_item_id?: string; refund?
 
 export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, setUser, refresh, notify } = useStore();
   const [data, setData] = useState<SellerData | null>(null);
   const [error, setError] = useState(""),
@@ -105,7 +106,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     [page, setPage] = useState(1);
   useEffect(() => {
     const target = new URLSearchParams(location.search).get("tab");
-    if (target === "sales" || target === "products") {
+    if (target && ['sales', 'products', 'revenue', 'withdrawals', 'support', 'profile', 'notifications'].includes(target)) {
       setTab(target);
       setQuery("");
       setFilter("all");
@@ -203,6 +204,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       </div>
     );
   const selectTab = (next: string) => {
+    navigate(`/seller?tab=${encodeURIComponent(next)}`);
     setTab(next);
     setFilter("all");
     setQuery("");
@@ -275,7 +277,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           (filter === "hidden" && !p.active) ||
           (filter === "empty" && stock(p) === 0) ||
           (filter === "low" &&
-            (!p.variants.length || p.variants.some((v) => v.stock <= 5)))),
+            (!p.variants.length || p.variants.some((v) => v.active !== false && !v.unlimited && v.delivery === 'key' && v.stock <= 5)))),
     )
     .sort((a, b) =>
       sort === "stock"
@@ -315,7 +317,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   );
   const low = data.products.filter(
     (p) =>
-      p.active && (!p.variants.length || p.variants.some((v) => v.stock <= 5)),
+      p.active && (!p.variants.length || p.variants.some((v) => v.active !== false && !v.unlimited && v.delivery === 'key' && v.stock <= 5)),
   );
   const pending = data.sales.filter(waiting);
   const displayed = <T,>(rows: T[]) =>
@@ -382,7 +384,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           </button>
           <small>
             {updated
-              ? `Cập nhật ${date(updated)} · tự động mỗi 5 giây`
+              ? `Cập nhật ${date(updated)} · tự động mỗi 30 giây`
               : "Đang kết nối"}
           </small>
         </div>
@@ -461,6 +463,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           ["revenue", "Doanh thu"],
           ["withdrawals", "Rút tiền"],
           ["support", "Hỗ trợ & bảo hành"],
+          ["notifications", "Hộp thông báo"],
           ["profile", "Hồ sơ & điều khoản"],
         ].map(([key, label]) => (
           <button
@@ -473,6 +476,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           </button>
         ))}
       </nav>
+      {tab === 'notifications' && <NotificationInbox />}
       {tab === "profile" && (
         <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} />
       )}
@@ -1240,3 +1244,4 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
 function Arrow() {
   return <span aria-hidden="true">→</span>;
 }
+import { NotificationInbox } from './Notifications';
