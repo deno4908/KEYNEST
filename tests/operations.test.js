@@ -47,6 +47,27 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
   const admin = (await login("admin@keynest.local", "Admin123!")).cookie;
   let buyer = (await login()).cookie;
   const uid = (await req("/me", buyer)).data.id;
+  await t.test('read all preserves later arrivals, timestamps and ownership across retries', async () => {
+    store.db.notifications ||= [];
+    const first = { id: `snapshot:${randomUUID()}`, user_id: uid, title: 'Before snapshot', href: '/account', created_at: '2020-01-01T00:00:00.000Z', read_at: null };
+    const other = { ...first, id: `snapshot:${randomUUID()}`, user_id: (await req('/me', admin)).data.id };
+    store.db.notifications.push(first, other);
+    const snapshot = (await req('/notifications?unread=1', buyer)).data.snapshot_at;
+    assert.ok(Number.isFinite(Date.parse(snapshot)));
+    const later = { ...first, id: `snapshot:${randomUUID()}`, created_at: new Date(Date.parse(snapshot) + 1000).toISOString() };
+    store.db.notifications.push(later);
+    assert.equal((await req('/notifications/read', buyer, { all: true, before: snapshot })).status, 200);
+    assert.ok(first.read_at);
+    assert.equal(later.read_at, null);
+    assert.equal(other.read_at, null);
+    const receipt = first.read_at;
+    await req('/notifications/read', buyer, { all: true, before: snapshot });
+    await req('/notifications/read', buyer, { id: first.id });
+    assert.equal(first.read_at, receipt);
+    assert.equal((await req('/notifications/read', buyer, { id: first.id, before: snapshot })).status, 400);
+    assert.equal((await req('/notifications/read', buyer, { all: true, before: 'invalid' })).status, 400);
+    store.db.notifications = store.db.notifications.filter(n => ![first.id,later.id,other.id].includes(n.id));
+  });
   await t.test('unread chat count is scoped, independent of pagination and only clears on explicit read', async () => {
     store.db.notifications ||= [];
     const ids = [randomUUID(), randomUUID()].map(id => `seller-chat:${id}`);

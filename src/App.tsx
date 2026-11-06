@@ -1,6 +1,6 @@
 import { useAccountCart } from "./useAccountCart";
 import { useLiveProducts } from "./useLiveProducts";
-import { NotificationProvider, NotificationBell, NotificationsPage } from './Notifications';
+import { NotificationProvider, NotificationBadge, NotificationsPage } from './Notifications';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
@@ -502,6 +502,7 @@ export function App() {
                     url={user.avatar_url}
                     className="header-avatar signed-in"
                   />
+                  <NotificationBadge />
                   </span>
                 ) : (
                   <span className="header-avatar">
@@ -515,7 +516,6 @@ export function App() {
                   </strong>
                 </span>
               </button>
-              {user && <NotificationBell />}
               <Link
                 className="cart-link icon-button"
                 to="/cart"

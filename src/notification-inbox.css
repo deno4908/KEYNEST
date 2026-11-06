@@ -259,116 +259,14 @@
 .inbox-message-details[open] summary span {
   font-size: 12px;
 }
-/* Shared inbox and header preview for customers, sellers and administrators. */
-.notification-bell {
-  position: relative;
-  flex-shrink: 0;
-}
-.notification-trigger {
-  position: relative;
-  width: 40px;
-  height: 40px;
-  color: #dce0e8;
-}
-.notification-trigger .header-chat-badge {
-  position: absolute;
-  right: -3px;
-  top: -4px;
-  pointer-events: none;
-  display: grid;
-  place-items: center;
-  min-width: 19px;
-  height: 19px;
-  padding: 0 4px;
-  border: 2px solid #191a1e;
-  border-radius: 999px;
-  background: #ef7045;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-.notification-popover .inbox-item-footer > span {
-  font-size: 10px;
-  font-weight: 400;
-  color: #92929b;
-}
 .notification-inbox .inbox-item-footer > span {
   font-size: 11px;
   font-weight: 400;
   color: #92929b;
   line-height: 1.7;
 }
-.notification-sync-error {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background: #e5ac64;
-  color: #191b20;
-  border-radius: 50%;
-  font-size: 10px;
-  width: 13px;
-  height: 13px;
-}
-.notification-popover {
-  position: absolute;
-  right: -45px;
-  top: calc(100% + 16px);
-  width: 420px;
-  max-width: calc(100vw - 28px);
-  background: #191a1e;
-  border: 1px solid #303136;
-  border-radius: 9px;
-  box-shadow: 0 24px 80px #0009;
-  z-index: 110;
-  overflow: hidden;
-  text-align: left;
-  color: #ecedf1;
-}
-.notification-popover-heading {
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 1px solid #303136;
-}
-.notification-popover-heading strong {
-  font-size: 14px;
-}
-.notification-popover-heading p {
-  font-size: 12px;
-  color: #92929b;
-  margin: 7px 0 0;
-}
-.notification-popover-list {
-  padding: 10px;
-  max-height: min(60vh, 530px);
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-.notification-popover .inbox-item {
-  margin-bottom: 6px;
-}
-.notification-popover-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-top: 1px solid #303136;
-  font-size: 12px;
-}
-.notification-popover-footer a,
 .inbox-view-all {
   color: #f2a67e;
-}
-.notification-popover-footer button {
-  background: none;
-  border: 0;
-  color: #d3d9e5;
-  font: inherit;
-  cursor: pointer;
 }
 .notifications-page {
   max-width: 1080px;
@@ -481,27 +379,11 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.notification-bell button:focus-visible,
 .notification-inbox button:focus-visible {
   outline: 2px solid #ecac85;
   outline-offset: 3px;
 }
 @media (max-width: 650px) {
-  .notification-popover {
-    position: fixed;
-    top: 100px;
-    left: 14px;
-    right: 14px;
-    width: auto;
-  }
-  .notification-trigger {
-    width: 34px;
-    height: 34px;
-    padding: 0;
-  }
-  .notification-popover-list {
-    max-height: 55vh;
-  }
   .inbox-heading-actions {
     flex-wrap: wrap;
   }
@@ -533,34 +415,9 @@
   font-size: 12px;
   line-height: 1.7;
 }
-.notification-popover .inbox-empty-compact {
-  padding: 12px 6px;
-}
 .notification-preview .inbox-view-all {
   justify-content: flex-start;
   padding: 14px 0 0;
   margin-top: 16px;
   border-top: 1px solid #303136;
-}
-.notification-popover .inbox-item {
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  padding: 12px 8px;
-  margin: 0;
-}
-.notification-popover .inbox-item + .inbox-item {
-  border-top: 1px solid #303136;
-}
-.notification-popover .inbox-icon {
-  width: 30px;
-  height: 30px;
-  flex-basis: 30px;
-}
-.notification-popover .inbox-item-heading h4 {
-  font-size: 12px;
-}
-.notification-popover .inbox-item-footer {
-  gap: 6px 12px;
-  margin-top: 6px;
 }

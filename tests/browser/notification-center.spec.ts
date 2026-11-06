@@ -77,9 +77,9 @@ test("customer and seller inboxes expose all events, synchronize receipts across
         ).ok(),
       ).toBeTruthy();
       await actor.goto("/notifications");
-      await expect(actor.locator(".notification-trigger")).toHaveAccessibleName(
-        "Thông báo, 1 chưa đọc",
-      );
+      await expect(
+        actor.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveAccessibleName("1 thông báo chưa đọc");
       await expect(
         actor.locator(".inbox-item").filter({ hasText: title }),
       ).toBeVisible();
@@ -93,36 +93,42 @@ test("customer and seller inboxes expose all events, synchronize receipts across
       const otherTab = await context.newPage();
       await otherTab.goto("/notifications");
       await expect(
-        otherTab.locator(".notification-trigger"),
-      ).toHaveAccessibleName("Thông báo, 1 chưa đọc");
+        otherTab.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveAccessibleName("1 thông báo chưa đọc");
       await actor
         .getByRole("button", { name: "Đánh dấu đã đọc", exact: true })
         .click();
-      await expect(actor.locator(".notification-trigger")).toHaveAccessibleName(
-        "Thông báo, 0 chưa đọc",
-      );
       await expect(
-        otherTab.locator(".notification-trigger"),
-      ).toHaveAccessibleName("Thông báo, 0 chưa đọc");
+        actor.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveCount(0);
+      await expect(
+        otherTab.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveCount(0);
       await otherTab.close();
       await actor.getByRole("button", { name: "Đã đọc", exact: true }).click();
       await expect(actor.locator(".inbox-item")).toHaveCount(1);
       await actor
         .getByRole("button", { name: "Đánh dấu chưa đọc", exact: true })
         .click();
-      await expect(actor.locator(".notification-trigger")).toHaveAccessibleName(
-        "Thông báo, 1 chưa đọc",
-      );
+      await expect(
+        actor.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveAccessibleName("1 thông báo chưa đọc");
       await actor
         .getByRole("button", { name: "Chưa đọc", exact: true })
         .click();
       await actor.setViewportSize({ width: 390, height: 844 });
-      await actor.locator(".notification-trigger").click();
-      const preview = actor.getByRole("region", { name: "Thông báo gần đây" });
-      await expect(preview.getByText(title, { exact: true })).toBeVisible();
-      await actor.keyboard.press("Escape");
-      await expect(preview).toHaveCount(0);
-      await expect(actor.locator(".notification-trigger")).toBeFocused();
+      await expect(actor.locator(".notification-trigger")).toHaveCount(0);
+      await actor.locator(".account-button").click();
+      await expect(actor).toHaveURL(/\/account$/);
+      await expect(
+        actor
+          .locator(".notification-preview .inbox-item")
+          .filter({ hasText: title }),
+      ).toBeVisible();
+      // Visiting the account leaves unread notices intact until explicitly acknowledged.
+      await expect(
+        actor.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveText("1");
       expect(
         await actor.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -140,7 +146,9 @@ test("customer and seller inboxes expose all events, synchronize receipts across
       }
       await actor.request.post("/api/auth/logout", { headers });
       await actor.reload();
-      await expect(actor.locator(".notification-trigger")).toHaveCount(0);
+      await expect(
+        actor.locator(".header-avatar-wrap .header-chat-badge"),
+      ).toHaveCount(0);
       expect(errors).toEqual([]);
     } finally {
       await context.close();

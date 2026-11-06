@@ -58,6 +58,13 @@ test("Supabase inbox scopes filtered pages, escapes search patterns, and scopes 
   assert.equal(requests[0].query.get("id"), "eq.private-receipt");
   assert.equal(requests[0].query.get("user_id"), "eq.actor");
   assert.deepEqual(JSON.parse(requests[0].body), { read_at: null });
+  requests.length = 0;
+  const before = "2026-11-06T10:00:00.000Z";
+  await ops.readNotification("actor", undefined, before);
+  assert.equal(requests[0].method, "PATCH");
+  assert.equal(requests[0].query.get("user_id"), "eq.actor");
+  assert.equal(requests[0].query.get("read_at"), "is.null");
+  assert.equal(requests[0].query.get("created_at"), `lte.${before}`);
 });
 
 test("event metadata classifies all actor events and rejects unsafe destinations", () => {

@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Bell,
   CheckCheck,
@@ -20,7 +20,6 @@ import {
   RefreshCw,
   Search,
   ShoppingBag,
-  X,
 } from "lucide-react";
 import { api, date, post } from "./api";
 import { useDataRefresh } from "./useDataRefresh";
@@ -42,6 +41,7 @@ type Inbox = {
   pages: number;
   total: number;
   unread_count: number;
+  snapshot_at?: string;
 };
 const categories = [
   ["all", "Tất cả loại"],
@@ -86,49 +86,62 @@ export function NotificationProvider({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [version, setVersion] = useState(0);
-  const alive = useRef(false);
-  const running = useRef<Promise<void> | null>(null);
-  const channel = useRef<BroadcastChannel | null>(null);
+  const generation = useRef(0);
+  const current = useRef<{
+    controller: AbortController;
+    task: Promise<void>;
+    again: boolean;
+  } | null>(null);
+  const latestData = useRef<Inbox | null>(null);
   const refresh = useCallback(async () => {
-    if (!userId || !alive.current) return;
-    if (running.current) return running.current;
+    if (!userId) return;
+    if (current.current) {
+      current.current.again = true;
+      return current.current.task;
+    }
+    const epoch = generation.current;
+    const controller = new AbortController();
+    const run = { controller, task: Promise.resolve(), again: false };
+    current.current = run;
     setLoading(true);
-    const task = api<Inbox>("/notifications?unread=1&page_size=8")
-      .then((result) => {
-        if (alive.current) {
+    run.task = (async () => {
+      do {
+        run.again = false;
+        try {
+          const result = await api<Inbox>(
+            "/notifications?unread=1&page_size=8",
+            { signal: controller.signal },
+          );
+          if (epoch !== generation.current || controller.signal.aborted) return;
+          if (run.again) continue;
+          latestData.current = result;
           setData(result);
           setError("");
+        } catch (e) {
+          if (epoch === generation.current && !controller.signal.aborted)
+            setError((e as Error).message);
         }
-      })
-      .catch((e) => {
-        if (alive.current) setError(e.message);
-      })
-      .finally(() => {
-        running.current = null;
-        if (alive.current) setLoading(false);
-      });
-    running.current = task;
-    return task;
+      } while (
+        run.again &&
+        !controller.signal.aborted &&
+        epoch === generation.current
+      );
+    })().finally(() => {
+      if (current.current === run) {
+        current.current = null;
+        setLoading(false);
+      }
+    });
+    return run.task;
   }, [userId]);
   useEffect(() => {
-    alive.current = true;
     void refresh();
-    if (userId && typeof BroadcastChannel !== "undefined") {
-      const connection = new BroadcastChannel("keynest-notifications");
-      channel.current = connection;
-      connection.onmessage = (event) => {
-        if (event.data === userId) {
-          setVersion((v) => v + 1);
-          void refresh();
-        }
-      };
-    }
     return () => {
-      alive.current = false;
-      channel.current?.close();
-      channel.current = null;
+      generation.current++;
+      current.current?.controller.abort();
+      current.current = null;
     };
-  }, [userId, refresh]);
+  }, [refresh]);
   useDataRefresh(
     refresh,
     [
@@ -142,15 +155,15 @@ export function NotificationProvider({
     { intervalMs: 10000, enabled: !!userId },
   );
   const read = async (id?: string, unread = false) => {
+    const epoch = generation.current;
+    const snapshot = latestData.current?.snapshot_at;
     await post(
       `/notifications/${unread ? "unread" : "read"}`,
-      id ? { id } : { all: true },
+      id ? { id } : { all: true, ...(snapshot ? { before: snapshot } : {}) },
     );
-    if (!alive.current) return;
-    // Let any older read finish before requesting the updated receipts.
-    await running.current;
+    if (epoch !== generation.current) return;
     setVersion((v) => v + 1);
-    channel.current?.postMessage(userId);
+    // Queue a fresh read even when a pre-mutation request is still in flight.
     await refresh();
   };
   return (
@@ -253,120 +266,22 @@ function NoticeCard({
   );
 }
 
-export function NotificationBell() {
-  const { data, error, refresh, loading, read } = useNotifications();
-  const [open, setOpen] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const location = useLocation();
-  useEffect(() => {
-    setOpen(false);
-  }, [location.key]);
-  useEffect(() => {
-    if (!open) return;
-    const escape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        trigger.current?.focus();
-      }
-    };
-    document.addEventListener("keydown", escape);
-    return () => {
-      document.removeEventListener("keydown", escape);
-    };
-  }, [open]);
+export function NotificationBadge() {
+  const { data, error } = useNotifications();
+  if (!data?.unread_count) return null;
   return (
-    <div className="notification-bell">
-      <button
-        type="button"
-        ref={trigger}
-        className="icon-button notification-trigger"
-        aria-label={`Thông báo${data ? `, ${data.unread_count} chưa đọc` : ""}`}
-        aria-expanded={open}
-        aria-controls="notification-popover"
-        onClick={() => {
-          setOpen((v) => !v);
-          if (!open) void refresh();
-        }}
-      >
-        <Bell size={22} />
-        {data && data.unread_count > 0 && (
-          <span className="header-chat-badge">
-            {data.unread_count > 99 ? "99+" : data.unread_count}
-          </span>
-        )}
-        {error && (
-          <span
-            className="notification-sync-error"
-            title="Chưa thể cập nhật thông báo"
-          >
-            !
-          </span>
-        )}
-      </button>
-      {open && (
-        <section
-          id="notification-popover"
-          className="notification-popover"
-          aria-label="Thông báo gần đây"
-        >
-          <div className="notification-popover-heading">
-            <div>
-              <strong>
-                Thông báo
-                {data && data.unread_count > 0 ? ` (${data.unread_count})` : ""}
-              </strong>
-            </div>
-            <button
-              className="icon-button"
-              aria-label="Đóng hộp thông báo"
-              onClick={() => {
-                setOpen(false);
-                trigger.current?.focus();
-              }}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          {(error || actionError) && (
-            <p className="form-error" role="alert">
-              {actionError || error}{" "}
-              <button onClick={() => void refresh()}>Thử lại</button>
-            </p>
-          )}
-          <div className="notification-popover-list">
-            {data?.items.map((n) => (
-              <NoticeCard key={n.id} notice={n} compact />
-            ))}
-            {data?.items.length === 0 && (
-              <p className="muted inbox-empty-compact">
-                Bạn đã xem hết thông báo mới
-              </p>
-            )}
-          </div>
-          <div className="notification-popover-footer">
-            <Link to="/notifications">Xem tất cả thông báo</Link>
-            <button
-              disabled={busy || loading || !data?.unread_count}
-              onClick={async () => {
-                setBusy(true);
-                setActionError("");
-                try {
-                  await read();
-                } catch (e) {
-                  setActionError((e as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Đọc tất cả
-            </button>
-          </div>
-        </section>
-      )}
-    </div>
+    <span
+      className="header-chat-badge"
+      role="status"
+      aria-label={`${data.unread_count} thông báo chưa đọc`}
+      title={
+        error
+          ? `${data.unread_count} chưa đọc · Chưa cập nhật được, sẽ thử lại`
+          : `${data.unread_count} thông báo chưa đọc`
+      }
+    >
+      {data.unread_count > 99 ? "99+" : data.unread_count}
+    </span>
   );
 }
 
@@ -418,8 +333,9 @@ export function NotificationInbox({
     if (status !== "all") params.set(status, "1");
     api<Inbox>(`/notifications?${params}`, { signal: controller.signal })
       .then((result) => {
-        if (result.pages > 0 && page > result.pages) {
-          setPage(result.pages);
+        if (controller.signal.aborted) return;
+        if (page > Math.max(1, result.pages)) {
+          setPage(Math.max(1, result.pages));
           return;
         }
         setData(result);
@@ -551,7 +467,14 @@ export function NotificationInbox({
       {error && (
         <p className="form-error" role="alert">
           {error}{" "}
-          <button onClick={() => setRevision((v) => v + 1)}>Thử lại</button>
+          <button
+            onClick={() => {
+              setRevision((v) => v + 1);
+              if (compact) void notifications.refresh();
+            }}
+          >
+            Thử lại
+          </button>
         </p>
       )}
       {!data && loading && (

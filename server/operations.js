@@ -506,6 +506,7 @@ export function createOperations(store) {
     },
     async notifications(uid, f) {
       this.syncDemoNotifications(uid);
+      const snapshot_at = now();
       if (demo) {
         const all = rows("notifications").filter((n) => n.user_id === uid);
         return {
@@ -522,6 +523,7 @@ export function createOperations(store) {
             f,
           ),
           unread_count: all.filter((n) => !n.read_at).length,
+          snapshot_at,
           unread_chat_count: all.filter((n) => !n.read_at && n.id.startsWith('seller-chat:')).length,
           unread_order_count: all.filter((n) => !n.read_at && (n.id.startsWith('seller-chat:') || n.id.startsWith('seller-refund:'))).length,
         };
@@ -556,29 +558,36 @@ export function createOperations(store) {
       return {
         ...shape(result.data.map(enrichNotice), result.count, f),
         unread_count: unread.count,
+        snapshot_at,
         unread_chat_count: unreadChat.count,
         unread_order_count: unreadOrder.count,
       };
     },
-    async readNotification(uid, id) {
+    async readNotification(uid, id, before) {
       this.syncDemoNotifications(uid);
       if (demo) {
         const selected = rows("notifications").filter(
-          (n) => n.user_id === uid && (!id || n.id === id),
+          (n) => n.user_id === uid && (!id || n.id === id) &&
+            (id || !before || Date.parse(n.created_at) <= Date.parse(before)),
         );
         if (id && !selected.length)
           throw new AppError("Không tìm thấy thông báo.", 404);
         for (const n of selected) n.read_at ||= now();
         store.save();
       } else {
+        // Preserve the original receipt timestamp on retries.
+        if (id) {
+          const existing = await query(store.client.from("notifications").select("id,read_at").eq("user_id", uid).eq("id", id).maybeSingle());
+          if (!existing) throw new AppError("Không tìm thấy thông báo.", 404);
+          if (existing.read_at) return;
+        }
         let q = store.client
           .from("notifications")
           .update({ read_at: now() })
-          .eq("user_id", uid);
+          .eq("user_id", uid).is("read_at", null);
         if (id) q = q.eq("id", id);
-        const result = await query(q.select("id"));
-        if (id && !result.length)
-          throw new AppError("Không tìm thấy thông báo.", 404);
+        else if (before) q = q.lte("created_at", before);
+        await query(q.select("id"));
       }
     },
     async unreadNotification(uid, id) {
@@ -632,15 +641,17 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
     ),
   );
   router.post("/notifications/read", auth, limiter(60), async (req, res) => {
-    const { id, all } = z
+    const { id, all, before } = z
       .object({
         id: z.string().min(1).max(150).optional(),
         all: z.literal(true).optional(),
+        before: z.iso.datetime().optional(),
       })
       .strict()
       .refine((v) => !!v.id !== !!v.all)
+      .refine((v) => !v.before || !!v.all)
       .parse(req.body);
-    await ops.readNotification(req.user.id, id);
+    await ops.readNotification(req.user.id, id, before);
     res.json({ success: true });
   });
   router.post('/notifications/unread', auth, limiter(60), async (req, res) => {
