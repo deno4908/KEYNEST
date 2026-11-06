@@ -34,13 +34,17 @@
 .verification-content { min-width: 0; }
 .verification-content .mfa-login-form { gap: 11px; }
 .verification-content .form-error { margin: 14px 0 0; font-size: 12px; line-height: 1.7; }
-.verification-code-field { position: relative; }
-.verification-code-field .mfa-login-code { width: 100%; height: 58px; padding: 0 12px 0 18px; font: 500 25px ui-monospace, Consolas, monospace; letter-spacing: 7px; text-align: center; background: #111216; color: #f6f4f1; border: 1px solid #43454e; border-radius: 9px; transition: border-color .2s, box-shadow .2s; }
-.verification-code-field > span { position: absolute; bottom: 0; left: 25%; right: 25%; height: 2px; background: #f2ad86; transform: scaleX(0); transition: transform .25s; }
-.verification-code-field:focus-within > span { transform: scaleX(1); }
-.verification-code-field .mfa-login-code:focus { outline: none; border-color: #b78061; box-shadow: 0 0 0 3px #cb8c6012; }
+.verification-code-field { position: relative; min-width: 0; }
+.verification-code-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #858b99; pointer-events: none; transition: color .2s; }
+.verification-card .verification-code-field .mfa-login-code { width: 100%; min-width: 0; height: 54px; padding: 0 14px 0 46px; font: 500 22px ui-monospace, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: 2px; text-align: left; background: #131419; color: #f6f4f1; border: 1px solid #3d4049; border-radius: 10px; caret-color: #f2ad86; transition: border-color .2s, box-shadow .2s, background .2s; }
+.verification-card .verification-code-field .mfa-login-code::placeholder { font-family: 'Be Vietnam Pro', sans-serif; font-size: 13px; font-weight: 400; letter-spacing: 0; color: #858b99; opacity: 1; }
+.verification-card .verification-code-field .mfa-login-code:hover:not(:disabled) { border-color: #60636d; }
+.verification-card .verification-code-field .mfa-login-code:focus { outline: none; background: #17171c; border-color: #c99372; box-shadow: 0 0 0 3px #cb8c6014; }
+.verification-code-field:focus-within .verification-code-icon { color: #f2ad86; }
+.verification-card .verification-code-field .mfa-login-code:disabled { opacity: .6; cursor: wait; }
 .verification-code-field[data-invalid="true"] { animation: verification-reject .25s ease; }
-.verification-code-field[data-invalid="true"] .mfa-login-code { border-color: #cf8181; }
+.verification-card .verification-code-field[data-invalid="true"] .mfa-login-code { border-color: #cf8181; box-shadow: 0 0 0 3px #cf818112; }
+.verification-code-field[data-invalid="true"] .verification-code-icon { color: #cf8181; }
 .verification-card .mfa-login-hint { color: #9299a6; font-size: 11px; line-height: 1.7; margin-bottom: 7px; }
 .verification-card .button { min-height: 44px; border-radius: 8px; font-size: 12px; }
 .verification-resend { margin-top: 12px; }

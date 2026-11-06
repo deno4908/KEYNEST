@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react';
-import { Check, Mail, ShieldCheck, Smartphone } from 'lucide-react';
+import { Check, KeyRound, Mail, ShieldCheck, Smartphone } from 'lucide-react';
 import './verification.css';
 
 export type VerificationStage = 'loading' | 'ready' | 'sending' | 'sent' | 'verifying' | 'success';
@@ -37,7 +37,7 @@ export function VerificationCard({ title, description, kind, stage, children, fo
 
 export function VerificationCodeInput({ ref, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
   return <div className="verification-code-field" data-invalid={props['aria-invalid'] === true}>
+    <KeyRound className="verification-code-icon" size={18} strokeWidth={1.7} aria-hidden="true" />
     <input {...props} ref={ref} className="mfa-login-code" spellCheck={false} />
-    <span aria-hidden="true" />
   </div>;
 }
