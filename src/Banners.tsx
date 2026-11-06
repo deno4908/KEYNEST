@@ -18,6 +18,27 @@ import { api, post } from "./api";
 import { useDataRefresh } from './useDataRefresh';
 import { Modal, useStore } from "./App";
 import type { Banner } from "./types";
+import { campaignImage, campaignImageSizes } from './campaign-images';
+
+function CampaignImage({ image, ready }: { image: string; ready: () => void }) {
+  const art = campaignImage(image);
+  const [loaded, setLoaded] = useState(false);
+  const [fallback, setFallback] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return <>
+    <div className="campaign-image-preview" aria-hidden="true"
+      style={art.preview ? { backgroundImage: `url("${art.preview}")` } : undefined} />
+    {!failed && <img className="campaign-image" src={fallback ? art.fallback : art.src}
+      srcSet={fallback ? undefined : art.srcSet} sizes={art.srcSet ? campaignImageSizes : undefined}
+      alt="" fetchPriority="high" decoding="async" data-loaded={loaded}
+      onLoad={() => { setLoaded(true); ready(); }}
+      onError={() => {
+        setLoaded(false);
+        if (art.fallback && !fallback) setFallback(true);
+        else { setFailed(true); ready(); }
+      }} />}
+  </>;
+}
 
 export function BannerSlider() {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -25,6 +46,9 @@ export function BannerSlider() {
   const [paused, setPaused] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const [focused, setFocused] = useState(false);
   const [hidden, setHidden] = useState(document.hidden);
+  const [readyImage, setReadyImage] = useState('');
+  const active = banners.length ? banners[index % banners.length] : undefined;
+  const imageReady = !!active && readyImage === active.image;
   useDataRefresh(async () => {
     try { setBanners(await api<Banner[]>("/banners")); setIndex(0); }
     catch { /* Keep the current banner on a temporary connection failure. */ }
@@ -47,20 +71,25 @@ export function BannerSlider() {
     };
   }, []);
   useEffect(() => {
-    if (banners.length < 2 || paused || focused || hidden)
+    if (banners.length < 2 || paused || focused || hidden || !imageReady)
       return;
     const timer = window.setInterval(
       () => setIndex((i) => (i + 1) % banners.length),
       8000,
     );
     return () => clearInterval(timer);
-  }, [banners.length, paused, focused, hidden, index]);
+  }, [banners.length, paused, focused, hidden, index, imageReady]);
   useEffect(() => {
-    if (banners.length < 2) return;
+    // Let the visible image finish before spending bandwidth on the next slide.
+    if (banners.length < 2 || !imageReady) return;
+    const art = campaignImage(banners[(index + 1) % banners.length].image);
     const nextImage = new window.Image();
-    nextImage.src = banners[(index + 1) % banners.length].image;
-  }, [banners, index]);
-  if (!banners.length)
+    nextImage.fetchPriority = 'low';
+    nextImage.decoding = 'async';
+    if (art.srcSet) { nextImage.sizes = campaignImageSizes; nextImage.srcset = art.srcSet; }
+    nextImage.src = art.src;
+  }, [banners, index, imageReady]);
+  if (!active)
     return (
       <div className="banner-fallback">
         <span>KEYNEST / DIGITAL STORE</span>
@@ -75,7 +104,6 @@ export function BannerSlider() {
         </Link>
       </div>
     );
-  const active = banners[index % banners.length];
   function move(next: number) {
     setIndex((next + banners.length) % banners.length);
   }
@@ -109,12 +137,7 @@ export function BannerSlider() {
         aria-roledescription="slide"
         aria-label={`${index + 1} / ${banners.length}`}
       >
-        <img
-          className="campaign-image"
-          src={active.image}
-          alt=""
-          fetchPriority="high"
-        />
+        <CampaignImage key={active.image} image={active.image} ready={() => setReadyImage(active.image)} />
         <div className="campaign-shade" />
         <div className="campaign-copy">
           <span>{active.eyebrow}</span>

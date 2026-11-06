@@ -473,7 +473,8 @@
   inset: 0;
   animation: campaign-enter 0.45s ease-out;
 }
-.campaign-image {
+.campaign-image,
+.campaign-image-preview {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -481,6 +482,14 @@
   object-fit: cover;
   object-position: center;
 }
+.campaign-image-preview {
+  background: radial-gradient(ellipse at 75% 30%, #696044, #262923 65%);
+  background-size: cover;
+  background-position: center;
+}
+.campaign-image { opacity: 0; transition: opacity .25s ease; }
+.campaign-image[data-loaded="true"] { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .campaign-image { transition: none; } }
 .campaign-shade {
   position: absolute;
   inset: 0;
