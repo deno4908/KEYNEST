@@ -8,7 +8,11 @@ async function client() {
   const options = { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022 } };
   const region = ts.transpileModule(await readFile(new URL('../src/region.ts', import.meta.url), 'utf8'), options).outputText;
   const regionUrl = `data:text/javascript;base64,${Buffer.from(region).toString('base64')}#${Math.random()}`;
-  const js = ts.transpileModule(source, options).outputText.replace("'./region'", JSON.stringify(regionUrl));
+  const dataChanges = ts.transpileModule(await readFile(new URL('../src/dataChanges.ts', import.meta.url), 'utf8'), options).outputText;
+  const dataChangesUrl = `data:text/javascript;base64,${Buffer.from(dataChanges).toString('base64')}#${Math.random()}`;
+  const js = ts.transpileModule(source, options).outputText
+    .replace("'./region'", JSON.stringify(regionUrl))
+    .replace("'./dataChanges'", JSON.stringify(dataChangesUrl));
   return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}#${Math.random()}`);
 }
 const response = (body, status = 200, token) => new Response(JSON.stringify(body), {
