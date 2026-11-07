@@ -155,7 +155,7 @@ export function Admin() {
     await load();
     await refresh();
   };
-  useDataRefresh(load, ["/admin/", "/seller/", "/tickets"]);
+  useDataRefresh(load, ["/admin/", "/seller/", "/tickets", "/orders", "/payments"]);
   async function doAction(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
@@ -229,25 +229,18 @@ export function Admin() {
                 {String(label)}
                 {id === "tickets" && (
                   <span
-                    aria-label="Yêu cầu hỗ trợ chưa đóng"
-                    title="Yêu cầu hỗ trợ chưa đóng"
+                    aria-label="Tổng số yêu cầu hỗ trợ"
+                    title="Tổng số yêu cầu hỗ trợ"
                   >
-                    {data
-                      ? data.tickets.filter((t) =>
-                          ["open", "in_progress"].includes(t.status),
-                        ).length
-                      : "—"}
+                    {data ? data.tickets.length : "—"}
                   </span>
                 )}
                 {id === "orders" && (
                   <span
-                    aria-label="Đơn hàng chờ giao"
-                    title="Đơn hàng chờ giao"
+                    aria-label="Tổng số đơn hàng"
+                    title="Tổng số đơn hàng"
                   >
-                    {data
-                      ? data.orders.filter((o) => o.status === "processing")
-                          .length
-                      : "—"}
+                    {data ? data.orders.length : "—"}
                   </span>
                 )}
               </button>
