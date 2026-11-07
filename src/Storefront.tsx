@@ -52,6 +52,7 @@ export function Home() {
     .filter((p) => category === "all" || p.category === category)
     .slice(0, 6);
   const cheap = products
+    .filter((p) => category === "all" || p.category === category)
     .filter((p) => p.variants.some((v) => v.price <= 200000))
     .slice(0, 6);
   const recent = readRecent()
@@ -270,7 +271,7 @@ export function Home() {
       <section className="home-section budget-section">
         <div className="section-title">
           <h2>Dưới 200.000đ</h2>
-          <Link to="/catalog?max=200000">
+          <Link to={catalogHref({ ...(category !== "all" ? { category } : {}), max: "200000" })}>
             Xem tất cả
             <ArrowRight size={16} />
           </Link>
@@ -280,6 +281,9 @@ export function Home() {
             <ProductCard product={p} key={p.id} />
           ))}
         </div>
+        {!cheap.length && (
+          <p className="muted">Danh mục này chưa có sản phẩm dưới 200.000đ.</p>
+        )}
       </section>
       {recent.length > 0 && (
         <section className="home-section recently-viewed">

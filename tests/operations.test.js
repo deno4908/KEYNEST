@@ -61,6 +61,7 @@ test("operations: scoped administration, revocation, inbox and stock", async (t)
     assert.equal(later.read_at, null);
     assert.equal(other.read_at, null);
     const receipt = first.read_at;
+    assert.equal((await req('/notifications/read', buyer, { all: true, before: snapshot.replace('Z', '000+00:00') })).status, 200);
     await req('/notifications/read', buyer, { all: true, before: snapshot });
     await req('/notifications/read', buyer, { id: first.id });
     assert.equal(first.read_at, receipt);

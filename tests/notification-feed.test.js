@@ -7,6 +7,8 @@ import { SupabaseStore } from "../server/supabase-store.js";
 
 test("Supabase inbox scopes filtered pages, escapes search patterns, and scopes unread updates", async () => {
   const requests = [];
+  // PostgreSQL is ahead of the app clock and retains microsecond precision.
+  const databaseTime = "2099-11-07T10:47:53.827762+00:00";
   const client = createClient("https://inbox-test.invalid", "test-key", {
     auth: { persistSession: false },
     global: {
@@ -23,7 +25,7 @@ test("Supabase inbox scopes filtered pages, escapes search patterns, and scopes 
                     id: "admin:payment-review:event:actor",
                     title: "Payment",
                     href: "/admin?tab=payments",
-                    created_at: new Date().toISOString(),
+                    created_at: databaseTime,
                     read_at: null,
                   },
                 ];
@@ -48,6 +50,10 @@ test("Supabase inbox scopes filtered pages, escapes search patterns, and scopes 
   });
   assert.equal(feed.items[0].category, "payments");
   assert.equal(feed.total, 1);
+  assert.equal(feed.snapshot_at, databaseTime);
+  const boundary = requests.find(r => r.query.get('select') === 'created_at');
+  assert.equal(boundary.query.get('limit'), '1');
+  assert.equal(boundary.query.get('order'), 'created_at.desc');
   const main = requests.find((r) => r.method !== "HEAD");
   assert.match(main.query.get("or"), /admin:payment-review:/);
   assert.equal(main.query.get("title"), "ilike.%100\\%\\_value%");
@@ -59,7 +65,7 @@ test("Supabase inbox scopes filtered pages, escapes search patterns, and scopes 
   assert.equal(requests[0].query.get("user_id"), "eq.actor");
   assert.deepEqual(JSON.parse(requests[0].body), { read_at: null });
   requests.length = 0;
-  const before = "2026-11-06T10:00:00.000Z";
+  const before = feed.snapshot_at;
   await ops.readNotification("actor", undefined, before);
   assert.equal(requests[0].method, "PATCH");
   assert.equal(requests[0].query.get("user_id"), "eq.actor");

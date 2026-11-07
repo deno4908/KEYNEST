@@ -536,7 +536,7 @@ export function createOperations(store) {
       if (f.read) q = q.not("read_at", "is", null);
       q = filterNoticeQuery(q, f.category);
       if (f.q) q = q.ilike('title', `%${f.q.replace(/[\\%_]/g, '\\$&')}%`);
-      const [result, unread, unreadChat, unreadOrder] = await Promise.all([
+      const [result, unread, unreadChat, unreadOrder, newest] = await Promise.all([
         q
           .order("created_at", { ascending: false })
           .order("id")
@@ -552,13 +552,18 @@ export function createOperations(store) {
         store.client.from("notifications")
           .select("id", { count: "exact", head: true })
           .eq("user_id", uid).is("read_at", null).or("id.like.seller-chat:%,id.like.seller-refund:%"),
+        // Use a database timestamp with its full precision. The application
+        // clock can lag behind PostgreSQL and otherwise exclude visible rows
+        // from a successful mark-all-read request.
+        store.client.from("notifications").select("created_at")
+          .eq("user_id", uid).order("created_at", { ascending: false }).limit(1),
       ]);
-      if (result.error || unread.error || unreadChat.error || unreadOrder.error)
+      if (result.error || unread.error || unreadChat.error || unreadOrder.error || newest.error)
         throw new AppError("Không thể tải thông báo.", 503);
       return {
         ...shape(result.data.map(enrichNotice), result.count, f),
         unread_count: unread.count,
-        snapshot_at,
+        snapshot_at: newest.data[0]?.created_at || snapshot_at,
         unread_chat_count: unreadChat.count,
         unread_order_count: unreadOrder.count,
       };
@@ -645,7 +650,7 @@ export function operationsRouter({ operations: ops, auth, admin, limiter }) {
       .object({
         id: z.string().min(1).max(150).optional(),
         all: z.literal(true).optional(),
-        before: z.iso.datetime().optional(),
+        before: z.iso.datetime({ offset: true }).optional(),
       })
       .strict()
       .refine((v) => !!v.id !== !!v.all)

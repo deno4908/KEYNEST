@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-const snapshot = "2026-11-06T10:00:00.000Z";
+const snapshot = "2026-11-06T10:00:00.123456+00:00";
 const notice = {
   id: "campaign:fixture:user",
   title: "Cập nhật tài khoản",
@@ -167,3 +167,20 @@ test("temporary fetch errors preserve the last count and the retry button recove
     page.locator(".notification-preview").getByRole("alert"),
   ).toHaveCount(0);
 });
+
+for (const path of ["/account", "/notifications"]) {
+  test(`mark all read at ${path} clears the list and avatar immediately`, async ({ page }) => {
+    const state = await fixture(page, 3);
+    await page.goto(path);
+    await expect(page.locator(".header-chat-badge")).toHaveText("3");
+    await expect(page.locator(".inbox-item")).toHaveCount(1);
+    await page.getByRole("button", { name: "Đánh dấu tất cả đã đọc", exact: true }).click();
+    expect(state.readBody).toEqual({ all: true, before: snapshot });
+    await expect(page.locator(".header-chat-badge")).toHaveCount(0);
+    await expect(page.locator(".inbox-item")).toHaveCount(0);
+    await expect(page.getByText("Bạn đã xem hết thông báo mới", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.locator(".inbox-item")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Đánh dấu tất cả đã đọc", exact: true })).toBeDisabled();
+  });
+}

@@ -65,7 +65,7 @@ type NotificationState = {
   loading: boolean;
   version: number;
   refresh: () => Promise<void>;
-  read: (id?: string, unread?: boolean) => Promise<void>;
+  read: (id?: string, unread?: boolean, before?: string) => Promise<void>;
 };
 const NotificationContext = createContext<NotificationState | null>(null);
 function useNotifications() {
@@ -154,9 +154,9 @@ export function NotificationProvider({
     ],
     { intervalMs: 10000, enabled: !!userId },
   );
-  const read = async (id?: string, unread = false) => {
+  const read = async (id?: string, unread = false, before?: string) => {
     const epoch = generation.current;
-    const snapshot = latestData.current?.snapshot_at;
+    const snapshot = before || latestData.current?.snapshot_at;
     await post(
       `/notifications/${unread ? "unread" : "read"}`,
       id ? { id } : { all: true, ...(snapshot ? { before: snapshot } : {}) },
@@ -404,7 +404,7 @@ export function NotificationInbox({
               setBusy(true);
               setError("");
               try {
-                await notifications.read();
+                await notifications.read(undefined, false, data?.snapshot_at);
               } catch (e) {
                 setError((e as Error).message);
               } finally {
