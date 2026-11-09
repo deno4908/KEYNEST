@@ -13,6 +13,7 @@ import {
   Download,
   RefreshCw,
   MessageCircle,
+  ChevronDown,
 } from "lucide-react";
 import { api, post, money, date, statuses, categories } from "./api";
 import { Loading, Modal, useStore } from "./App";
@@ -584,7 +585,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                 <div className="seller-product-copy">
                   <div className="seller-product-heading">
                     {p.active && p.review_status === 'approved' ? <Link to={`/products/${p.slug}`}><strong>{p.name}</strong></Link> : <strong>{p.name}</strong>}
-                    <span className={`seller-review-badge seller-review-${p.review_status || 'pending'}`}>
+                    <span className={`seller-review-badge seller-review-${p.review_status === 'approved' && !p.active ? 'hidden' : p.review_status || 'pending'}`}>
                       {p.review_status === 'approved' ? (p.active ? 'Đang bán' : 'Đã ẩn') : p.review_status === 'rejected' ? 'Cần chỉnh sửa' : 'Chờ duyệt'}
                     </span>
                   </div>
@@ -592,38 +593,6 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                   {p.review_status !== 'approved' && <p className="seller-product-review-note">
                     {p.review_status === 'rejected' ? `Lý do từ chối: ${p.review_reason || 'Liên hệ hỗ trợ để biết thêm.'}` : 'Admin đang kiểm tra. Sản phẩm sẽ được mở bán sau khi duyệt.'}
                   </p>}
-                  <details>
-                    <summary>Xem gói & nhập kho</summary>
-                    <div className="seller-stock-list">
-                      {p.variants.map((v) => (
-                        <div key={v.id}>
-                          <span>
-                            {v.name} · {money(v.price)} ·{" "}
-                            <b className={v.stock <= 5 ? "orange" : ""}>
-                              {v.unlimited ? 'Không giới hạn' : `${v.is_preorder ? 'Còn lượt đặt' : 'Tồn'} ${v.stock}`}
-                            </b>
-                          </span>
-                          {v.delivery === "key" && !v.unlimited && (
-                            <button
-                              className="button button-small button-outline"
-                              onClick={() =>
-                                openAction({
-                                  endpoint: `/seller/inventory/${v.id}`,
-                                  title: `Nhập mã · ${v.name}`,
-                                })
-                              }
-                            >
-                              <Upload size={14} />
-                              Nhập mã
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {!p.variants.length && (
-                        <p>Chưa có gói. Mở Quản lý để thêm gói bán.</p>
-                      )}
-                    </div>
-                  </details>
                 </div>
                 <div className="seller-row-actions">
                   <button
@@ -650,7 +619,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                     {p.active ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                   <button
-                    className="icon-button"
+                    className="icon-button seller-delete-button"
                     aria-label={`Xóa sản phẩm ${p.name}`}
                     onClick={() => {
                       setDeleting(p);
@@ -660,6 +629,39 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                     <Trash2 size={18} />
                   </button>
                 </div>
+                <details className="seller-product-variants">
+                  <summary><span><Package size={15} />Gói bán & tồn kho<small>{p.variants.length}</small></span><ChevronDown size={16} /></summary>
+                  <div className="seller-stock-list">
+                    {p.variants.map((v) => (
+                      <div key={v.id}>
+                        <div className="seller-stock-info">
+                          <strong>{v.name}</strong>
+                          <span>{money(v.price)}</span>
+                        </div>
+                        <span className={`seller-stock-badge${!v.unlimited && v.stock <= 5 ? ' is-low' : ''}`}>
+                          {v.unlimited ? 'Không giới hạn' : `${v.is_preorder ? 'Còn lượt đặt' : 'Tồn'} ${v.stock}`}
+                        </span>
+                        {v.delivery === "key" && !v.unlimited && (
+                          <button
+                            className="button button-small button-outline"
+                            onClick={() =>
+                              openAction({
+                                endpoint: `/seller/inventory/${v.id}`,
+                                title: `Nhập mã · ${v.name}`,
+                              })
+                            }
+                          >
+                            <Upload size={14} />
+                            Nhập mã
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {!p.variants.length && (
+                      <p>Chưa có gói. Mở Quản lý để thêm gói bán.</p>
+                    )}
+                  </div>
+                </details>
               </article>
             ))}
           </div>

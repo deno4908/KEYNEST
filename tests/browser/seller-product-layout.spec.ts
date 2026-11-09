@@ -8,9 +8,9 @@ test('seller product cards contain full images and wrap actions on mobile', asyn
     await page.setViewportSize({ width, height: 900 });
     await page.setContent(`<style>${css}</style><div class="container seller-page"><div class="seller-product-list"><article>
       <span class="seller-product-cover"><img src="${src}" alt="Product"></span>
-      <div class="seller-product-copy"><div class="seller-product-heading"><strong>${'Long product name '.repeat(5)}</strong><span class="seller-review-badge">Pending</span></div><p class="seller-product-review-note">Waiting for administrator approval</p>
-      <details open><summary>Stock</summary><div class="seller-stock-list"><div><span>${'variant'.repeat(30)}</span><button class="button">Import</button></div></div></details></div>
+      <div class="seller-product-copy"><div class="seller-product-heading"><strong>${'Long product name '.repeat(5)}</strong><span class="seller-review-badge">Pending</span></div><p class="seller-product-review-note">Waiting for administrator approval</p></div>
       <div class="seller-row-actions"><button class="button button-outline">Manage</button><button class="icon-button" disabled>Show</button><button class="icon-button">Delete</button></div>
+      <details class="seller-product-variants" open><summary><span>Stock<small>1</small></span></summary><div class="seller-stock-list"><div><div class="seller-stock-info"><strong>${'variant'.repeat(30)}</strong><span>100.000 ₫</span></div><span class="seller-stock-badge is-low">Stock 1</span><button class="button">Import</button></div></div></details>
       </article></div></div>`);
     await expect(page.locator('img')).toHaveCSS('object-fit', 'contain');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
