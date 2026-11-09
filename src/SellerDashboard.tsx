@@ -128,6 +128,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     [ticketId, setTicketId] = useState<string | null>(null),
     [reply, setReply] = useState("");
   const [idempotency, setIdempotency] = useState(() => crypto.randomUUID());
+  const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
   const generation = useRef(0);
   const load = async () => {
     if (user?.role !== "seller") return;
@@ -265,6 +266,8 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         (filter === "all" ||
           (filter === "active" && p.active) ||
           (filter === "hidden" && !p.active) ||
+          (filter === "pending" && p.review_status === 'pending') ||
+          (filter === "rejected" && p.review_status === 'rejected') ||
           (filter === "empty" && stock(p) === 0) ||
           (filter === "low" &&
             (!p.variants.length || p.variants.some((v) => v.active !== false && !v.unlimited && v.delivery === 'key' && v.stock <= 5)))),
@@ -352,8 +355,91 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         s.seller_reversed_at ? "Có" : "Không",
       ]),
     ]);
+  const toolbar = (
+    <div className="seller-toolbar">
+      <label>
+        Tìm kiếm
+        <input
+          type="search"
+          placeholder={
+            tab === "sales"
+              ? "Mã đơn, tên sản phẩm hoặc gói…"
+              : "Nhập từ khóa…"
+          }
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
+      <label>
+        Trạng thái
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">Tất cả</option>
+          {(tab === "products"
+            ? [
+                ["active", "Đang bán"],
+                ["hidden", "Đã ẩn"],
+                ["pending", "Chờ duyệt"],
+                ["rejected", "Cần chỉnh sửa"],
+                ["empty", "Hết hàng"],
+                ["low", "Tồn kho ≤ 5"],
+              ]
+            : tab === "sales"
+              ? [
+                  ["waiting", "Chờ giao"],
+                  ["pending", "Chờ thanh toán"],
+                  ["processing", "Đang xử lý"],
+                  ["completed", "Hoàn thành"],
+                  ["refunded", "Đã hoàn tiền"],
+                  ["cancelled", "Đã hủy"],
+                  ["expired", "Hết hạn"],
+                ]
+              : tab === "support"
+                ? [
+                    ["open", "Đang chờ"],
+                    ["in_progress", "Đang xử lý"],
+                    ["closed", "Đã đóng"],
+                  ]
+                : [
+                    ["pending", "Chờ duyệt"],
+                    ["paid", "Đã chuyển"],
+                    ["rejected", "Từ chối"],
+                    ["cancelled", "Đã hủy"],
+                  ]
+          ).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {tab === "products" && (
+        <>
+          <label>
+            Danh mục
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {Object.entries(categories).map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Sắp xếp
+            <select value={sort} onChange={(e) => setSort(e.target.value)}>
+              <option value="name">Tên A–Z</option>
+              <option value="stock">Tồn kho thấp trước</option>
+            </select>
+          </label>
+        </>
+      )}
+    </div>
+  );
   return (
-    <div className="container page seller-page">
+    <div className={`container page seller-page${tab === 'products' ? ' seller-page-products' : ''}`}>
       <header className="page-heading">
         <div>
           <span className="eyebrow orange">KEYNEST / SELLER</span>
@@ -470,87 +556,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       {tab === "profile" && (
           <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} nameRequest={data.name_request} />
       )}
-      {["products", "sales", "withdrawals", "support"].includes(tab) && (
-        <div className="seller-toolbar">
-          <label>
-            Tìm kiếm
-            <input
-              type="search"
-              placeholder={
-                tab === "sales"
-                  ? "Mã đơn, tên sản phẩm hoặc gói…"
-                  : "Nhập từ khóa…"
-              }
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-          <label>
-            Trạng thái
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="all">Tất cả</option>
-              {(tab === "products"
-                ? [
-                    ["active", "Đang bán"],
-                    ["hidden", "Đã ẩn"],
-                    ["empty", "Hết hàng"],
-                    ["low", "Tồn kho ≤ 5"],
-                  ]
-                : tab === "sales"
-                  ? [
-                      ["waiting", "Chờ giao"],
-                      ["pending", "Chờ thanh toán"],
-                      ["processing", "Đang xử lý"],
-                      ["completed", "Hoàn thành"],
-                      ["refunded", "Đã hoàn tiền"],
-                      ["cancelled", "Đã hủy"],
-                      ["expired", "Hết hạn"],
-                    ]
-                  : tab === "support"
-                    ? [
-                        ["open", "Đang chờ"],
-                        ["in_progress", "Đang xử lý"],
-                        ["closed", "Đã đóng"],
-                      ]
-                    : [
-                        ["pending", "Chờ duyệt"],
-                        ["paid", "Đã chuyển"],
-                        ["rejected", "Từ chối"],
-                        ["cancelled", "Đã hủy"],
-                      ]
-              ).map(([k, label]) => (
-                <option key={k} value={k}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {tab === "products" && (
-            <>
-              <label>
-                Danh mục
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  {Object.entries(categories).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Sắp xếp
-                <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                  <option value="name">Tên A–Z</option>
-                  <option value="stock">Tồn kho thấp trước</option>
-                </select>
-              </label>
-            </>
-          )}
-        </div>
-      )}
+      {["sales", "withdrawals", "support"].includes(tab) && toolbar}
       {["sales", "revenue"].includes(tab) && (
         <div className="seller-toolbar">
           <label>
@@ -569,14 +575,16 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         </div>
       )}
       {tab === "products" && (
-        <section>
-          <div className="section-title">
-            <h2>Sản phẩm của tôi</h2>
+        <section className="seller-products-workspace">
+          <div className="section-title seller-products-title">
+            <div><h2>Sản phẩm của tôi <span>{data.products.length}</span></h2><p>Quản lý sản phẩm, giá bán và tồn kho.</p></div>
             <button className="button" onClick={() => setEditing({})}>
               <Plus size={16} />
               Thêm sản phẩm
             </button>
           </div>
+          {toolbar}
+          {!!products.length && <div className="seller-product-list-heading" aria-hidden="true"><span>Sản phẩm</span><span>Trạng thái</span><span>Tồn kho</span><span>Giá từ</span><span>Thao tác</span></div>}
           <div className="seller-product-list">
             {displayed(products).map((p) => (
               <article key={p.id}>
@@ -586,14 +594,18 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                 <div className="seller-product-copy">
                   <div className="seller-product-heading">
                     {p.active && p.review_status === 'approved' ? <Link to={`/products/${p.slug}`}><strong>{p.name}</strong></Link> : <strong>{p.name}</strong>}
-                    <span className={`seller-review-badge seller-review-${p.review_status === 'approved' && !p.active ? 'hidden' : p.review_status || 'pending'}`}>
-                      {p.review_status === 'approved' ? (p.active ? 'Đang bán' : 'Đã ẩn') : p.review_status === 'rejected' ? 'Cần chỉnh sửa' : 'Chờ duyệt'}
-                    </span>
                   </div>
-                  <p className="seller-product-meta">{p.variants.length} gói bán · {p.variants.some(v => v.unlimited) ? 'Kho không giới hạn' : `${stock(p)} tồn kho`}</p>
-                  {p.review_status !== 'approved' && <p className="seller-product-review-note">
-                    {p.review_status === 'rejected' ? `Lý do từ chối: ${p.review_reason || 'Liên hệ hỗ trợ để biết thêm.'}` : 'Admin đang kiểm tra. Sản phẩm sẽ được mở bán sau khi duyệt.'}
+                  <p className="seller-product-meta">{categories[p.category] || p.category}{p.platform ? ` · ${p.platform}` : ''} · {p.variants.length} gói</p>
+                  {p.review_status === 'rejected' && <p className="seller-product-review-note">
+                    {p.review_reason || 'Liên hệ hỗ trợ để biết lý do từ chối.'}
                   </p>}
+                </div>
+                <div className="seller-product-status"><span className={`seller-review-badge seller-review-${p.review_status === 'approved' && !p.active ? 'hidden' : p.review_status || 'pending'}`}>
+                  {p.review_status === 'approved' ? (p.active ? 'Đang bán' : 'Đã ẩn') : p.review_status === 'rejected' ? 'Cần chỉnh sửa' : 'Chờ duyệt'}
+                </span></div>
+                <div className="seller-product-metrics">
+                  <div className="seller-product-stock"><small>Tồn kho</small><strong>{p.variants.some(v => v.unlimited) ? 'Không giới hạn' : stock(p)}</strong></div>
+                  <div className="seller-product-price"><small>Giá từ</small><strong>{p.variants.length ? money(Math.min(...p.variants.map(v => v.price))) : 'Chưa có gói'}</strong></div>
                 </div>
                 <div className="seller-row-actions">
                   <button
@@ -629,9 +641,12 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                   >
                     <Trash2 size={18} />
                   </button>
+                  <button className={`icon-button seller-expand-product${expandedProducts.includes(p.id) ? ' is-expanded' : ''}`}
+                    aria-label={`Gói bán & tồn kho ${p.name}`} title="Gói bán & tồn kho" aria-expanded={expandedProducts.includes(p.id)} aria-controls={`seller-variants-${p.id}`}
+                    onClick={() => setExpandedProducts(ids => ids.includes(p.id) ? ids.filter(id => id !== p.id) : [...ids, p.id])}><ChevronDown size={16} /></button>
                 </div>
-                <details className="seller-product-variants">
-                  <summary><span><Package size={15} />Gói bán & tồn kho<small>{p.variants.length}</small></span><ChevronDown size={16} /></summary>
+                <div className="seller-product-variants" id={`seller-variants-${p.id}`} hidden={!expandedProducts.includes(p.id)}>
+                  <h3>Gói bán & tồn kho <span>{p.variants.length}</span></h3>
                   <div className="seller-stock-list">
                     {p.variants.map((v) => (
                       <div key={v.id}>
@@ -662,7 +677,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                       <p>Chưa có gói. Mở Quản lý để thêm gói bán.</p>
                     )}
                   </div>
-                </details>
+                </div>
               </article>
             ))}
           </div>
