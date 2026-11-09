@@ -306,16 +306,15 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     (s) =>
       new Date(s.order.created_at).getTime() >= since && s.seller_net != null,
   );
-  const gross = revenue.reduce((sum, s) => sum + (s.seller_gross || 0), 0),
-    fees = revenue
-      .filter((s) => !s.seller_reversed_at)
-      .reduce((sum, s) => sum + (s.seller_fee || 0), 0),
+  const currentRevenue = revenue.filter(
+    (s) => !s.seller_reversed_at && !s.refunded_at && s.order.status !== "refunded",
+  );
+  const gross = currentRevenue.reduce((sum, s) => sum + (s.seller_gross || 0), 0),
+    fees = currentRevenue.reduce((sum, s) => sum + (s.seller_fee || 0), 0),
     reversed = revenue
       .filter((s) => s.seller_reversed_at)
       .reduce((sum, s) => sum + (s.seller_net || 0), 0),
-    net = revenue
-      .filter((s) => !s.seller_reversed_at)
-      .reduce((sum, s) => sum + (s.seller_net || 0), 0);
+    net = currentRevenue.reduce((sum, s) => sum + (s.seller_net || 0), 0);
   const withdrawals = data.withdrawals.filter(
     (w) =>
       (filter === "all" || w.status === filter) &&
@@ -801,12 +800,12 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         <section className="seller-section">
           <h2>Doanh thu & đối soát</h2>
           <p className="muted">
-            Theo thời gian đặt đơn, chỉ tính các gói đã thanh toán. Doanh thu
+            Theo thời gian đặt đơn, chỉ tính các gói đã thanh toán và chưa hoàn tiền. Doanh thu
             thực nhận khác số dư ví sau khi mua hàng, rút tiền hoặc bù trừ.
           </p>
           <div className="seller-stats">
             {[
-              ["Doanh thu sau giảm giá", gross],
+              ["Doanh thu sau hoàn tiền", gross],
               ["Phí của đơn chưa hoàn", fees],
               ["Thực nhận chưa bị thu hồi", net],
               ["Thu nhập đã thu hồi", reversed],
