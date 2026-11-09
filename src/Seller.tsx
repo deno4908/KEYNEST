@@ -70,7 +70,7 @@ export function SellerContact({
   return (
     <div className="seller-contact">
       <span className="seller-avatar">
-        <Store size={22} />
+        <Store size={20} aria-hidden="true" />
       </span>
       <div>
         <small>Người bán</small>
