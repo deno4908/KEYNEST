@@ -24,6 +24,7 @@ import type { Product, Ticket } from "./types";
 import { useDataRefresh } from "./useDataRefresh";
 import { useChatLive } from './useChatLive';
 import { SELLER_TERMS_VERSION } from "../shared/seller-terms.js";
+import bankDirectory from "./data/vietnam-banks.json";
 
 const fold = (s: string) =>
   s
@@ -886,7 +887,14 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
             </label>
             <label>
               Ngân hàng
-              <input name="bank" minLength={2} maxLength={100} required />
+              <select name="bank" defaultValue="" required>
+                <option value="" disabled>Chọn ngân hàng nhận tiền</option>
+                {bankDirectory.banks.map((bank) => (
+                  <option key={bank.code} value={bank.shortName}>
+                    {bank.shortName} — {bank.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Số tài khoản

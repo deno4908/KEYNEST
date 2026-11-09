@@ -573,7 +573,8 @@
 .seller-withdraw-layout > .form { padding:20px; gap:14px; }
 .seller-withdraw-layout > .form h2 { margin:0; font-size:18px; }
 .seller-withdraw-layout > .form > p { margin:0; font-size:12px; line-height:1.8; }
-.seller-withdraw-layout .form input { min-height:40px; }
+.seller-withdraw-layout .form input,
+.seller-withdraw-layout .form select { min-height:40px; }
 .seller-withdraw-list > .panel { padding:18px; }
 .seller-withdraw-list {
   display: grid;
