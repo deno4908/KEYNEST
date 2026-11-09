@@ -746,9 +746,6 @@
   line-height: 1.7;
   color: #b8bbc5;
 }
-.seller-product-card .card-name {
-  margin-bottom: 4px;
-}
 .seller-product-card .seller-card-name {
   display: flex;
   align-items: center;
@@ -780,12 +777,6 @@
   line-height: 1.7;
   font-weight: 500;
   color: #d9d9df;
-}
-.seller-product-card .card-bottom {
-  margin-top: 12px;
-}
-.seller-product-card .card-arrow {
-  opacity: 1;
 }
 .seller-page td p {
   font-size: 13px;

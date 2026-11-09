@@ -781,7 +781,7 @@ hr {
 .card-bottom {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 3px;
 }
 .card-bottom > div {
@@ -3009,7 +3009,7 @@ td small {
     margin: 8px 0 12px;
   }
   .card-bottom {
-    align-items: flex-end;
+    align-items: flex-start;
   }
   .card-bottom > div {
     gap: 4px;

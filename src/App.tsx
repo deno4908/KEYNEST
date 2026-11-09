@@ -798,12 +798,6 @@ export function ProductCard({ product }: { product: Product }) {
         {product.name}
       </Link>
       <RatingLine product={product} />
-      {product.seller && (
-        <p className="seller-card-name" title={`Người bán: ${product.seller.name}`}>
-          <Store size={17} aria-hidden="true" />
-          <span><small>Người bán</small><strong>{product.seller.name}</strong></span>
-        </p>
-      )}
       <div className="card-bottom">
         <div>
           {v ? (
@@ -825,6 +819,12 @@ export function ProductCard({ product }: { product: Product }) {
           <ArrowUpRight size={18} />
         </Link>
       </div>
+      {product.seller && (
+        <p className="seller-card-name" title={`Người bán: ${product.seller.name}`}>
+          <Store size={17} aria-hidden="true" />
+          <span><small>Người bán</small><strong>{product.seller.name}</strong></span>
+        </p>
+      )}
     </article>
   );
 }
