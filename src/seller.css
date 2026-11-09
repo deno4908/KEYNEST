@@ -699,19 +699,93 @@
   color: #f4a47f;
 }
 .seller-notice {
-  border-block: 1px solid #34363e;
-  padding-bottom: 18px;
+  border-top: 1px solid #34363e;
+  padding-top: 16px;
   margin-top: 18px;
 }
-.seller-notice > p {
+.seller-notice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.seller-notice-heading .seller-contact {
+  min-width: 0;
+  padding: 0;
+  gap: 10px;
+}
+.seller-notice-heading .seller-contact > div {
+  min-width: 0;
+}
+.seller-notice-heading .seller-contact strong {
   font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.seller-notice-heading .seller-contact small {
+  font-size: 10px;
+}
+.seller-notice-heading .seller-avatar {
+  min-width: 34px;
+  height: 34px;
+  border-radius: 7px;
+}
+.seller-notice-heading > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #b8bbc5;
+}
+.seller-notice-heading > a:hover {
+  color: #f4a47f;
+}
+.seller-notice > p {
+  margin: 12px 0 0;
+  font-size: 11px;
   line-height: 1.7;
   color: #b8bbc5;
 }
-.seller-card-name {
-  font-size: 12px;
+.seller-product-card .card-name {
+  margin-bottom: 4px;
+}
+.seller-product-card .seller-card-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding-top: 9px;
+  border-top: 1px solid #303136;
   color: #a6a9b2;
-  margin: 6px 0;
+}
+.seller-product-card .seller-card-name > svg {
+  flex-shrink: 0;
+  color: #cba68f;
+}
+.seller-product-card .seller-card-name > span {
+  min-width: 0;
+}
+.seller-product-card .seller-card-name small {
+  display: block;
+  font-size: 9px;
+  line-height: 1.5;
+  color: #90929c;
+}
+.seller-product-card .seller-card-name strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.7;
+  font-weight: 500;
+  color: #d9d9df;
+}
+.seller-product-card .card-bottom {
+  margin-top: 12px;
+}
+.seller-product-card .card-arrow {
+  opacity: 1;
 }
 .seller-page td p {
   font-size: 13px;

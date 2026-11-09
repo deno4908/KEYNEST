@@ -52,6 +52,7 @@ import {
   Server,
   ShieldCheck,
   ShoppingBag,
+  Store,
   Ticket as TicketIcon,
   Trash2,
   UserRound,
@@ -772,7 +773,7 @@ export function ProductCard({ product }: { product: Product }) {
   );
   return (
     <article
-      className={`product-card ${product.category === "game" ? "game-poster" : "digital-product"}`}
+      className={`product-card ${product.category === "game" ? "game-poster" : "digital-product"}${product.seller ? " seller-product-card" : ""}`}
     >
       <Link to={`/products/${product.slug}`} className="card-art">
         <Art product={product} poster />
@@ -797,7 +798,12 @@ export function ProductCard({ product }: { product: Product }) {
         {product.name}
       </Link>
       <RatingLine product={product} />
-      {product.seller && <p className="seller-card-name">Người bán: {product.seller.name}</p>}
+      {product.seller && (
+        <p className="seller-card-name" title={`Người bán: ${product.seller.name}`}>
+          <Store size={17} aria-hidden="true" />
+          <span><small>Người bán</small><strong>{product.seller.name}</strong></span>
+        </p>
+      )}
       <div className="card-bottom">
         <div>
           {v ? (
@@ -884,7 +890,6 @@ function ProductPage() {
             {p.platform} / {categories[p.category]}
           </span>
           <h1>{p.name}</h1>
-          {p.seller && <section className="seller-notice"><SellerContact seller={p.seller}/><p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p></section>}
           <button
             className="detail-rating-button"
             onClick={() => {
@@ -999,6 +1004,15 @@ function ProductPage() {
             </>
           ) : (
             <p>Chưa có gói đang bán.</p>
+          )}
+          {p.seller && (
+            <section className="seller-notice" aria-label="Thông tin người bán">
+              <div className="seller-notice-heading">
+                <SellerContact seller={p.seller} />
+                <Link to="/support">Hỗ trợ <ArrowUpRight size={14} aria-hidden="true" /></Link>
+              </div>
+              <p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p>
+            </section>
           )}
         </div>
       </div>
