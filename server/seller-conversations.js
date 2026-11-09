@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { AppError } from "./security.js";
+import { z } from 'zod';
+
+export const conversationInput = z.object({
+  action: z.enum(['message', 'request', 'agree', 'reject', 'refund']),
+  body: z.string().trim().max(3000).default(''),
+  request_id: z.uuid().optional(),
+}).strict();
 
 export function itemPaidAmount(order, itemId) {
   let cumulative = 0n;

@@ -4,6 +4,7 @@ import { NotificationProvider, NotificationBadge, NotificationsPage } from './No
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
 import { useDataRefresh } from './useDataRefresh';
+import { useChatLive } from './useChatLive';
 import { PreorderNote } from './PreorderNote';
 import { HomeAnnouncements } from "./Announcements";
 import { LegalPage, SocialLinks } from "./LegalPages";
@@ -1960,6 +1961,8 @@ function SupportPage() {
   useEffect(() => {
     load();
   }, [user?.id]);
+  const supportLive = useChatLive<Ticket[]>(user ? 'tickets' : null, user?.id, setTickets,
+    message => notify(message, true));
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!user) return login();
@@ -2033,7 +2036,8 @@ function SupportPage() {
               <p className="muted">Chưa có yêu cầu hỗ trợ.</p>
             ) : (
               tickets.map((t) => (
-                <CustomerTicketCard key={t.id} ticket={t} refresh={load} />
+                <CustomerTicketCard key={t.id} ticket={t} refresh={load}
+                  connected={supportLive.connected} sendReply={body => supportLive.send({ id: t.id, body })} />
               ))
             )}
           </div>

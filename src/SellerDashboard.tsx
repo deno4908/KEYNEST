@@ -21,6 +21,7 @@ import { ProfileForm, WithdrawalList } from "./Seller";
 import type { Sale, SellerData } from "./Seller";
 import type { Product, Ticket } from "./types";
 import { useDataRefresh } from "./useDataRefresh";
+import { useChatLive } from './useChatLive';
 import { SELLER_TERMS_VERSION } from "../shared/seller-terms.js";
 
 const fold = (s: string) =>
@@ -143,14 +144,6 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       if (version === generation.current) setSyncing(false);
     }
   };
-  const loadSupport = async () => {
-    try {
-      setTickets(await api<Support[]>("/seller/support"));
-      setSupportError("");
-    } catch (e) {
-      setSupportError((e as Error).message);
-    }
-  };
   const saved = async () => {
     await load();
     await refresh();
@@ -166,13 +159,8 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     ["/seller/", "/admin/", "/orders", "/wallet", "/tickets", "/order-chat/"],
     { intervalMs: 30000, enabled: user?.role === "seller" },
   );
-  useDataRefresh(loadSupport, ["/seller/support/", "/tickets", "/admin/"], {
-    intervalMs: 5000,
-    enabled: tab === "support",
-  });
-  useEffect(() => {
-    if (tab === "support") void loadSupport();
-  }, [tab]);
+  const supportLive = useChatLive<Support[]>(tab === 'support' && user?.role === 'seller' ? 'seller-support' : null,
+    user?.id, rows => { setTickets(rows); setSupportError(''); }, setSupportError);
   useEffect(() => {
     setPage(1);
   }, [query, filter, category, sort, period, tab]);
@@ -1210,14 +1198,11 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                 if (
                   await run(
                     () =>
-                      post(`/seller/support/${selectedTicket.id}/messages`, {
-                        body: reply,
-                      }),
+                      supportLive.send({ id: selectedTicket.id, body: reply }),
                     "Đã gửi phản hồi.",
                   )
                 ) {
                   setReply("");
-                  await loadSupport();
                 }
               }}
             >
@@ -1231,7 +1216,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
                   required
                 />
               </label>
-              <button className="button" disabled={busy}>
+              <button className="button" disabled={busy || !supportLive.connected}>
                 Gửi phản hồi
               </button>
             </form>

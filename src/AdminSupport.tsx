@@ -64,9 +64,13 @@ export function TicketHistory({
 export function CustomerTicketCard({
   ticket,
   refresh,
+  sendReply,
+  connected = true,
 }: {
   ticket: Ticket;
   refresh: () => void;
+  sendReply?: (body: string) => Promise<void>;
+  connected?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false),
     [body, setBody] = useState(""),
@@ -77,9 +81,10 @@ export function CustomerTicketCard({
     setBusy(true);
     setError("");
     try {
-      await post(`/tickets/${ticket.id}/messages`, { body: body.trim() });
+      if (sendReply) await sendReply(body.trim());
+      else await post(`/tickets/${ticket.id}/messages`, { body: body.trim() });
       setBody("");
-      refresh();
+      if (!sendReply) refresh();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -128,7 +133,7 @@ export function CustomerTicketCard({
             {error && <p className="form-error">{error}</p>}
             <button
               className="button button-small"
-              disabled={busy || body.trim().length < 3}
+              disabled={busy || !connected || body.trim().length < 3}
             >
               <Send size={14} />
               {busy ? "Đang gửi…" : "Gửi trả lời"}

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { api, post, date, money } from "./api";
+import { date, money } from "./api";
 import { Modal, useStore } from "./App";
 import { Send, MessageCircle } from 'lucide-react';
 import './order-chat.css';
-import { useDataRefresh } from "./useDataRefresh";
+import { useChatLive } from "./useChatLive";
 
 export type SellerDispute = {
   order_id: string;
@@ -83,7 +83,6 @@ export function OrderChat({
     [requesting, setRequesting] = useState(false),
     [decision, setDecision] = useState("");
   const [requestId, setRequestId] = useState(() => crypto.randomUUID());
-  const sequence = useRef(0);
   const readOnly = data?.can_message === undefined ? admin || user?.role === 'admin' : !data.can_message;
   const viewerRole = data?.viewer_role || (user?.role === 'seller' ? 'seller' : 'customer');
   const logRef = useRef<HTMLDivElement>(null);
@@ -92,40 +91,21 @@ export function OrderChat({
   useEffect(() => {
     if (followLatest.current && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [lastMessage]);
-  const load = async () => {
-    const version = ++sequence.current;
-    try {
-      const next = await api<Conversation>(`/order-chat/${itemId}`);
-      if (version === sequence.current) {
-        setData(next);
-      }
-    } catch (e) {
-      if (version === sequence.current) setError((e as Error).message);
-    }
-  };
-  useEffect(() => {
-    void load();
-    return () => {
-      sequence.current++;
-    };
-  }, [itemId]);
-  useDataRefresh(load, ["/order-chat/", "/admin/"], {
-    intervalMs: 5000,
-    enabled: !busy,
-  });
+  useEffect(() => { setData(null); }, [itemId, user?.id]);
+  const live = useChatLive<Conversation>(`order:${itemId}`, user?.id, next => {
+    setData(next);
+    setError('');
+  }, setError);
   const send = async (action: string) => {
     if (busy || (action === 'message' && (readOnly || !body.trim()))) return;
     setBusy(true);
     setError("");
-    sequence.current++;
     try {
-      setData(
-        await post(`/order-chat/${itemId}`, {
+      await live.send({
           action,
           body: action === "message" ? body : reason,
           ...(action === "message" ? { request_id: requestId } : {}),
-        }),
-      );
+        });
       if (action === "message") {
         followLatest.current = true;
         setBody("");
@@ -158,6 +138,7 @@ export function OrderChat({
           {error}
         </p>
       )}
+      <p className="order-chat-connection" role="status">{live.connected ? 'Đã kết nối chat trực tiếp' : 'Đang kết nối lại chat…'}</p>
       {data && (
         <>
           {!requesting && <>
@@ -205,7 +186,7 @@ export function OrderChat({
                 maxLength={3000}
                 rows={1}
               />
-              <button className="button" aria-label="Gửi tin nhắn" disabled={busy || !body.trim()}>
+              <button className="button" aria-label="Gửi tin nhắn" disabled={busy || !live.connected || !body.trim()}>
                 <Send size={19} />
               </button>
             </form>

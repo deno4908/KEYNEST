@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError, encrypt } from "./security.js";
 import { requireSeller, releaseSellerFunds } from "./seller-accounting.js";
-import { sellerConversation } from "./seller-conversations.js";
+import { sellerConversation, conversationInput } from "./seller-conversations.js";
 import { SELLER_TERMS_VERSION, sellerTerms } from "../shared/seller-terms.js";
 
 export function createSellers(store) {
@@ -475,14 +475,7 @@ export function sellersRouter({
     auth,
     limiter(20, 60000, "order-chat-write"),
     async (req, res) => {
-      const input = z
-        .object({
-          action: z.enum(["message", "request", "agree", "reject", "refund"]),
-          body: z.string().trim().max(3000).default(""),
-          request_id: uuid.optional(),
-        })
-        .strict()
-        .parse(req.body);
+      const input = conversationInput.parse(req.body);
       res.json(
         await sellerConversation(
           store,

@@ -69,7 +69,10 @@ Chưa thể khẳng định an toàn gói Free nếu chưa có số phát sinh t
   báo một lần. Áp dụng migration rồi khởi động lại để bật kiểm tra nhẹ.
 - Tra cứu một sản phẩm chỉ lấy thống kê đánh giá cho sản phẩm đó.
 - Trang người bán tải overview mỗi 30 giây thay vì 5 giây. Vẫn cập nhật sau
-  thao tác và khi trở lại trang; polling hỗ trợ/chat giữ nguyên.
+  thao tác và khi trở lại trang. Chat đơn hàng và trao đổi hỗ trợ seller/khách
+  hàng đã chuyển sang WebSocket, không còn GET mỗi 5 giây. Kết nối nhàn rỗi
+  chỉ ping/pong; tải lại khi có thay đổi hoặc kết nối lại. Xem
+  [cấu hình proxy và giới hạn](chat-websocket.md).
 - Ảnh công khai `/api/media/<uuid>.webp` có cache trên đĩa VPS (tối đa 256 MiB
   mỗi project/tiến trình ghi); gộp các lượt tải đồng thời cùng ảnh. Cache tồn tại
   qua lần khởi động lại, chỉ tải Storage khi thiếu ảnh. Khi đầy, loại ảnh cũ.

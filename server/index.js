@@ -1,5 +1,8 @@
 import { sessionRefreshHandler } from './session-refresh.js';
 import express from "express";
+import { createServer as createHttpServer } from 'node:http';
+import { createChatLive } from './chat-live.js';
+import { sellerConversation, conversationInput } from './seller-conversations.js';
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { createApiLimits } from './rate-limits.js';
@@ -14,7 +17,8 @@ import { mfaRouter, needsMfa } from "./mfa.js";
 import { createAdminOtp } from "./admin-otp.js";
 import { createReceiptWorker } from './order-receipts.js';
 import { createPaymentRouting } from './payment-routing.js';
-import { sellersRouter } from './sellers.js';
+import { sellersRouter, createSellers } from './sellers.js';
+import { requireSeller } from './seller-accounting.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
 import { createPasswordTransport } from './password-transport.js';
@@ -131,7 +135,7 @@ app.use(
           "https://cdn.discordapp.com",
           "https://media.discordapp.net",
         ],
-        connectSrc: ["'self'", ...(config.captcha.enabled ? ['https://www.google.com/recaptcha/'] : [])],
+        connectSrc: ["'self'", config.origin.replace(/^http/, 'ws'), ...(config.captcha.enabled ? ['https://www.google.com/recaptcha/'] : [])],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -256,6 +260,64 @@ const admin = (req, res, next) =>
 const uuid = z.uuid();
 app.use('/api', apiAccessGuard({ auth, admin }));
 app.use('/api', apiLimits.authenticated);
+// Reuse the HTTP auth guard for socket delivery and commands, including session
+// revocation, account suspension, MFA and the admin email proof. Never retain
+// the HTTP request/socket or put a long-lived bearer token in a WebSocket URL.
+const chatSellers = createSellers(store);
+const supportMessage = z.object({ id: z.uuid(), body: z.string().trim().min(3).max(3000) }).strict();
+export const chatLive = createChatLive({
+  origin: config.origin,
+  authorize: context => new Promise((resolveUser, reject) => {
+    const request = { ...context, headers: { ...context.headers }, cookies: { ...context.cookies },
+      originalUrl: '/api/chat/live-ticket', get(name) { return this.headers[name.toLowerCase()]; } };
+    const response = { statusCode: 200, status(code) { this.statusCode = code; return this; },
+      json(body) { reject(new AppError(body.error, this.statusCode)); } };
+    void auth(request, response, error => error ? reject(error) : resolveUser(request.user));
+  }),
+  async load(topic, user) {
+    if (topic.startsWith('order:')) return sellerConversation(store, user.id, topic.slice(6));
+    if (topic === 'seller-support') {
+      if (user.role !== 'seller') throw new AppError('Cần quyền người bán.', 403);
+      requireSeller(user);
+      return chatSellers.support(user.id);
+    }
+    return store.tickets(user.id);
+  },
+  async command(topic, user, value) {
+    if (topic.startsWith('order:')) {
+      const input = conversationInput.parse(value);
+      await sellerConversation(store, user.id, topic.slice(6), input.action, input.body, input.request_id);
+      return;
+    }
+    const input = supportMessage.parse(value);
+    if (topic === 'seller-support') {
+      if (user.role !== 'seller') throw new AppError('Cần quyền người bán.', 403);
+      requireSeller(user);
+      await chatSellers.support(user.id, input.id, input.body);
+    } else {
+      if (!(await store.tickets(user.id, false, input.id)).length) throw new AppError('Không tìm thấy yêu cầu.', 404);
+      await store.addTicketMessage(user.id, input.id, input.body);
+    }
+  },
+});
+app.post('/api/chat/live-ticket', limiter(30, 60000, 'chat-ticket'), async (req, res) => {
+  const { topic } = z.object({ topic: z.string().max(80) }).strict().parse(req.body);
+  const context = { headers: { authorization: req.headers.authorization, 'user-agent': req.get('user-agent') },
+    cookies: { kn_session: req.cookies.kn_session, kn_admin_verified: req.cookies.kn_admin_verified } };
+  res.json(await chatLive.issue(topic, req.user, context));
+});
+app.use('/api', (req, res, next) => {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+      /^\/(?:order-chat|tickets|orders|seller|admin)(?:\/|$)/i.test(req.path)) {
+    const item = /^\/order-chat\/([0-9a-f-]{36})\/?$/i.exec(req.path)?.[1];
+    res.on('finish', () => {
+      if (res.statusCode >= 400) return;
+      chatLive.invalidate(item ? `order:${item}` : undefined);
+      if (item) chatLive.invalidate('support');
+    });
+  }
+  next();
+});
 app.use('/api', passwordTransport.middleware.bind(passwordTransport));
 app.use("/api/auth/mfa", mfaRouter({ config, auth, limiter, setAuth }));
 app.use('/api', categoriesRouter({ categories: categoryStore, auth, admin, limiter, store }));
@@ -1209,8 +1271,13 @@ app.use((err, req, res, next) => {
         : "Có lỗi hệ thống. Vui lòng thử lại.",
   });
 });
+export function createServer() {
+  const server = createHttpServer(app);
+  chatLive.attach(server);
+  return server;
+}
 if (process.env.NODE_ENV !== "test") {
-  const server = app.listen(
+  const server = createServer().listen(
     config.port,
     config.production ? "0.0.0.0" : "127.0.0.1",
     () =>
@@ -1241,6 +1308,7 @@ if (process.env.NODE_ENV !== "test") {
     clearInterval(receiptTimer);
     clearInterval(tingeeTimer);
     catalogLive.close();
+    chatLive.close();
     const force = setTimeout(() => process.exit(1), 30000);
     force.unref();
     await new Promise((done) => server.close(done));

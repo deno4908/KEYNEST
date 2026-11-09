@@ -68,3 +68,4 @@
 .order-chat-composer .button { min-height:42px; border-radius:10px; flex-shrink:0; }
 .order-chat-readonly { font-size:12px; color:#b4b6c2; line-height:1.7; padding:12px 0; }
 @media(max-width:480px) { .order-chat-messages { padding:12px; } .chat-message { max-width:92%; } .order-chat-composer .button span { display:none; } }
+.order-chat-connection{font-size:11px;color:#a6a9b8;margin:0;padding:6px 20px;flex-shrink:0}
