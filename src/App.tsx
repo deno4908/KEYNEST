@@ -52,7 +52,6 @@ import {
   Server,
   ShieldCheck,
   ShoppingBag,
-  Store,
   Ticket as TicketIcon,
   Trash2,
   UserRound,
@@ -798,13 +797,7 @@ export function ProductCard({ product }: { product: Product }) {
         {product.name}
       </Link>
       <RatingLine product={product} />
-      {product.seller && (
-        <p className="seller-card-name" title={`Người bán: ${product.seller.name}`}>
-          <Store size={13} aria-hidden="true" />
-          <span className="sr-only">Người bán: </span>
-          <span>{product.seller.name}</span>
-        </p>
-      )}
+      {product.seller && <p className="seller-card-name">Người bán: {product.seller.name}</p>}
       <div className="card-bottom">
         <div>
           {v ? (
@@ -860,7 +853,7 @@ function ProductPage() {
   const v = p.variants.find((v) => v.id === variantId) || p.variants[0];
   if (!v) return <Empty title="Sản phẩm tạm ngừng bán" description="Cửa hàng chưa mở bán gói nào cho sản phẩm này."><Link className="button" to="/catalog">Về cửa hàng</Link></Empty>;
   return (
-    <div className="container page product-detail-page">
+    <div className="container page">
       <div className="breadcrumb">
         <Link to="/">Trang chủ</Link>
         <ChevronRight size={13} />
@@ -871,7 +864,7 @@ function ProductPage() {
         {p.name}
       </div>
       <div className="detail-grid">
-        <div className="detail-media">
+        <div>
           <div className="detail-art">
             <Art product={p} />
           </div>
@@ -891,6 +884,7 @@ function ProductPage() {
             {p.platform} / {categories[p.category]}
           </span>
           <h1>{p.name}</h1>
+          {p.seller && <section className="seller-notice"><SellerContact seller={p.seller}/><p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p></section>}
           <button
             className="detail-rating-button"
             onClick={() => {
@@ -917,13 +911,12 @@ function ProductPage() {
                   </>
                 )}
               </div>
-              <div className="detail-package-heading"><span className="field-title" id="detail-package-label">Chọn phiên bản / gói</span><small>{p.variants.length} gói bán</small></div>
-              <div className="variants" role="group" aria-labelledby="detail-package-label">
+              <label className="field-title">Chọn phiên bản / gói</label>
+              <div className="variants">
                 {p.variants.map((x) => (
                   <button
                     key={x.id}
                     className={x.id === v.id ? "selected" : ""}
-                    aria-pressed={x.id === v.id}
                     onClick={() => {
                       setVariant(x.id);
                       setQuantity(1);
@@ -1008,15 +1001,6 @@ function ProductPage() {
             <p>Chưa có gói đang bán.</p>
           )}
         </div>
-        {p.seller && (
-          <section className="seller-notice" aria-label="Thông tin người bán">
-            <div className="seller-notice-heading">
-              <SellerContact seller={p.seller} />
-              <Link to="/support" className="seller-support-link">Hỗ trợ <ArrowUpRight size={14} aria-hidden="true" /></Link>
-            </div>
-            <p>Người bán chịu trách nhiệm về thông tin, chất lượng, giao hàng và bảo hành sản phẩm này. Khi có vấn đề, hãy gửi yêu cầu tại Trung tâm hỗ trợ KEYNEST để được kiểm tra.</p>
-          </section>
-        )}
       </div>
       <div className="detail-tabs" id="product-feedback-tabs">
         <button
