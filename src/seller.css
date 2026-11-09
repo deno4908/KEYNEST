@@ -11,6 +11,22 @@
 .seller-page section > h3 { font-size:14px; }
 .seller-page .section-title { gap:12px; margin-bottom:14px; }
 .seller-page .panel { border-radius:8px; }
+.seller-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.seller-section > h2,
+.seller-section > h3,
+.seller-section > p {
+  margin: 0;
+}
+.seller-sales-table th:last-child {
+  text-align: right;
+}
+.seller-sales-table .seller-sale-actions {
+  justify-content: flex-end;
+}
 .seller-toolbar {
   display: flex;
   align-items: end;

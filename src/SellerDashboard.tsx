@@ -682,10 +682,10 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         </section>
       )}
       {tab === "sales" && (
-        <section>
+        <section className="seller-section">
           <h2>Đơn bán & giao hàng</h2>
           <div className="panel table-scroll">
-            <table>
+            <table className="seller-sales-table">
               <thead>
                 <tr>
                   <th>Đơn / sản phẩm</th>
@@ -767,7 +767,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         </section>
       )}
       {tab === "revenue" && (
-        <section>
+        <section className="seller-section">
           <h2>Doanh thu & đối soát</h2>
           <p className="muted">
             Theo thời gian đặt đơn, chỉ tính các gói đã thanh toán. Doanh thu
@@ -817,7 +817,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
         </section>
       )}
       {tab === "revenue" && (
-        <section className="panel table-scroll">
+        <section className="panel table-scroll seller-section">
           <h3>Tiền đang giữ</h3>
           <p>
             48 giờ tính từ lúc giao thành công từng sản phẩm. Yêu cầu hoàn tiền
