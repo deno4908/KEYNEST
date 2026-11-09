@@ -266,6 +266,63 @@
   width: 100%;
   margin: auto;
 }
+.seller-profile-editor { display:grid; gap:20px; min-width:0; }
+.seller-profile-title h2 { margin:0 0 8px; font-size:20px; }
+.seller-profile-title p { margin:0; font-size:12px; color:var(--text-secondary); }
+.seller-profile-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:20px; align-items:start; }
+.seller-profile-grid > .panel { min-width:0; padding:24px; }
+.seller-name-form { margin:0; gap:16px; }
+.seller-current-shop { display:flex; align-items:center; gap:12px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+.seller-current-shop > span { display:grid; place-items:center; flex:0 0 42px; height:42px; border:1px solid #ff80552b; border-radius:8px; background:#ff80550a; color:var(--accent); }
+.seller-current-shop > div { display:grid; gap:4px; min-width:0; }
+.seller-current-shop small { font-size:11px; }
+.seller-current-shop strong { font-size:16px; font-weight:600; overflow-wrap:anywhere; }
+.seller-name-form-heading h3 { margin:0 0 6px; font-size:14px; }
+.seller-name-form-heading p { margin:0; line-height:1.8; }
+.seller-name-form > label { display:grid; gap:8px; font-size:12px; }
+.seller-name-form > small { line-height:1.8; font-size:11px; }
+.seller-name-submit { display:flex; justify-content:flex-end; padding-top:4px; }
+.seller-name-notice { display:flex; gap:10px; padding:14px; border:1px solid #d6a6443b; background:#d6a64409; border-radius:7px; }
+.seller-name-notice > svg { flex-shrink:0; color:#e9c47b; margin-top:2px; }
+.seller-name-notice > div { min-width:0; }
+.seller-name-notice strong { font-size:12px; color:#e9c47b; }
+.seller-name-notice p { margin:6px 0; overflow-wrap:anywhere; }
+.seller-name-notice small { font-size:10px; overflow-wrap:anywhere; }
+.seller-name-notice.is-rejected { border-color:#d6575733; background:#d6575708; }
+.seller-name-notice.is-rejected strong { color:#f3a2a2; }
+.seller-profile-fee { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.seller-profile-fee h3 { margin:0 0 6px; font-size:14px; }
+.seller-profile-fee p { margin:0; line-height:1.8; }
+.seller-profile-fee > strong { color:var(--accent); font-size:30px; font-weight:600; white-space:nowrap; }
+.seller-profile-fee strong small { color:inherit; font-size:16px; margin-left:3px; }
+.seller-profile-example { display:grid; gap:12px; margin:20px 0; font-size:12px; }
+.seller-profile-example > div { display:flex; justify-content:space-between; gap:12px; }
+.seller-profile-example dt { color:var(--text-secondary); }
+.seller-profile-example dd { margin:0; font-variant-numeric:tabular-nums; }
+.seller-profile-example > div:last-child { padding-top:12px; border-top:1px solid var(--border); }
+.seller-profile-example > div:last-child dd { color:#9bdbb5; }
+.seller-profile-policy-details { padding-top:16px; border-top:1px solid var(--border); }
+.seller-profile-policy-details > summary { cursor:pointer; display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-primary); }
+.seller-profile-policy-details > summary::after { content:'+'; margin-left:auto; color:var(--text-secondary); }
+.seller-profile-policy-details[open] > summary::after { content:'−'; }
+.seller-profile-policy-details > summary::-webkit-details-marker { display:none; }
+.seller-profile-policy-details .seller-terms { margin-top:14px; max-height:320px; }
+.seller-profile-policy .seller-profile-accepted { margin:12px 0 0; font-size:10px; line-height:1.8; }
+.seller-name-review-list { display:grid; gap:12px; }
+.seller-name-review-card { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.seller-name-review-card > div { min-width:0; }
+.seller-name-review-card > button { flex-shrink:0; }
+.seller-name-comparison { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:10px 0; overflow-wrap:anywhere; }
+.seller-name-comparison > strong { min-width:0; max-width:100%; font-size:14px; }
+.seller-name-comparison > svg { flex-shrink:0; color:var(--accent); }
+.seller-name-review-summary { display:grid; gap:8px; }
+.seller-name-review-summary strong { overflow-wrap:anywhere; }
+@media(max-width:800px) { .seller-profile-grid { grid-template-columns:1fr; } }
+@media(max-width:480px) {
+ .seller-profile-grid > .panel { padding:18px; }
+ .seller-name-submit > button { width:100%; }
+ .seller-name-review-card { align-items:stretch; flex-direction:column; }
+}
 .seller-profile.form {
   padding: 0;
   gap: 0;

@@ -70,6 +70,9 @@ if (config.mode === 'supabase') {
   const { error } = await store.client.from('payment_routes').select('payment_id,qr_kind,poll_failures').limit(0)
     .abortSignal(AbortSignal.timeout(10000));
   if (error) throw new Error('Không truy cập được schema payment_routes. Kiểm tra kết nối Supabase và áp dụng đầy đủ migration đến 056 trước khi triển khai.');
+  const names = await store.client.from('seller_name_requests').select('id,requested_name,status').limit(0)
+    .abortSignal(AbortSignal.timeout(10000));
+  if (names.error) throw new Error('Áp dụng migration 057_seller_name_approval.sql trước khi triển khai phiên bản này.');
 }
 export const bankPayments = createBankPayments({
   config,

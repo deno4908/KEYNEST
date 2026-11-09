@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useDataRefresh } from "./useDataRefresh";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { Store, ExternalLink, ShieldCheck, ArrowRight } from "lucide-react";
+import { Store, ExternalLink, ShieldCheck, ArrowRight, Clock3 } from "lucide-react";
 import { api, post, money, date } from "./api";
 import { Loading, Modal, useStore } from "./App";
 import type { Product, User, OrderItem } from "./types";
@@ -44,6 +44,17 @@ export type SellerData = {
   held?: number;
   disputes?: SellerDispute[];
   ledger?: import("./types").Ledger[];
+  name_request?: SellerNameRequest | null;
+};
+export type SellerNameRequest = {
+  id: string;
+  user_id: string;
+  current_name: string;
+  requested_name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reason: string;
+  created_at: string;
+  resolved_at: string | null;
 };
 const withdrawalStatus: Record<string, string> = {
   pending: "Chờ duyệt",
@@ -72,16 +83,24 @@ export function ProfileForm({
   profile,
   fee,
   saved,
+  nameRequest,
 }: {
   profile: User;
   fee: number;
   saved: () => Promise<void>;
+  nameRequest?: SellerNameRequest | null;
 }) {
   const { setUser } = useStore();
   const accepted =
     profile.seller_terms_version === SELLER_TERMS_VERSION &&
     !!profile.seller_terms_accepted_at;
-  const [shopName, setShopName] = useState(profile.seller_name || profile.name);
+  const pending = nameRequest?.status === 'pending';
+  const [shopName, setShopName] = useState(accepted ? '' : profile.seller_name || profile.name);
+  const [sent, setSent] = useState(false);
+  useEffect(() => {
+    setShopName(accepted ? (nameRequest?.status === 'pending' ? nameRequest.requested_name : '') : profile.seller_name || profile.name);
+    setSent(false);
+  }, [accepted, profile.seller_name, profile.name, nameRequest?.id, nameRequest?.status]);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -90,18 +109,18 @@ export function ProfileForm({
     setBusy(true);
     setError("");
     try {
-      const user = await post<User>(
-        accepted ? "/seller/profile/name" : "/seller/profile",
-        accepted
-          ? { name: f.get("name") }
-          : {
+      if (accepted) {
+        await post<SellerNameRequest>('/seller/profile/name', { name: f.get('name') });
+        setSent(true);
+      } else {
+        const user = await post<User>('/seller/profile', {
               name: f.get("name"),
               accepted: f.get("accepted") === "on",
               terms_version: SELLER_TERMS_VERSION,
               fee_bps: fee,
-            },
-      );
-      setUser(user);
+            });
+        setUser(user);
+      }
       await saved();
     } catch (e) {
       setError((e as Error).message);
@@ -109,6 +128,36 @@ export function ProfileForm({
       setBusy(false);
     }
   }
+  if (accepted) return (
+    <section className="seller-profile-editor">
+      <header className="seller-profile-title">
+        <h2>Hồ sơ gian hàng</h2>
+        <p>Tên hiển thị, yêu cầu đổi tên và điều khoản người bán.</p>
+      </header>
+      <div className="seller-profile-grid">
+        <form className="panel form seller-name-form" onSubmit={submit}>
+          <div className="seller-current-shop">
+            <span><Store size={22} /></span>
+            <div><small>Tên đang hiển thị</small><strong>{profile.seller_name || profile.name}</strong></div>
+          </div>
+          <div className="seller-name-form-heading"><h3>Yêu cầu đổi tên</h3><p>Tên hiện tại được giữ nguyên cho đến khi admin duyệt tên mới.</p></div>
+          {pending && <div className="seller-name-notice" role="status"><Clock3 size={18} /><div><strong>Đang chờ xét duyệt</strong><p>{nameRequest.requested_name}</p><small>Gửi lúc {date(nameRequest.created_at)}</small></div></div>}
+          {!pending && nameRequest?.status === 'rejected' && <div className="seller-name-notice is-rejected"><div><strong>Yêu cầu trước chưa được duyệt</strong><p>{nameRequest.reason}</p><small>Tên đề xuất: {nameRequest.requested_name}</small></div></div>}
+          {sent && !pending && <p className="info-note" role="status">Đã gửi yêu cầu đổi tên. Admin sẽ kiểm tra trước khi cập nhật.</p>}
+          {!pending && <><label>Tên gian hàng mới<input name="name" required minLength={2} maxLength={80} value={shopName} onChange={e => { setShopName(e.target.value); setSent(false); }} placeholder="Nhập tên muốn sử dụng" /></label>
+          <small>Dùng tên rõ ràng, không mạo danh cá nhân hoặc thương hiệu khác.</small></>}
+          {error && <p className="form-error" role="alert">{error}</p>}
+          {!pending && <div className="seller-name-submit"><button className="button" disabled={busy || shopName.trim().length < 2 || shopName.trim() === (profile.seller_name || profile.name)}>{busy ? 'Đang gửi…' : 'Gửi yêu cầu đổi tên'}<ArrowRight size={16} /></button></div>}
+        </form>
+        <aside className="panel seller-profile-policy">
+          <div className="seller-profile-fee"><div><h3>Phí nền tảng</h3><p>Trên giá trị sản phẩm sau giảm giá.</p></div><strong>{fee / 100}<small>%</small></strong></div>
+          <dl className="seller-profile-example"><div><dt>Ví dụ bán</dt><dd>{money(100000)}</dd></div><div><dt>Phí nền tảng</dt><dd>−{money(fee * 10)}</dd></div><div><dt>Bạn nhận</dt><dd>{money(100000 - fee * 10)}</dd></div></dl>
+          <details className="seller-profile-policy-details"><summary><ShieldCheck size={17} />Điều khoản người bán</summary><div className="seller-terms">{sellerTerms.map(([title, body]) => <section key={title}><h4>{title}</h4><p>{body}</p></section>)}</div></details>
+          <p className="seller-profile-accepted">Đã chấp nhận ngày {date(profile.seller_terms_accepted_at!)}.</p>
+        </aside>
+      </div>
+    </section>
+  );
   return (
     <form className="form panel seller-profile" onSubmit={submit}>
       <div className="seller-profile-heading">
@@ -139,6 +188,7 @@ export function ProfileForm({
                 minLength={2}
                 maxLength={80}
                 value={shopName}
+                readOnly={!!profile.seller_name}
                 onChange={(e) => setShopName(e.target.value)}
               />
             </label>
@@ -269,11 +319,15 @@ export function WithdrawalList({
 export function AdminSellers() {
   const [chat, setChat] = useState<string | null>(null);
   const { notify } = useStore();
+  const [nameReview, setNameReview] = useState<SellerNameRequest | null>(null);
+  const [nameDecision, setNameDecision] = useState<'approved' | 'rejected'>('approved');
+  const [nameReason, setNameReason] = useState('');
   const [data, setData] = useState<{
       disputes: SellerDispute[];
       sellers: User[];
       withdrawals: Withdrawal[];
       fee_bps: number;
+      name_requests?: SellerNameRequest[];
     } | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -341,6 +395,13 @@ export function AdminSellers() {
         !error && <Loading />
       ) : (
         <>
+          {!!data.name_requests?.length && <section className="seller-name-review-list">
+            <div className="section-title"><h2>Yêu cầu đổi tên gian hàng</h2><span className="badge">{data.name_requests.length} chờ duyệt</span></div>
+            {data.name_requests.map(request => <article className="panel seller-name-review-card" key={request.id}>
+              <div><small>{data.sellers.find(s => s.id === request.user_id)?.email || request.user_id}</small><div className="seller-name-comparison"><strong>{request.current_name}</strong><ArrowRight size={16} /><strong>{request.requested_name}</strong></div><small>Gửi lúc {date(request.created_at)}</small></div>
+              <button className="button button-outline" onClick={() => { setNameReview(request); setNameDecision('approved'); setNameReason(''); }}>Xét duyệt</button>
+            </article>)}
+          </section>}
           <section>
             {data.disputes?.map((d) => (
               <article className="panel seller-support-card" key={d.item_id}>
@@ -413,6 +474,22 @@ export function AdminSellers() {
         </>
       )}
       {chat && <OrderChat itemId={chat} close={() => setChat(null)} admin />}
+      {nameReview && <Modal title="Xét duyệt tên gian hàng" close={() => !busy && setNameReview(null)}>
+        <form className="form" onSubmit={async e => {
+          e.preventDefault(); setBusy(true);
+          try {
+            await post(`/admin/sellers/name-requests/${nameReview.id}`, { status: nameDecision, reason: nameReason });
+            setNameReview(null); await load(); notify(nameDecision === 'approved' ? 'Đã duyệt tên gian hàng mới.' : 'Đã từ chối yêu cầu đổi tên.');
+          } catch (error) { notify((error as Error).message, true); }
+          finally { setBusy(false); }
+        }}>
+          <div className="seller-name-review-summary"><small>Tên hiện tại</small><strong>{nameReview.current_name}</strong><small>Tên đề xuất</small><strong>{nameReview.requested_name}</strong></div>
+          <label>Kết quả xét duyệt<select value={nameDecision} onChange={e => setNameDecision(e.target.value as 'approved' | 'rejected')}><option value="approved">Duyệt tên mới</option><option value="rejected">Từ chối</option></select></label>
+          <label>{nameDecision === 'rejected' ? 'Lý do từ chối' : 'Ghi chú (không bắt buộc)'}<textarea rows={3} value={nameReason} onChange={e => setNameReason(e.target.value)} required={nameDecision === 'rejected'} minLength={nameDecision === 'rejected' ? 3 : undefined} maxLength={1000} /></label>
+          <p className="muted">{nameDecision === 'approved' ? 'Tên mới sẽ được hiển thị trên gian hàng và các sản phẩm. Tên trong đơn hàng cũ được giữ nguyên.' : 'Giữ nguyên tên hiện tại và gửi lý do cho người bán.'}</p>
+          <button className="button" disabled={busy}>{busy ? 'Đang xử lý…' : 'Xác nhận xét duyệt'}</button>
+        </form>
+      </Modal>}
       {review && (
         <Modal
           title="Xử lý rút tiền"

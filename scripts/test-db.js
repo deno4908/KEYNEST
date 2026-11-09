@@ -2143,6 +2143,58 @@ try {
     await db.exec('rollback');
     pass('admin events cover support/replies, paid and pending preorders, seller review/withdrawals, refunds and payment review; recipients, independent read receipts, deduplication, rollback and trigger privileges');
   }
+  {
+    await db.exec('begin');
+    const seller = randomUUID(), admin = randomUUID(), customer = randomUUID();
+    for (const id of [seller, admin, customer]) await db.query('insert into auth.users(id,email) values($1,$2)', [id, `${id}@name-review.test`]);
+    await db.query("update profiles set role='seller',seller_name='Original shop',seller_terms_version=$2,seller_terms_accepted_at=now() where id=$1", [seller, SELLER_TERMS_VERSION]);
+    await db.query("update profiles set role='admin' where id=$1", [admin]);
+    const reject = async (sql, params) => {
+      await db.exec('savepoint name_error');
+      await assert.rejects(db.query(sql, params));
+      await db.exec('rollback to name_error; release name_error');
+    };
+    const submit = name => scalar('select request_seller_name($1,$2)', [seller, name]);
+    const review = (id, status, reason = '') => scalar('select review_seller_name($1,$2,$3,$4)', [admin, id, status, reason]);
+    await reject('select request_seller_name($1,$2)', [customer, 'Forged shop']);
+    await reject('select request_seller_name($1,$2)', [seller, 'x']);
+    await reject('select request_seller_name($1,$2)', [seller, 'Original shop']);
+    await db.exec('set local role service_role');
+    const request = await submit('Reviewed shop');
+    await db.exec('reset role');
+    assert.equal(await scalar('select seller_name from profiles where id=$1', [seller]), 'Original shop');
+    assert.equal((await submit('Reviewed shop')).id, request.id);
+    await reject('select request_seller_name($1,$2)', [seller, 'Second pending name']);
+    assert.equal(await scalar('select count(*)::int from seller_name_requests where user_id=$1', [seller]), 1);
+    await reject("update profiles set seller_name='Bypass API' where id=$1", [seller]);
+    await reject('select seller_command($1,$2,$3)', [seller, 'profile', JSON.stringify({ name: 'Bypass onboarding', social_links: [], terms_version: SELLER_TERMS_VERSION, fee_bps: 700 })]);
+    await reject('select review_seller_name($1,$2,$3,$4)', [seller, request.id, 'approved', '']);
+    await reject('select review_seller_name($1,$2,$3,$4)', [admin, request.id, 'rejected', '']);
+    await review(request.id, 'rejected', 'Choose a clear storefront name');
+    assert.equal(await scalar('select seller_name from profiles where id=$1', [seller]), 'Original shop');
+    await reject('select review_seller_name($1,$2,$3,$4)', [admin, request.id, 'approved', '']);
+    const next = await submit('Approved shop');
+    await db.exec('savepoint name_rollback; set local role service_role');
+    await review(next.id, 'approved');
+    await db.exec('reset role; rollback to name_rollback; release name_rollback');
+    assert.equal(await scalar('select seller_name from profiles where id=$1', [seller]), 'Original shop');
+    assert.equal(await scalar('select status from seller_name_requests where id=$1', [next.id]), 'pending');
+    assert.equal(await scalar('select count(*)::int from notifications where id=$1', [`seller-name:${next.id}`]), 0);
+    await db.exec('set local role service_role');
+    await review(next.id, 'approved');
+    await db.exec('reset role');
+    assert.equal(await scalar('select seller_name from profiles where id=$1', [seller]), 'Approved shop');
+    assert.equal(await scalar('select count(*)::int from notifications where id=$1', [`seller-name:${next.id}`]), 1);
+    assert.equal(await scalar('select count(*)::int from notifications where id=$1', [`admin:seller-name:${next.id}:${admin}`]), 1);
+    await reject("update profiles set seller_name='Direct rename after approval' where id=$1", [seller]);
+    for (const role of ['anon', 'authenticated']) {
+      assert.equal(await scalar('select has_table_privilege($1,$2,$3)', [role, 'seller_name_requests', 'SELECT']), false);
+      for (const fn of ['request_seller_name(uuid,text)', 'review_seller_name(uuid,uuid,text,text)', 'guard_seller_name_change()'])
+        assert.equal(await scalar('select has_function_privilege($1,$2,$3)', [role, fn, 'EXECUTE']), false);
+    }
+    await db.exec('rollback');
+    pass('seller names stay unchanged until admin approval; pending requests deduplicate, rejection permits resubmission, direct/legacy writes fail, decisions and notifications are atomic and service-only');
+  }
   console.log(
     `${checks} PostgreSQL checks passed. Real multi-connection contention and hosted Supabase Auth still require integration testing.`,
   );

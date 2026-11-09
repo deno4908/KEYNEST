@@ -5,9 +5,11 @@ import { AppError, encrypt } from "./security.js";
 import { requireSeller, releaseSellerFunds } from "./seller-accounting.js";
 import { sellerConversation, conversationInput } from "./seller-conversations.js";
 import { SELLER_TERMS_VERSION, sellerTerms } from "../shared/seller-terms.js";
+import { createSellerNameRequests } from './seller-name-requests.js';
 
 export function createSellers(store) {
   const demo = Boolean(store.db);
+  const names = createSellerNameRequests(store);
   if (demo) store.db.seller_withdrawals ||= [];
   const fee = async () =>
     demo
@@ -45,6 +47,7 @@ export function createSellers(store) {
     } else requireSeller(user);
     let result = { ok: true };
     if (action === "profile") {
+      if (user.seller_name && data.name !== user.seller_name) throw new AppError('Đổi tên gian hàng cần được admin duyệt.', 409);
       if (
         data.terms_version !== SELLER_TERMS_VERSION ||
         data.fee_bps !== (store.db.seller_fee_bps ?? 700)
@@ -369,6 +372,7 @@ export function createSellers(store) {
           );
       return {
         profile,
+        name_request: await names.latest(uid),
         products,
         sales,
         withdrawals,
@@ -443,7 +447,7 @@ export function createSellers(store) {
               .order("created_at", { ascending: false })
               .limit(500),
           );
-      return { sellers, withdrawals, disputes, fee_bps: await fee() };
+      return { sellers, withdrawals, disputes, name_requests: await names.pending(), fee_bps: await fee() };
     },
   };
 }
@@ -460,6 +464,7 @@ export function sellersRouter({
 }) {
   const router = Router(),
     sellers = createSellers(store),
+    names = createSellerNameRequests(store),
     uuid = z.string().uuid();
   router.get(
     "/order-chat/:id",
@@ -511,6 +516,7 @@ export function sellersRouter({
       })
       .strict()
       .parse(req.body);
+    if (req.user.seller_name && input.name !== req.user.seller_name) throw new AppError('Đổi tên gian hàng cần được admin duyệt.', 409);
     await sellers.command(req.user.id, "profile", input);
     res.json(await store.profile(req.user.id));
   });
@@ -532,11 +538,7 @@ export function sellersRouter({
       .object({ name: z.string().trim().min(2).max(80) })
       .strict()
       .parse(req.body);
-    if (store.db) {
-      store.db.users.find((u) => u.id === req.user.id).seller_name = name;
-      store.save();
-    } else await store.updateProfile(req.user.id, { seller_name: name });
-    res.json(await store.profile(req.user.id));
+    res.json(await names.submit(req.user.id, name));
   });
   router.get("/seller/support", async (req, res) =>
     res.json(await sellers.support(req.user.id)),
@@ -613,6 +615,11 @@ export function sellersRouter({
   router.get("/admin/sellers", async (req, res) =>
     res.json(await sellers.adminOverview()),
   );
+  router.post('/admin/sellers/name-requests/:id', async (req, res) => {
+    const input = z.object({ status: z.enum(['approved', 'rejected']), reason: z.string().trim().max(1000).default('') })
+      .strict().refine(v => v.status !== 'rejected' || v.reason.length >= 3, 'Nhập lý do từ chối.').parse(req.body);
+    res.json(await names.review(req.user.id, uuid.parse(req.params.id), input.status, input.reason));
+  });
   router.post("/admin/sellers/role", async (req, res) =>
     res.json(
       await sellers.command(

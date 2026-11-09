@@ -190,7 +190,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   if (onboarding && !ready)
     return (
       <div className="container page seller-page seller-onboarding">
-        <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} />
+        <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} nameRequest={data.name_request} />
       </div>
     );
   const selectTab = (next: string) => {
@@ -468,7 +468,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       </nav>
       {tab === 'notifications' && <NotificationInbox />}
       {tab === "profile" && (
-        <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} />
+          <ProfileForm profile={data.profile} fee={data.fee_bps} saved={saved} nameRequest={data.name_request} />
       )}
       {["products", "sales", "withdrawals", "support"].includes(tab) && (
         <div className="seller-toolbar">

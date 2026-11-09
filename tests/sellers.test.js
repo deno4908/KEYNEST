@@ -363,6 +363,28 @@ test("seller HTTP ownership, onboarding, payment settlement, withdrawals and ref
     200,
   );
   assert.equal(owner.seller_terms_accepted_at, acceptedAt);
+  assert.equal(owner.seller_name, 'Seller Test', 'submission must not rename the storefront');
+  const nameRequest = (await req('/seller/overview', null, login.cookie)).body.name_request;
+  assert.equal(nameRequest.requested_name, 'Seller renamed');
+  assert.equal(nameRequest.status, 'pending');
+  assert.equal((await req('/seller/profile/name', { name: 'Seller renamed' }, login.cookie)).body.id, nameRequest.id);
+  assert.equal((await req('/seller/profile/name', { name: 'Another name' }, login.cookie)).status, 409);
+  assert.equal((await req('/seller/profile', { ...profile, name: 'Bypass approval' }, login.cookie)).status, 409);
+  const reviewPath = `/admin/sellers/name-requests/${nameRequest.id}`;
+  assert.equal((await req(reviewPath, { status: 'approved' }, login.cookie)).status, 403);
+  assert.equal((await req(reviewPath, { status: 'approved' }, buyer.cookie)).status, 403);
+  assert.ok((await req('/admin/sellers', null, admin.cookie)).body.name_requests.some(r => r.id === nameRequest.id));
+  assert.equal((await req(reviewPath, { status: 'rejected', reason: 'Tên chưa phù hợp' }, admin.cookie)).status, 200);
+  assert.equal(owner.seller_name, 'Seller Test');
+  assert.equal((await req('/seller/overview', null, login.cookie)).body.name_request.status, 'rejected');
+  assert.equal((await req(reviewPath, { status: 'approved' }, admin.cookie)).status, 409);
+  const second = await req('/seller/profile/name', { name: 'Approved storefront' }, login.cookie);
+  assert.equal(second.status, 200);
+  assert.equal((await req(`/admin/sellers/name-requests/${second.body.id}`, { status: 'approved' }, admin.cookie)).status, 200);
+  assert.equal(owner.seller_name, 'Approved storefront');
+  assert.equal(store.products().find(p => p.id === product.id).seller.name, 'Approved storefront');
+  assert.equal(owner.seller_terms_accepted_at, acceptedAt);
+  assert.ok(store.db.notifications.some(n => n.id === `seller-name:${second.body.id}` && n.user_id === seller.id));
   assert.equal(
     (
       await req(
