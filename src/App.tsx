@@ -1770,14 +1770,14 @@ function WalletPage() {
             <section className="wallet-card">
               <div className="wallet-card-heading">
                 <span className="wallet-symbol">
-                  <Wallet size={22} />
+                  <Wallet size={19} />
                 </span>
-                <span>KEYNEST WALLET</span>
+                <span className="wallet-heading-copy"><strong>Ví KEYNEST</strong><small>Thanh toán trong cửa hàng</small></span>
               </div>
               <span>Số dư khả dụng</span>
               <strong>{money(user?.balance ?? data.balance)}</strong>
               <p>
-                Dùng để thanh toán game key, gift card và dịch vụ tại KEYNEST.
+                Dùng để mua game key, gift card và dịch vụ số.
               </p>
               <Link className="wallet-shop-link" to="/catalog">
                 Khám phá cửa hàng <ArrowUpRight size={16} />

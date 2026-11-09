@@ -121,8 +121,7 @@ export function ProfileForm({
             {accepted ? "Hồ sơ gian hàng" : "Thiết lập gian hàng của bạn"}
           </h2>
           <p className="muted">
-            Hoàn thiện thông tin và xem điều khoản trước khi bắt đầu bán hàng
-            trên KEYNEST.
+            {accepted ? 'Cập nhật tên hiển thị và xem điều khoản của gian hàng.' : 'Hoàn thiện thông tin và xem điều khoản trước khi bắt đầu bán hàng trên KEYNEST.'}
           </p>
         </div>
       </div>

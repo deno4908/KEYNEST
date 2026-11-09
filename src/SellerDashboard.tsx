@@ -372,7 +372,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           </button>
           <small>
             {updated
-              ? `Cập nhật ${date(updated)} · tự động mỗi 30 giây`
+              ? `Cập nhật ${date(updated)}`
               : "Đang kết nối"}
           </small>
         </div>
@@ -383,7 +383,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
           tải thành công gần nhất.
         </p>
       )}
-      <div className="seller-stats">
+      <div className="seller-stats seller-overview-stats">
         <div>
           <small>Tiền đang giữ</small>
           <strong>{money(data.held || 0)}</strong>
@@ -395,7 +395,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
             <small> / {data.products.length}</small>
           </strong>
         </div>
-        <div>
+        <div className="seller-stat-balance">
           <small>Số dư khả dụng</small>
           <strong>{money(data.profile.balance)}</strong>
         </div>

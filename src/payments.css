@@ -1,27 +1,31 @@
 /* Wallet and bank transfers follow the storefront's charcoal palette. */
 .wallet-page .wallet-layout {
   grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.35fr);
-  gap: 22px;
+  gap: 20px;
   align-items: stretch;
   margin-bottom: 24px;
 }
 .wallet-page .wallet-card {
   align-self: stretch;
   min-width: 0;
-  padding: 30px;
-  background: #191a1e;
-  border: 1px solid #37383e;
-  border-radius: 10px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 .wallet-page .wallet-card-heading {
   justify-content: flex-start;
-  gap: 12px;
-  margin-bottom: 32px;
-  color: #d2cfd3;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1.5px;
+  gap: 10px;
+  padding-bottom: 18px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  letter-spacing: 0;
 }
+.wallet-heading-copy { display:grid; gap:4px; min-width:0; }
+.wallet-heading-copy strong { font-size:13px; font-weight:600; }
+.wallet-heading-copy small { font-size:11px; font-weight:400; color:var(--text-secondary); }
+.wallet-page .wallet-symbol { width:34px; height:34px; border-radius:7px; }
 .wallet-symbol,
 .transfer-bank-icon {
   display: inline-flex;
@@ -42,29 +46,29 @@
 }
 .wallet-page .wallet-card > strong {
   color: #f6f3ee;
-  font-size: clamp(29px, 3.1vw, 42px);
+  font-size: clamp(28px, 2.5vw, 34px);
   font-weight: 600;
-  letter-spacing: -1.4px;
+  letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
-  margin: 12px 0 18px;
+  margin: 8px 0 10px;
   overflow-wrap: anywhere;
 }
 .wallet-card > p {
-  max-width: 290px;
+  max-width: 320px;
   color: #99979f;
   font-size: 12px;
-  line-height: 1.85;
-  margin: 0 0 20px;
+  line-height: 1.75;
+  margin: 0 0 14px;
 }
 .wallet-shop-link {
   display: inline-flex;
   align-items: center;
   gap: 10px;
   align-self: flex-start;
-  color: #f1d1c3;
+  color: var(--accent);
   font-size: 12px;
   padding: 5px 0;
-  margin-bottom: 26px;
+  margin-bottom: 18px;
 }
 .wallet-shop-link:hover {
   color: #ff986e;
@@ -72,11 +76,12 @@
 .wallet-page .wallet-card-note {
   justify-content: flex-start;
   gap: 10px;
-  padding-top: 18px;
+  align-items: flex-start;
+  padding-top: 14px;
   margin-top: auto;
   border-top: 1px solid #303136;
   color: #929099;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.8;
 }
 .wallet-card-note svg {
@@ -85,17 +90,17 @@
 .wallet-page .topup-form {
   min-width: 0;
   margin: 0;
-  padding: 30px;
-  border: 1px solid #37383e;
-  border-radius: 10px;
-  background: #191a1e;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
 }
 .wallet-topup-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 26px;
+  margin-bottom: 20px;
 }
 .wallet-topup-heading > svg {
   color: #8f8b94;
@@ -103,7 +108,7 @@
   margin-top: 3px;
 }
 .wallet-page .wallet-topup-heading h2 {
-  font-size: 20px;
+  font-size: 18px;
   margin: 0 0 9px;
   font-weight: 600;
 }
@@ -535,10 +540,10 @@
     gap: 16px;
   }
   .wallet-page .wallet-card-heading {
-    margin-bottom: 23px;
+    margin-bottom: 18px;
   }
   .wallet-page .wallet-card > strong {
-    font-size: 36px;
+    font-size: 30px;
   }
   .wallet-page .wallet-history,
   .wallet-page .wallet-requests {
