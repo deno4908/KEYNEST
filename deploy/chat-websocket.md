@@ -10,6 +10,9 @@ vẫn có lịch cập nhật riêng.
 - `POST /api/chat/live-ticket` dùng phiên HTTP hiện có để xác thực và kiểm tra
   quyền của topic (`order:<item UUID>`, `seller-support`, `tickets`). Vé ngẫu
   nhiên hết hạn sau 30 giây, chỉ dùng một lần và không lưu trong database.
+  Phản hồi kèm `initial`: lịch sử theo đúng quyền người xem từ lần đọc kiểm tra
+  này, để giao diện hiển thị ngay mà không phải chờ mở socket. Trang hỗ trợ
+  không cần GET lịch sử riêng lúc mở. Nút gửi vẫn chờ kết nối trực tiếp sẵn sàng.
 - Browser gửi vé qua subprotocol `ticket.<vé>`, không đưa bearer/refresh token
   vào URL. Server chỉ chấp nhận Origin đúng `APP_ORIGIN` và subprotocol
   `keynest-chat`.
@@ -17,6 +20,9 @@ vẫn có lịch cập nhật riêng.
   yêu cầu/giải quyết hoàn tiền vẫn dùng các hàm/RPC và kiểm tra quyền hiện có.
   Chỉ xác nhận gửi sau khi lưu. Dữ liệu được đẩy lại cho các kết nối liên quan;
   không dùng lại snapshot của người gửi cho người nhận.
+  Socket đọc lại dữ liệu sau Upgrade để nhận cả tin nhắn phát sinh từ lúc cấp vé;
+  lần đầu dùng kết quả xác thực vừa kiểm tra tại Upgrade, các lần sau kiểm tra
+  lại phiên như trước.
 - HTTP chat API vẫn hoạt động cho client cũ; mutation thành công cũng kích hoạt
   cập nhật WebSocket. Thay đổi hỗ trợ làm mới các danh sách đang kết nối theo
   đúng quyền của từng tài khoản. Ghi trực tiếp vào Supabase ngoài ứng dụng không

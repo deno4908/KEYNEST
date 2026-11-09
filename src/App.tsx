@@ -1967,7 +1967,7 @@ function SupportPage() {
           .catch((e) => notify(e.message, true))
       : Promise.resolve();
   useEffect(() => {
-    load();
+    setTickets([]);
   }, [user?.id]);
   const supportLive = useChatLive<Ticket[]>(user ? 'tickets' : null, user?.id, setTickets,
     message => notify(message, true));

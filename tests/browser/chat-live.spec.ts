@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { WebSocketRoute } from '@playwright/test';
 import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { SELLER_TERMS_VERSION } from '../../shared/seller-terms.js';
 
@@ -110,4 +111,46 @@ test('buyer and seller chat over the real WebSocket proxy without polling and re
     expect(reads.length).toBe(supportReads);
     expect(errors).toEqual([]);
   } finally { await sellerContext.close(); }
+});
+
+test('order chat shows ticket history before a slow socket snapshot and keeps the draft during catch-up', async ({ page, request }) => {
+  await expect.poll(async () => {
+    try { return (await (await request.get('/api/health')).json()).mode; }
+    catch { return null; }
+  }).toBe('demo');
+  const now = new Date().toISOString(), itemId = crypto.randomUUID();
+  const profile = { id: crypto.randomUUID(), name: 'Fast chat seller', seller_name: 'Fast chat shop', role: 'seller',
+    balance: 0, seller_terms_version: SELLER_TERMS_VERSION, seller_terms_accepted_at: now };
+  const initial = { name: 'Chat product', seller_name: profile.seller_name, order_number: 'CHAT-OPEN', order_status: 'processing',
+    order_total: 10000, refund_amount: 10000, quantity: 1, variant_name: 'Standard', can_request: false,
+    can_message: true, viewer_role: 'seller', dispute: null,
+    messages: [{ id: 'first', body: 'History available before socket snapshot', role: 'customer', created_at: now }] };
+  await page.route('**/api/me', route => route.fulfill({ json: profile }));
+  await page.route('**/api/auth/refresh', route => route.fulfill({ json: { ok: true } }));
+  await page.route('**/api/seller/overview', route => route.fulfill({ json: {
+    profile, products: [], withdrawals: [], ledger: [], held: 0, fee_bps: 700,
+    sales: [{ id: itemId, name: initial.name, variant_name: initial.variant_name, price: 10000, quantity: 1, delivery: 'manual',
+      order: { number: initial.order_number, status: 'processing', created_at: now, customer_note: '' } }],
+  } }));
+  await page.route('**/api/chat/live-ticket', route => {
+    expect(route.request().postDataJSON().topic).toBe(`order:${itemId}`);
+    return route.fulfill({ json: { ticket: 'preview-ticket', initial } });
+  });
+  let socket: WebSocketRoute | undefined;
+  await page.routeWebSocket('**/api/chat/live', ws => { socket = ws; });
+  await page.goto('/seller?tab=sales');
+  await page.getByRole('button', { name: 'Chat', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('log')).toContainText(initial.messages[0].body);
+  await expect(dialog.getByRole('status')).toHaveText('Đang kết nối lại chat…');
+  const draft = dialog.getByRole('textbox', { name: 'Tin nhắn', exact: true });
+  await draft.fill('Preserve my draft while connecting');
+  await expect(dialog.getByRole('button', { name: 'Gửi tin nhắn', exact: true })).toBeDisabled();
+  await expect.poll(() => !!socket).toBe(true);
+  socket!.send(JSON.stringify({ type: 'snapshot', data: { ...initial,
+    messages: [...initial.messages, { id: 'missed', body: 'Message received during handshake', role: 'customer', created_at: now }] } }));
+  await expect(dialog.getByRole('status')).toHaveText('Đã kết nối chat trực tiếp');
+  await expect(dialog.getByRole('log')).toContainText('Message received during handshake');
+  await expect(draft).toHaveValue('Preserve my draft while connecting');
+  await expect(dialog.getByRole('button', { name: 'Gửi tin nhắn', exact: true })).toBeEnabled();
 });

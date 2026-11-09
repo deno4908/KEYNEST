@@ -51,12 +51,14 @@ export function createChatLive({ origin, authorize, load, command,
     if (user.id !== client.uid) throw new AppError('Phiên đăng nhập đã thay đổi.', 401);
     return user;
   };
-  const refresh = client => {
+  const refresh = (client, upgradeUser) => {
     if (client.refreshing) { client.dirty = true; return; }
     client.refreshing = true;
     enqueue(client, async () => {
       try {
-        const user = await userFor(client);
+        // The first delivery can reuse the session checked immediately before
+        // this upgrade. Later deliveries always revalidate the original session.
+        const user = upgradeUser || await userFor(client);
         send(client, { type: 'snapshot', data: await load(client.topic, user) });
       } finally {
         client.refreshing = false;
@@ -72,7 +74,7 @@ export function createChatLive({ origin, authorize, load, command,
       if (!topic || client.topic === topic || (topic === 'support' && !client.topic.startsWith('order:'))) refresh(client);
     }
   };
-  wss.on('connection', (ws, request, ticket) => {
+  wss.on('connection', (ws, request, ticket, upgradeUser) => {
     const client = { ws, ...ticket, queued: 0, queue: Promise.resolve(), alive: true };
     clients.add(client);
     const expiry = setTimeout(() => ws.close(4000, 'Renew session'), lifetimeMs);
@@ -104,7 +106,7 @@ export function createChatLive({ origin, authorize, load, command,
         send(client, { type: 'result', id: message.id });
       }, message.id);
     });
-    refresh(client); // Also supplies missed messages after reconnect.
+    refresh(client, upgradeUser); // Also supplies messages sent after ticket issuance.
   });
   const heartbeat = setInterval(() => {
     prune();
@@ -122,10 +124,12 @@ export function createChatLive({ origin, authorize, load, command,
       if (clients.size >= maxClients || count(user.id) >= maxPerUser || tickets.size >= 1000)
         throw new AppError('Có quá nhiều kết nối chat. Hãy đóng bớt cửa sổ rồi thử lại.', 429);
       spend(user.id, 'tickets', 30, 60000);
-      await load(topic, user); // Verify topic ownership before issuing a one-use ticket.
+      // This read already verifies topic ownership and loads the viewer's history.
+      // Return it now rather than discard it while the browser waits for Upgrade.
+      const initial = await load(topic, user);
       const token = randomBytes(32).toString('base64url');
       tickets.set(token, { topic, uid: user.id, context, expires: Date.now() + ticketMs });
-      return { ticket: token };
+      return { ticket: token, initial };
     },
     invalidate,
     attach(server) {
@@ -145,7 +149,7 @@ export function createChatLive({ origin, authorize, load, command,
           if (socket.destroyed) return;
           // Recheck after asynchronous authentication to bound simultaneous upgrades.
           if (clients.size >= maxClients || count(ticket.uid) >= maxPerUser) return reject('429 Too Many Requests');
-          wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request, ticket));
+          wss.handleUpgrade(request, socket, head, ws => wss.emit('connection', ws, request, ticket, user));
         } catch { reject('401 Unauthorized'); }
       };
       server.on('upgrade', upgrade);

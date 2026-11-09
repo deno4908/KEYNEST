@@ -191,3 +191,42 @@ test('transport bounds writes, renews idle sessions, and does not poll data whil
   await new Promise(resolve => setTimeout(resolve, 600));
   assert.equal(await denied(new WebSocket(url, ['keynest-chat', `ticket.${expired.ticket}`], { origin })), 401);
 });
+
+test('tickets supply authorized history early, Upgrade catches missed messages without duplicate session verification', async t => {
+  let version = 1, reads = 0, checks = 0, revoked = false;
+  const user = { id: 'early-history-user' };
+  const hub = createChatLive({ origin,
+    authorize: async () => {
+      checks++;
+      if (revoked) throw Object.assign(new Error('Session revoked'), { status: 401 });
+      return user;
+    },
+    load: async (topic, viewer) => { reads++; return { viewer: viewer.id, version }; },
+    command: async () => {},
+  });
+  const server = httpServer(); hub.attach(server); server.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(async () => { hub.close(); await new Promise(resolve => server.close(resolve)); });
+  const ticket = await hub.issue('tickets', user, {});
+  assert.deepEqual(ticket.initial, { viewer: user.id, version: 1 });
+  assert.equal(reads, 1, 'initial history reuses the existing ownership read');
+  version = 2; // Another participant wrote after the HTTP response, before Upgrade.
+  const stream = observe(new WebSocket(`ws://127.0.0.1:${server.address().port}/api/chat/live`,
+    ['keynest-chat', `ticket.${ticket.ticket}`], { origin }));
+  await ready(stream.ws);
+  const first = await stream.wait(message => message.type === 'snapshot');
+  assert.deepEqual(first.data, { viewer: user.id, version: 2 });
+  assert.equal(checks, 1, 'Upgrade already verified the session for the first delivery');
+  assert.equal(reads, 2);
+  version = 3;
+  hub.invalidate('tickets');
+  await stream.wait(message => message.type === 'snapshot' && message.data.version === 3);
+  assert.equal(checks, 2, 'later deliveries must revalidate the session');
+  const beforeRevocation = stream.messages.length;
+  revoked = true;
+  hub.invalidate('tickets');
+  await stream.wait(message => message.type === 'error' && message.status === 401, beforeRevocation);
+  assert.equal(checks, 3);
+  assert.equal(reads, 3, 'revoked sessions receive no further conversation reads or snapshots');
+  assert.ok(!stream.messages.slice(beforeRevocation).some(message => message.type === 'snapshot'));
+});

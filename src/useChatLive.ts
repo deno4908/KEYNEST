@@ -4,8 +4,9 @@ import { publishDataChange } from './dataChanges';
 
 type Pending = { resolve: () => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
 
-// History arrives on subscription/reconnection; subsequent snapshots are pushed
-// only after changes. Timers reconnect/ping the transport, never poll chat APIs.
+// Ticket issuance supplies authenticated history before the socket connects.
+// Socket snapshots catch up after Upgrade/reconnection and subsequent changes.
+// Timers reconnect/ping the transport, never poll chat APIs.
 export function useChatLive<T>(topic: string | null, owner: string | undefined,
   receive: (data: T) => void, report: (message: string) => void) {
   const [connected, setConnected] = useState(false);
@@ -37,10 +38,12 @@ export function useChatLive<T>(topic: string | null, owner: string | undefined,
       connecting = true;
       controller = new AbortController();
       try {
-        const { ticket } = await api<{ ticket: string }>('/chat/live-ticket', {
+        const response = await api<{ ticket: string; initial?: T }>('/chat/live-ticket', {
           method: 'POST', body: JSON.stringify({ topic }), signal: controller.signal,
         });
         if (stopped) return;
+        if (Object.hasOwn(response, 'initial')) latest.current.receive(response.initial as T);
+        const { ticket } = response;
         const url = new URL('/api/chat/live', window.location.href);
         url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(url, ['keynest-chat', `ticket.${ticket}`]);
