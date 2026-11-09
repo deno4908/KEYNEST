@@ -1,7 +1,7 @@
 import { accountLegal, orderLegal } from '../helpers/legal.js';
 import { test, expect } from "@playwright/test";
 import sharp from "sharp";
-test("buyer reviews and product comments are persisted, isolated and rendered as text", async ({
+test("product feedback uses one review tab with ratings and written feedback, persisted and rendered as text", async ({
   page,
   request,
 }) => {
@@ -60,9 +60,11 @@ test("buyer reviews and product comments are persisted, isolated and rendered as
     ).ok(),
   ).toBeTruthy();
   await page.goto("/products/hollow-knight");
+  await expect(page.locator('.detail-tabs button')).toHaveCount(3);
+  await expect(page.locator('.detail-tabs').getByRole('button', { name: 'Bình luận', exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Xem đánh giá sản phẩm" }).click();
   await page.getByRole("radio", { name: "4 sao", exact: true }).check();
-  const reviewText = `Nhận key nhanh ${Date.now()}`;
+  const reviewText = `<img src=x onerror=alert(1)> Nhận key nhanh ${Date.now()}`;
   await page.getByLabel("Trải nghiệm của bạn").fill(reviewText);
   await page.getByRole("button", { name: "Gửi đánh giá", exact: true }).click();
   await expect(
@@ -73,31 +75,19 @@ test("buyer reviews and product comments are persisted, isolated and rendered as
   ).toContainText(`${product.review_count + 1} đánh giá`);
   await expect(page.locator(".feedback-thanks")).toBeVisible();
   const reviewEntry = page.locator(".feedback-entry").filter({ hasText: reviewText });
+  await expect(reviewEntry.locator('.feedback-body img')).toHaveCount(0);
   await expect(reviewEntry.locator(".feedback-avatar img")).toHaveAttribute("src", avatar_url);
   await expect.poll(() => reviewEntry.locator(".feedback-avatar img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Bình luận", exact: true }).click();
-  const comment = `<img src=x onerror=alert(1)> Hỏi về khu vực ${Date.now()}`;
-  await page.getByLabel("Nội dung bình luận").fill(comment);
-  await page
-    .getByRole("button", { name: "Gửi bình luận", exact: true })
-    .click();
-  await expect(
-    page.locator(".feedback-body").filter({ hasText: comment }),
-  ).toBeVisible();
-  expect(await page.locator(".feedback-body img").count()).toBe(0);
-  const commentEntry = page.locator(".feedback-entry").filter({ hasText: comment });
-  await expect(commentEntry.locator(".feedback-avatar img")).toHaveAttribute("src", avatar_url);
   await page.reload();
-  await page.getByRole("button", { name: "Bình luận", exact: true }).click();
-  await expect(
-    page.locator(".feedback-body").filter({ hasText: comment }),
-  ).toBeVisible();
-  await expect.poll(() => commentEntry.locator(".feedback-avatar img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Xem đánh giá sản phẩm" }).click();
+  await expect(reviewEntry).toContainText("4/5");
+  await expect(page.locator('.feedback-thanks')).toBeVisible();
+  await expect.poll(() => reviewEntry.locator(".feedback-avatar img").evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
   await page.route(`**${avatar_url}`, route => route.fulfill({ status: 404, body: "Missing avatar" }));
   await page.reload();
-  await page.getByRole("button", { name: "Bình luận", exact: true }).click();
-  await expect(commentEntry.locator(".feedback-avatar img")).toHaveCount(0);
-  await expect(commentEntry.locator(".feedback-avatar")).toHaveText("FB");
+  await page.getByRole("button", { name: "Xem đánh giá sản phẩm" }).click();
+  await expect(reviewEntry.locator(".feedback-avatar img")).toHaveCount(0);
+  await expect(reviewEntry.locator(".feedback-avatar")).toHaveText("FB");
   for (const width of [1440, 768, 390, 320]) {
     await page.setViewportSize({ width, height: 950 });
     await expect
@@ -106,17 +96,9 @@ test("buyer reviews and product comments are persisted, isolated and rendered as
       )
       .toBe(true);
   }
-  await page
-    .locator(".feedback-entry")
-    .filter({ hasText: comment })
-    .getByRole("button", { name: "Xóa bình luận của Feedback Buyer" })
-    .click();
-  await expect(
-    page.locator(".feedback-body").filter({ hasText: comment }),
-  ).toHaveCount(0);
   await page.goto("/products/steam-wallet");
-  await page.getByRole("button", { name: "Bình luận", exact: true }).click();
+  await page.getByRole("button", { name: "Xem đánh giá sản phẩm" }).click();
   await expect(
-    page.locator(".feedback-body").filter({ hasText: comment }),
+    page.locator(".feedback-body").filter({ hasText: reviewText }),
   ).toHaveCount(0);
 });

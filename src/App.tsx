@@ -1035,12 +1035,6 @@ function ProductPage() {
         >
           Đánh giá ({p.review_count || 0})
         </button>
-        <button
-          className={tab === "comments" ? "active" : ""}
-          onClick={() => setTab("comments")}
-        >
-          Bình luận
-        </button>
       </div>
       <div className="detail-content">
         {tab === "description" ? (
@@ -1076,9 +1070,9 @@ function ProductPage() {
         ) : (
           <>
             <ProductFeedback
-              key={`${p.id}-${tab}`}
+              key={p.id}
               product={p}
-              mode={tab === "reviews" ? "reviews" : "comments"}
+              mode="reviews"
             />
           </>
         )}
