@@ -129,6 +129,14 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
     [reply, setReply] = useState("");
   const [idempotency, setIdempotency] = useState(() => crypto.randomUUID());
   const [expandedProducts, setExpandedProducts] = useState<string[]>([]);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
+  const withdrawAmountInput = useRef<HTMLInputElement>(null);
+  const withdrawMaximum = Math.max(0, Math.min(data?.profile.balance ?? 0, 100000000));
+  const withdrawAmountError = withdrawAmount && (withdrawAmount < 50000 || withdrawAmount > withdrawMaximum)
+    ? `Nhập số tiền từ ${money(50000)} đến ${money(withdrawMaximum)}.` : '';
+  useEffect(() => {
+    withdrawAmountInput.current?.setCustomValidity(withdrawAmountError);
+  }, [withdrawAmountError, tab, data?.profile.balance]);
   const generation = useRef(0);
   const load = async () => {
     if (user?.role !== "seller") return;
@@ -239,13 +247,18 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
   }
   async function withdraw(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
+    if (withdrawMaximum < 50000 || data?.profile.seller_debt || !Number.isSafeInteger(withdrawAmount) || withdrawAmount < 50000 || withdrawAmount > withdrawMaximum) {
+      notify(withdrawMaximum < 50000 ? 'Số dư khả dụng chưa đủ để rút tối thiểu 50.000 ₫.' : data?.profile.seller_debt ? 'Chưa thể rút tiền khi còn khoản cần bù trừ.' : `Nhập số tiền từ ${money(50000)} đến ${money(withdrawMaximum)}.`, true);
+      return;
+    }
     const form = e.currentTarget;
     const f = new FormData(form);
     if (
       await run(
         () =>
           post("/seller/withdrawals", {
-            amount: Number(f.get("amount")),
+            amount: withdrawAmount,
             bank: f.get("bank"),
             account_number: f.get("account_number"),
             account_name: f.get("account_name"),
@@ -255,7 +268,7 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
       )
     ) {
       setIdempotency(crypto.randomUUID());
-      (form.elements.namedItem("amount") as HTMLInputElement).value = "";
+      setWithdrawAmount(0);
     }
   }
   const products = data.products
@@ -893,13 +906,41 @@ export function Seller({ onboarding = false }: { onboarding?: boolean }) {
               Số tiền
               <input
                 name="amount"
-                type="number"
-                min={50000}
-                max={Math.min(data.profile.balance, 100000000)}
-                step={1}
+                ref={withdrawAmountInput}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={15}
+                placeholder="Ví dụ: 100.000"
+                aria-describedby="seller-withdraw-amount-hint"
+                value={withdrawAmount ? withdrawAmount.toLocaleString('vi-VN') : ''}
+                disabled={busy || withdrawMaximum < 50000 || !!data.profile.seller_debt}
+                onKeyDown={e => {
+                  const input = e.currentTarget, caret = input.selectionStart ?? 0;
+                  if (caret !== input.selectionEnd) return;
+                  if (e.key === 'Backspace' && input.value[caret - 1] === '.') input.setSelectionRange(caret - 1, caret - 1);
+                  if (e.key === 'Delete' && input.value[caret] === '.') input.setSelectionRange(caret + 1, caret + 1);
+                }}
+                onChange={e => {
+                  const input = e.currentTarget;
+                  const before = input.value.slice(0, input.selectionStart ?? input.value.length).normalize('NFKC').replace(/\D/g, '').length;
+                  const next = Number(input.value.normalize('NFKC').replace(/\D/g, ''));
+                  const formatted = next ? next.toLocaleString('vi-VN') : '';
+                  setWithdrawAmount(next);
+                  input.value = formatted;
+                  let caret = 0, digits = 0;
+                  while (caret < formatted.length && digits < before) {
+                    if (/\d/.test(formatted[caret])) digits++;
+                    caret++;
+                  }
+                  input.setSelectionRange(caret, caret);
+                }}
                 required
               />
             </label>
+            <small id="seller-withdraw-amount-hint" className="seller-withdraw-amount-hint">
+              {withdrawMaximum < 50000 ? 'Số dư khả dụng chưa đủ để rút tối thiểu 50.000 ₫.' : `Đơn vị VND · Từ ${money(50000)} đến ${money(withdrawMaximum)}.`}
+            </small>
             <label>
               Ngân hàng
               <select name="bank" defaultValue="" required>
