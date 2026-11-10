@@ -9,7 +9,7 @@ KEYNEST là website bán game key, gift card, gói nạp game và sản phẩm/d
 - [Chức năng và quy tắc nghiệp vụ](#features)
 - [Kiến trúc và mã nguồn](#architecture)
 - [Chạy thử trên máy](#local)
-- [Database: bản gộp và 57 SQL cũ](#database)
+- [Cài đặt database](#database)
 - [Biến môi trường](#configuration)
 - [Đăng nhập, email và bảo mật](#authentication)
 - [Thanh toán](#payments)
@@ -78,7 +78,6 @@ Trình duyệt gọi API ứng dụng; `service_role` chỉ nằm trên backend.
 | [server/](server/) | OAuth, MFA, OTP admin, thanh toán, recovery, seller, media, thông báo và rate limit |
 | [shared/](shared/) | Danh mục mẫu, điều khoản/chính sách có phiên bản và dữ liệu dùng chung |
 | [supabase/database.sql](supabase/database.sql) | SQL gộp để cài schema và trích bước nâng cấp |
-| [supabase/migrations/](supabase/migrations/) | Giữ đủ 57 SQL lịch sử `001`–`057` |
 | [supabase/email-templates/](supabase/email-templates/) | HTML recovery và OTP để cài trong Supabase |
 | [public/](public/) và [src/assets/](src/assets/) | Tài nguyên thực sự được website sử dụng |
 | [scripts/](scripts/) và [tests/](tests/) | Setup, seed, build, kiểm tra SQL/API/UI và công cụ vận hành |
@@ -110,11 +109,11 @@ Khách mẫu có 1.500.000 VND mô phỏng; đăng ký mới bắt đầu 0 VND.
 `npm run dev:api` chỉ chạy API. Sau build, có thể thử website trên Node bằng `npm start` với `APP_ORIGIN=http://127.0.0.1:3001`, `APP_MODE=demo`, `NODE_ENV=development`.
 
 <a id="database"></a>
-## Database: bản gộp và 57 SQL cũ
+## Cài đặt database
 
-**Giữ nguyên toàn bộ 57 file trong `supabase/migrations/`.** [database.sql](supabase/database.sql) là bản gộp bổ sung đúng thứ tự `001`–`057`, gồm schema, index, trigger, RLS, grants và RPC. Không phải backup dữ liệu khách hàng; không tự tạo project hay thay thế schema `auth`/`storage` do Supabase quản lý.
+[database.sql](supabase/database.sql) định nghĩa schema, index, trigger, RLS, grants và RPC của ứng dụng. File này dùng để cài đặt cấu trúc database, không chứa backup dữ liệu khách hàng và không thay thế schema `auth`/`storage` do Supabase quản lý.
 
-Mỗi bước có mốc `-- KEYNEST STEP ... BEGIN/END`. Một số bước sửa định nghĩa hàm từ bước trước nên phải giữ đúng thứ tự. Kiểm tra repo đối chiếu nội dung từng bước với 57 file gốc. Thay đổi sau `057` thêm vào cuối file gộp với số tiếp theo; SQL cũ tiếp tục lưu để tra cứu.
+Mỗi bước có mốc `-- KEYNEST STEP ... BEGIN/END` và cần thực hiện theo thứ tự. Khi bổ sung schema, thêm bước mới vào cuối file với số tiếp theo.
 
 ### Project Supabase mới
 
@@ -132,7 +131,7 @@ where id = (select id from auth.users where email = 'YOUR_ADMIN_EMAIL');
 
 Nếu user đã có trước schema ứng dụng, kiểm tra profile gắn đúng `auth.users.id`. Không cấp quyền quản trị từ metadata phía trình duyệt.
 
-### Project đang có dữ liệu
+### Cập nhật schema
 
 **Không chạy lại toàn bộ bản gộp trên schema đã có, không xóa database để dùng bản gộp.** Xác nhận bước cuối đã chạy thành công, chỉ lấy bước còn thiếu:
 
@@ -144,9 +143,9 @@ node scripts/database-sql.js --after 056 > database-pending.sql
 
 Xem trước tệp rồi chạy phần nâng cấp cần thiết trong SQL Editor sau khi sao lưu. Công cụ chỉ xuất SQL, không kết nối database. Dùng lệnh `node` khi chuyển hướng để không lẫn banner npm vào SQL. PowerShell cũ có thể xuất UTF-16; chọn UTF-8 khi mở/lưu lại bằng editor.
 
-Đã áp dụng đến `057` thì hiện không còn bước thiếu; không cần chạy SQL chỉ vì thêm bản gộp. `--after 000` dành cho schema ứng dụng mới hoàn toàn. Trích theo số bước giả định các bước trước đã chạy đầy đủ; không suy đoán từ số file mở trong IDE. SQL Editor không tự tạo lịch sử migration của Supabase CLI. Từng chạy một phần bị lỗi thì kiểm tra trạng thái thực tế trước khi tiếp tục.
+`--after 000` dành cho schema ứng dụng mới hoàn toàn. Trích theo số bước giả định các bước trước đã chạy đầy đủ. SQL Editor không tự tạo lịch sử migration của Supabase CLI. Nếu một bước từng chạy một phần bị lỗi, kiểm tra trạng thái thực tế trước khi tiếp tục.
 
-SQL trích xuất tạm không đưa lên GitHub. Cài mới dùng file gộp **hoặc** chạy đủ SQL cũ theo thứ tự, không làm cả hai. Pipeline không tự chạy SQL trên Supabase thật.
+SQL trích xuất tạm không đưa lên GitHub. Pipeline không tự chạy SQL trên Supabase thật.
 
 ### Nhóm dữ liệu và quyền
 
@@ -408,7 +407,7 @@ npm run build
 
 | Lệnh | Phạm vi |
 | --- | --- |
-| `check:repo` | Git index: README chính, báo cáo/ảnh phụ/secret theo tên, link README, đủ 57 SQL gốc khớp bản gộp |
+| `check:repo` | Git index: README chính, báo cáo/ảnh phụ/secret theo tên, liên kết README và tính nhất quán của SQL |
 | `npm test` | Nghiệp vụ/API/bảo mật/thanh toán/chat/recovery/seller/công cụ với dữ liệu tạm |
 | `test:db` | Nạp **SQL gộp** vào PostgreSQL qua PGlite RAM; transaction/RPC/RLS/grants/kho/tiền/hoàn/phê duyệt |
 | `build` | TypeScript/Vite tạo `dist/` |
@@ -423,7 +422,7 @@ PGlite mô phỏng `auth.users`/`auth.uid()`, không thay kiểm thử Auth/Stor
 <a id="backup"></a>
 ## Sao lưu và khôi phục
 
-Cần ba nhóm riêng: **database có dữ liệu**, **tệp Storage**, **khóa mã hóa/cấu hình**. Bản gộp và 57 SQL cũ chỉ tái tạo cấu trúc, không chứa đơn/người dùng/ảnh production.
+Cần ba nhóm riêng: **database có dữ liệu**, **tệp Storage**, **khóa mã hóa/cấu hình**. `database.sql` chỉ tái tạo cấu trúc, không chứa đơn/người dùng/ảnh production.
 
 Repo chưa có workflow backup hàng ngày hoàn chỉnh lên R2. Nếu triển khai Actions + R2: bucket private riêng, credentials giới hạn, mã hóa bản sao trước upload, chính sách lưu/xóa và cảnh báo thất bại. Không đặt dump/key trong artifact/log công khai. Kiểm tra backup/retention gói Supabase thực tế trên Dashboard/tài liệu tại thời điểm dùng.
 
@@ -454,7 +453,7 @@ Repo chưa có workflow backup hàng ngày hoàn chỉnh lên R2. Nếu triển 
 <a id="repository"></a>
 ## Quy tắc GitHub và giới hạn
 
-Giữ code/test/package lock/config mẫu/deploy/tài nguyên website/HTML email/bản SQL gộp và **đủ 57 SQL cũ**. `README.md` là Markdown chính được theo dõi. Markdown phụ, screenshot/biểu đồ báo cáo, DOCX/PPTX/PDF, archive, output, dump, `.env` thật và private key được bỏ qua bởi [.gitignore](.gitignore).
+Giữ code/test/package lock/config mẫu/deploy/tài nguyên website/HTML email và SQL cài đặt. `README.md` là Markdown chính được theo dõi. Markdown phụ, screenshot/biểu đồ báo cáo, DOCX/PPTX/PDF, archive, output, dump, `.env` thật và private key được bỏ qua bởi [.gitignore](.gitignore).
 
 File phụ trên máy có thể giữ local. Bỏ theo dõi không xóa bản local đang thao tác hoặc lịch sử commit trước trên GitHub. Checkout khác có thể loại file đã bỏ khỏi phiên bản mới; lưu báo cáo cá nhân riêng nếu cần giữ lâu dài. Không dùng GitHub làm backup dữ liệu/secret. Chọn file cụ thể và kiểm tra `git diff --cached` trước push.
 
