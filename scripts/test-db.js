@@ -1,12 +1,12 @@
 import { SELLER_TERMS_VERSION } from '../shared/seller-terms.js';
 import { LEGAL_VERSION } from '../shared/legal-content.js';
 import { consentProof } from '../server/legal-consent.js';
-// Executes the exact Supabase migration in an ephemeral PostgreSQL (WASM) instance.
+// Executes the canonical Supabase SQL in an ephemeral PostgreSQL (WASM) instance.
 // Supabase Auth is replaced only by a local users table and auth.uid() claim stub.
 // No network credentials, persistent files or live databases are used.
 import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
-import { readFile, readdir } from "node:fs/promises";
+import { databaseSql, databaseStep } from './database-sql.js';
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 const db = new PGlite({ extensions: { pgcrypto } });
@@ -34,18 +34,8 @@ try {
  create table auth.refresh_tokens(id uuid primary key,session_id uuid references auth.sessions(id) on delete cascade);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant execute on function auth.uid() to anon,authenticated,service_role;`);
-  for (const name of (
-    await readdir(new URL("../supabase/migrations/", import.meta.url))
-  )
-    .filter((n) => n.endsWith(".sql"))
-    .sort())
-    await db.exec(
-      await readFile(
-        new URL(`../supabase/migrations/${name}`, import.meta.url),
-        "utf8",
-      ),
-    );
-  pass("migration compiles with pgcrypto and all functions");
+  await db.exec(databaseSql);
+  pass("canonical database.sql compiles with pgcrypto and all functions");
   const recoveryUser = randomUUID();
   const recoveryId = randomUUID();
   const recoveryEmailHash = "a".repeat(64);
@@ -82,7 +72,7 @@ try {
   await db.query("update profiles set role='seller',balance=12345 where id=$1", [existingProfile]);
   await db.exec('drop trigger new_auth_user on auth.users');
   await db.query("insert into auth.users(id,email,raw_user_meta_data) values($1,'missing-profile@example.test','{\"name\":\"Email Customer\",\"role\":\"admin\"}')", [missingProfile]);
-  await db.exec(await readFile(new URL('../supabase/migrations/023_restore_customer_profiles.sql', import.meta.url), 'utf8'));
+  await db.exec(databaseStep('023_restore_customer_profiles'));
   assert.equal(await scalar('select role from profiles where id=$1', [missingProfile]), 'customer');
   assert.equal(await scalar('select name from profiles where id=$1', [missingProfile]), 'Email Customer');
   assert.equal(await scalar('select balance::int from profiles where id=$1', [existingProfile]), 12345);
@@ -1753,7 +1743,7 @@ try {
   await db.query('insert into auth.sessions(id,user_id) values($1,$2)', [cleanupAuth,sessionUser]);
   await db.query('insert into app_sessions(id,user_id,token_hash,auth_session_id,revoked_at) values($1,$2,$3,$4,now())',
     [cleanupApp, sessionUser, 'previously-revoked', cleanupAuth]);
-  await db.exec(await readFile(new URL('../supabase/migrations/034_revoke_provider_session.sql', import.meta.url), 'utf8'));
+  await db.exec(databaseStep('034_revoke_provider_session'));
   assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [cleanupAuth])), 0);
   assert.equal(Number(await scalar('select count(*) from auth.sessions where id=$1', [unrelatedAuth])), 1);
   pass('single-device revocation removes provider session and refresh tokens, preserves unrelated devices, rejects unmapped legacy records and cleans up old revocations');
@@ -2121,7 +2111,7 @@ try {
         assert.equal(await scalar('select has_function_privilege($1,$2,$3)', [role, fn, 'EXECUTE']), false);
 
     // Re-run just the deployment backfill: read receipts stay read and no row duplicates.
-    const migration = await readFile(new URL('../supabase/migrations/054_admin_event_notifications.sql', import.meta.url), 'utf8');
+    const migration = databaseStep('054_admin_event_notifications');
     const backfill = migration.slice(migration.indexOf('do $$\ndeclare t public.tickets;')).replace(/commit;\s*$/, '');
     await db.query("update tickets set status='open' where id=$1", [ticket]);
     const newAdmin = randomUUID();

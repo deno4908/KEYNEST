@@ -9,6 +9,6 @@ if (existsSync(".env")) {
   );
   writeFileSync(".env", template, { flag: "wx", mode: 0o600 });
   console.log(
-    "Đã tạo .env ở chế độ demo và sinh khóa kho. Cấu hình Tingee/Pay2S theo deploy/tingee-payments.md.",
+    "Đã tạo .env ở chế độ demo và sinh khóa kho. Cấu hình Tingee/Pay2S theo README.md#payments.",
   );
 }

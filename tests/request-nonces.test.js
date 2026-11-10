@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { databaseStep } from '../scripts/database-sql.js';
 import { PGlite } from '@electric-sql/pglite';
 import { createSupabaseNonceStore } from '../server/request-nonces.js';
 
@@ -8,7 +8,7 @@ test('database nonce consumption persists across adapters, rejects replay and ex
   const db = new PGlite();
   try {
     await db.exec('create role anon; create role authenticated; create role service_role;');
-    await db.exec(await readFile(new URL('../supabase/migrations/030_password_request_nonces.sql', import.meta.url), 'utf8'));
+    await db.exec(databaseStep('030_password_request_nonces'));
     const client = { async rpc(name, params) {
       assert.equal(name, 'consume_password_request_nonce');
       const result = await db.query('select public.consume_password_request_nonce($1,$2) as used', [params.p_nonce_hash, params.p_expires_at]);

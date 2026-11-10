@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { readFile } from 'node:fs/promises';
+import { databaseStep } from '../scripts/database-sql.js';
 import { PGlite } from '@electric-sql/pglite';
 import { AppError } from "../server/security.js";
 import { createPasswordRecovery as createRecovery } from "../server/password-recovery.js";
@@ -36,7 +36,7 @@ test('SQL delivery reservation, failed resend, ticket replay and expiry', async 
   try {
     await db.exec('create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key);');
     for (const name of ['027_password_recovery_links.sql', '028_password_recovery_delivery.sql'])
-      await db.exec(await readFile(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'));
+      await db.exec(databaseStep(name));
     const reserve = async id => (await db.query('select reserve_password_recovery($1,$2) as ok', [hash,id])).rows[0].ok;
     const finish = (id,sent) => db.query('select finish_password_recovery($1,$2,$3)',[hash,id,sent]);
     assert.equal(await reserve(first),true);

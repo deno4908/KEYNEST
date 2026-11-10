@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { databaseStep } from '../scripts/database-sql.js';
 import { PGlite } from '@electric-sql/pglite';
 import { deleteAdminRecord } from '../server/admin-deletion.js';
 
@@ -38,7 +38,7 @@ test('SQL deletion enforces admin access, dependencies, audit and service-only a
       insert into categories values('game'); insert into products values('game');
       insert into coupons values('SALE','game'); insert into orders values('SALE');
       insert into banners values('${admin}');`);
-    await db.exec(await readFile(new URL('../supabase/migrations/026_admin_deletion.sql',import.meta.url),'utf8'));
+    await db.exec(databaseStep('026_admin_deletion'));
     const remove=(actor,kind,id)=>db.query('select delete_admin_record($1,$2,$3)',[actor,kind,id]);
     await assert.rejects(remove(seller,'banner',admin),/quản trị/);
     await assert.rejects(remove(admin,'category','game'),/còn sản phẩm/);
