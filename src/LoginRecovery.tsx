@@ -74,7 +74,7 @@ export function LoginRecovery({ email, captcha, back, close }: {
           {wait ? `Gửi lại sau ${wait} giây` : 'Yêu cầu mã mới'}
         </button>}
       </fieldset>
-      <p className="muted"><ShieldCheck size={14} /> Cần đúng OTP và CAPTCHA trước khi đặt mật khẩu mới.</p>
+      <p className="muted auth-recovery-note"><ShieldCheck size={12} /> Cần đúng OTP và CAPTCHA trước khi đặt mật khẩu mới.</p>
     </form>
   </div>;
 }
