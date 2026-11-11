@@ -11,6 +11,11 @@ type WelcomeProvider = 'google' | 'discord' | 'email' | 'register';
 export function showEmailWelcome(registered = false) {
   window.dispatchEvent(new CustomEvent('keynest:auth-welcome', { detail: registered ? 'register' : 'email' }));
 }
+export function queueEmailWelcome() {
+  try { sessionStorage.setItem(storageKey, JSON.stringify({ provider: 'email', expires: Date.now() + 600000 })); }
+  catch { /* The event still works for navigation within this tab. */ }
+  showEmailWelcome();
+}
 const fallbackArt = { name: 'ELDEN RING', src: '/images/products/elden-ring-welcome.jpg' };
 type GameArt = typeof fallbackArt;
 // Cosmetic marker only. The authenticated /me response controls the greeting.
@@ -82,7 +87,7 @@ export function OAuthWelcome() {
   }, [provider]);
   const location = useLocation();
   const navigate = useNavigate();
-  const visible = !!user && !!provider && !['/two-factor', '/admin-verification', '/auth/error'].includes(location.pathname);
+  const visible = !!user && !!provider && !['/two-factor', '/admin-verification', '/auth/error', '/reset-password'].includes(location.pathname);
   useEffect(() => {
     if (!visible) return;
     try { sessionStorage.removeItem(storageKey); } catch { /* Optional storage. */ }

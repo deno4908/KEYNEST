@@ -81,7 +81,7 @@ import { HeaderSearch, StoreNavigation } from "./Navigation";
 import { Catalog } from "./Catalog";
 import { rememberProduct } from "./discovery";
 import { AuthModal, OAuthErrorPage } from "./Auth";
-import { OAuthWelcome } from './OAuthWelcome';
+import { OAuthWelcome, queueEmailWelcome } from './OAuthWelcome';
 import { checkRegion, isRegionRestricted } from './region';
 import { RegionRestricted } from './RegionRestricted';
 import { Avatar } from "./Avatar";
@@ -2091,7 +2091,8 @@ function SupportPage() {
   );
 }
 function ResetPassword() {
-  const { notify } = useStore();
+  const { notify, setUser } = useStore();
+  const navigate = useNavigate();
   const [completed, setCompleted] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [newPasswordValue, setNewPasswordValue] = useState('');
@@ -2176,6 +2177,11 @@ function ResetPassword() {
       setNewPasswordValue('');
       setTicket(null);
       setCompleted(true);
+      setUser(null);
+      queueEmailWelcome();
+      // The reset response establishes cookies, but only /me confirms the new
+      // identity and any required MFA/admin OTP before showing a signed-in greeting.
+      void api<User>('/me').then(setUser).catch(() => { /* Authentication may need an additional verification step. */ });
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -2184,7 +2190,7 @@ function ResetPassword() {
   }
   return (
     <Modal title={completed ? 'Mật khẩu đã được cập nhật' : 'Đặt mật khẩu mới'} className="auth-dialog recovery-dialog"
-      close={() => window.location.assign(completed ? '/account' : '/')}>
+      close={() => completed ? navigate('/', { replace: true }) : window.location.assign('/')}>
       <div className="auth-layout">
         <aside className="auth-art" data-mode="login">
           <span className="auth-art-background auth-art-background-login" aria-hidden="true" />
@@ -2212,8 +2218,8 @@ function ResetPassword() {
           <div className="recovery-complete">
             <PasswordChangeAnimation />
             <p>Dùng mật khẩu mới cho những lần đăng nhập tiếp theo.</p>
-            <button type="button" className="button auth-submit" autoFocus onClick={() => window.location.assign('/account')}>
-              Tiếp tục đến tài khoản <ArrowRight size={17} />
+            <button type="button" className="button auth-submit" autoFocus onClick={() => navigate('/', { replace: true })}>
+              Tiếp tục vào cửa hàng <ArrowRight size={17} />
             </button>
           </div>
         ) : checkingLink ? (
