@@ -3231,3 +3231,129 @@ grant execute on function public.request_seller_name(uuid,text),public.review_se
 notify pgrst,'reload schema';
 commit;
 -- KEYNEST STEP 057_seller_name_approval END
+
+-- KEYNEST STEP 058_login_protection BEGIN
+begin;
+create table public.login_attempts (
+ email_hash text primary key check(email_hash ~ '^[a-f0-9]{64}$'),
+ failures integer not null default 0 check(failures between 0 and 5),
+ window_started_at timestamptz not null default now(),
+ otp_required boolean not null default false,
+ otp_blocked_until timestamptz,
+ otp_strikes integer not null default 0,
+ otp_last_abuse timestamptz,
+ otp_window timestamptz,
+ otp_sends integer not null default 0,
+ otp_checks integer not null default 0,
+ attempt_id uuid,
+ lease_until timestamptz
+);
+create index login_attempts_expiry on public.login_attempts(window_started_at);
+alter table public.login_attempts enable row level security;
+revoke all on public.login_attempts from public,anon,authenticated;
+grant all on public.login_attempts to service_role;
+
+-- Reserve before contacting Auth: concurrent requests cannot race past the limit.
+create function public.begin_login_attempt(p_email_hash text,p_attempt uuid) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare r public.login_attempts;
+begin
+ if p_email_hash is null or p_email_hash !~ '^[a-f0-9]{64}$' or p_attempt is null then raise exception 'Invalid login attempt'; end if;
+ delete from public.login_attempts where not otp_required and window_started_at < now()-interval '1 day' and coalesce(lease_until,now())<=now();
+ insert into public.login_attempts(email_hash) values(p_email_hash) on conflict do nothing;
+ select * into r from public.login_attempts where email_hash=p_email_hash for update;
+ if r.otp_required then return jsonb_build_object('otp_required',true); end if;
+ if r.lease_until>now() then return jsonb_build_object('busy',true,'retry_after',2); end if;
+ if r.window_started_at<=now()-interval '15 minutes' then
+  update public.login_attempts set failures=0,window_started_at=now() where email_hash=p_email_hash;
+ end if;
+ update public.login_attempts set attempt_id=p_attempt,lease_until=now()+interval '30 seconds' where email_hash=p_email_hash;
+ return jsonb_build_object('attempt_id',p_attempt);
+end $$;
+
+create function public.finish_login_attempt(p_email_hash text,p_attempt uuid,p_outcome text) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare r public.login_attempts;
+begin
+ if p_outcome is null or p_outcome not in ('success','failure','error') then raise exception 'Invalid login outcome'; end if;
+ select * into r from public.login_attempts where email_hash=p_email_hash for update;
+ if not found or r.attempt_id is distinct from p_attempt or r.lease_until<=now() then return null; end if;
+ if p_outcome='success' then delete from public.login_attempts where email_hash=p_email_hash; return '{}'::jsonb; end if;
+ update public.login_attempts set failures=least(5,failures+case when p_outcome='failure' then 1 else 0 end),
+  otp_required=otp_required or (p_outcome='failure' and failures>=4),
+  attempt_id=null,lease_until=null where email_hash=p_email_hash returning * into r;
+ return jsonb_build_object('otp_required',r.otp_required);
+end $$;
+
+create function public.login_protection_state(p_email_hash text) returns jsonb
+language sql security definer set search_path='' as $$
+ select coalesce((select jsonb_build_object('otp_required',otp_required) from public.login_attempts where email_hash=p_email_hash),'{}'::jsonb);
+$$;
+
+-- Count across challenges, browsers and IPs. Requests during a ban do not extend
+-- it. Each later abuse incident doubles 30 minutes, capped at 365 days.
+create function public.login_otp_budget(p_email_hash text,p_action text) returns jsonb
+language plpgsql security definer set search_path='' as $$
+declare r public.login_attempts; seconds integer; incident boolean:=false;
+begin
+ if p_action is null or p_action not in ('send','verify','failure') then raise exception 'Invalid OTP action'; end if;
+ select * into r from public.login_attempts where email_hash=p_email_hash for update;
+ if not found or not r.otp_required then return jsonb_build_object('not_required',true); end if;
+ if r.otp_blocked_until>now() then return jsonb_build_object('locked',true,'retry_after',ceil(extract(epoch from r.otp_blocked_until-now()))::int); end if;
+ if r.otp_blocked_until is not null or r.otp_window is null or r.otp_window<=now()-interval '15 minutes' then
+  r.otp_window:=now(); r.otp_sends:=0; r.otp_checks:=0; r.otp_blocked_until:=null;
+ end if;
+ if p_action='send' then r.otp_sends:=r.otp_sends+1; incident:=r.otp_sends>=5;
+ elsif p_action='verify' then r.otp_checks:=r.otp_checks+1; incident:=r.otp_checks>5;
+ else incident:=r.otp_checks>=5; end if;
+ if incident then
+  r.otp_strikes:=least(16,r.otp_strikes+1);
+  seconds:=least(31536000,1800*power(2,r.otp_strikes-1))::integer;
+  r.otp_blocked_until:=now()+make_interval(secs=>seconds); r.otp_last_abuse:=now();
+ end if;
+ update public.login_attempts set otp_sends=r.otp_sends,otp_checks=r.otp_checks,otp_window=r.otp_window,
+  otp_blocked_until=r.otp_blocked_until,otp_strikes=r.otp_strikes,otp_last_abuse=r.otp_last_abuse where email_hash=p_email_hash;
+ return jsonb_build_object('locked',incident,'retry_after',coalesce(seconds,0));
+end $$;
+
+create function public.unlock_login_protection(p_actor uuid,p_user uuid,p_email_hash text) returns void
+language plpgsql security definer set search_path='' as $$
+begin
+ perform 1 from public.profiles where id=p_actor and role='admin' for update;
+ if not found or exists(select 1 from public.account_controls where user_id=p_actor and suspended) then raise exception 'Cần quyền quản trị'; end if;
+ perform 1 from public.profiles where id=p_user for update;
+ if not found or p_email_hash is null or p_email_hash !~ '^[a-f0-9]{64}$' then raise exception 'Invalid account'; end if;
+ delete from public.login_attempts where email_hash=p_email_hash;
+ insert into public.audit_logs(user_id,action,target) values(p_actor,'login_protection_unlocked',p_user::text);
+end $$;
+
+alter table public.password_recovery_links add column otp_attempts integer not null default 0 check(otp_attempts between 0 and 5),
+ add column otp_generation uuid;
+create function public.claim_recovery_otp_attempt(p_email_hash text,p_recovery_id uuid) returns boolean
+language plpgsql security definer set search_path='' as $$
+begin
+ update public.password_recovery_links set otp_attempts=case when otp_generation=p_recovery_id then otp_attempts+1 else 1 end,
+  otp_generation=p_recovery_id where email_hash=p_email_hash and recovery_id=p_recovery_id
+  and consumed_at is null and expires_at>now() and (otp_generation is distinct from p_recovery_id or otp_attempts<5);
+ return found;
+end $$;
+
+-- Only an actual password update clears the gate, not requesting/verifying OTP.
+create function public.clear_login_attempts_after_password() returns trigger
+language plpgsql security definer set search_path='' as $$
+begin
+ if new.encrypted_password is distinct from old.encrypted_password then
+  delete from public.login_attempts a using public.password_recovery_tickets t where t.user_id=new.id and t.email_hash=a.email_hash;
+ end if;
+ return new;
+end $$;
+create trigger password_login_protection_reset after update of encrypted_password on auth.users
+ for each row execute function public.clear_login_attempts_after_password();
+revoke all on function public.begin_login_attempt(text,uuid),public.finish_login_attempt(text,uuid,text),
+ public.claim_recovery_otp_attempt(text,uuid),public.clear_login_attempts_after_password(),
+ public.login_otp_budget(text,text),public.login_protection_state(text),public.unlock_login_protection(uuid,uuid,text) from public,anon,authenticated;
+grant execute on function public.begin_login_attempt(text,uuid),public.finish_login_attempt(text,uuid,text),
+ public.claim_recovery_otp_attempt(text,uuid),public.login_otp_budget(text,text),public.login_protection_state(text),public.unlock_login_protection(uuid,uuid,text) to service_role;
+notify pgrst,'reload schema';
+commit;
+-- KEYNEST STEP 058_login_protection END

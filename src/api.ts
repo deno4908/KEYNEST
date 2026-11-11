@@ -3,6 +3,9 @@ import { publishDataChange } from './dataChanges';
 let accessToken: string | null = null;
 let initialized = false;
 let refreshing: Promise<boolean> | null = null;
+export class ApiError extends Error {
+  constructor(message: string, public status: number, public code?: string, public retryAfter?: number) { super(message); }
+}
 
 function receiveToken(res: Response) {
   const token = res.headers.get('X-Access-Token');
@@ -44,7 +47,7 @@ export async function api<T>(
   // Private routes and every mutation still wait for authentication as before.
   const publicRead = (options.method || 'GET').toUpperCase() === 'GET' &&
     ['/config', '/products', '/categories', '/catalog', '/banners', '/promotions', '/announcements'].includes(path.split('?')[0]);
-  const recovery = ['/auth/reset/verify', '/auth/reset'].includes(path);
+  const recovery = ['/auth/reset/verify', '/auth/reset', '/auth/login-recovery/send', '/auth/login-recovery/verify'].includes(path);
   if (!initialized && !publicRead && !recovery) await refreshAccess();
   const send = async () => {
     const headers = new Headers(options.headers);
@@ -85,7 +88,7 @@ export async function api<T>(
     redirectTo("/two-factor");
     throw new Error("Vui lòng xác minh hai bước.");
   }
-  if (!res.ok) throw new Error(body.error || "Không thể kết nối.");
+  if (!res.ok) throw new ApiError(body.error || "Không thể kết nối.", res.status, body.code, body.retry_after);
   if (
     !['GET', 'HEAD', 'OPTIONS'].includes((options.method || 'GET').toUpperCase()) &&
     typeof window !== 'undefined' &&

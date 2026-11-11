@@ -196,6 +196,14 @@ Request thay đổi dữ liệu từ browser cần Origin đúng và `X-App-Requ
 
 Mật khẩu 10–128 ký tự, gồm hoa/thường/số. Đổi/reset chặn mật khẩu hiện tại và mật khẩu đã thay thế trong 30 ngày. Không lưu mật khẩu rõ trong hồ sơ cửa hàng. Thay trực tiếp ngoài ứng dụng không đi qua toàn bộ chính sách API; cần hạn chế quyền quản trị Supabase.
 
+### Chống thử mật khẩu và spam OTP
+
+Sai mật khẩu 5 lần trong 15 phút thì tài khoản bắt buộc xác minh OTP email và CAPTCHA trước khi đặt mật khẩu mới. Trạng thái lưu trên server, không mất khi quay lại, tải trang, đổi trình duyệt/IP hay restart API. Chỉ đổi mật khẩu thành công hoặc admin mở khóa mới gỡ yêu cầu này. Gửi OTP cần CAPTCHA, chờ ít nhất 90 giây giữa hai email; xác minh mã cần CAPTCHA mới và tối đa 5 lượt thử trong cửa sổ giới hạn. Không tự gửi email chỉ vì ai đó nhập sai mật khẩu.
+
+Spam gửi hoặc nhập sai OTP vượt giới hạn sẽ khóa luồng OTP theo tài khoản: 30 phút, 1 giờ, 2 giờ và tiếp tục gấp đôi, tối đa **365 ngày**. Request trong thời gian khóa không gửi mail hoặc kéo dài thời điểm hết khóa. Sau khi hết hạn, đợt vi phạm tiếp theo tăng mức khóa; trở về trang đăng nhập vẫn cần OTP. Đây là khóa luồng xác minh, không phải vô hiệu hóa toàn bộ tài khoản. Admin có nút **Mở khóa OTP** trong danh sách khách hàng, có kiểm tra quyền và ghi audit log.
+
+Triển khai tính năng cần áp dụng bước `058_login_protection` trước khi cập nhật API và bật reCAPTCHA v2 với key hợp lệ. Email mã dùng mẫu Magic Link `otp.html` hiện có; không tạo user mới khi yêu cầu mã. OTP chỉ cấp vé đặt mật khẩu một lần, không cấp phiên đăng nhập cho trình duyệt trước khi đặt mật khẩu. Chức năng email này cần Supabase, không gửi mail trong demo.
+
 ### OAuth và Authenticator
 
 1. Bật provider trong Supabase Authentication → Providers, điền client ID/secret tại Supabase.
@@ -214,7 +222,7 @@ Supabase Authentication → Email Templates:
 | Mẫu | File/mục đích |
 | --- | --- |
 | Reset Password | [recovery.html](supabase/email-templates/recovery.html): liên kết đặt mật khẩu |
-| Magic Link | [otp.html](supabase/email-templates/otp.html): OTP email admin |
+| Magic Link | [otp.html](supabase/email-templates/otp.html): OTP email admin và xác minh đặt lại mật khẩu |
 | Confirm signup | Giữ liên kết xác minh theo cấu hình đăng ký, không thay bằng OTP admin |
 
 SMTP cấu hình riêng; HTML không thiết lập gửi thư. Giữ nguyên placeholder `{{ .Token }}`, `{{ .TokenHash }}`, `{{ .RedirectTo }}` ở mẫu tương ứng. Mẫu dùng bảng/inline CSS, không cần JavaScript/ảnh/font ngoài.

@@ -82,8 +82,8 @@ export function createApiLimits({ rateStore = () => undefined } = {}) {
         if (path.startsWith('/auth/')) {
           if (['GET', 'HEAD'].includes(req.method) && path === '/auth/password-key') return next();
           const specific = req.method === 'POST' && ({
-            '/auth/register': register, '/auth/forgot': forgot,
-            '/auth/reset': recovery, '/auth/reset/verify': recovery,
+            '/auth/register': register, '/auth/forgot': forgot, '/auth/login-recovery/send': forgot,
+            '/auth/reset': recovery, '/auth/reset/verify': recovery, '/auth/login-recovery/verify': recovery,
           })[path];
           return login(req, res, error => error ? next(error) : specific ? specific(req, res, next) : next());
         }

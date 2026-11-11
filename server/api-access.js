@@ -9,7 +9,7 @@ export function isPublicApi(method, path) {
       || /^\/media\/[^/]+$/.test(path);
   }
   return method === 'POST' && ['/auth/login', '/auth/register', '/auth/forgot',
-    '/auth/reset', '/auth/reset/verify', '/auth/refresh', '/auth/logout',
+    '/auth/reset', '/auth/reset/verify', '/auth/login-recovery/send', '/auth/login-recovery/verify', '/auth/refresh', '/auth/logout',
     '/webhooks/pay2s', '/webhooks/sepay'].includes(path);
 }
 

@@ -37,7 +37,7 @@ test('unlisted API routes require authentication and admin routes also require p
     assert.equal((await request(path, 'HEAD')).status, 200);
     assert.equal((await request(path, 'POST')).status, 401);
   }
-  for (const path of ['/auth/login', '/auth/register', '/auth/forgot', '/auth/reset', '/auth/reset/verify', '/webhooks/pay2s']) {
+  for (const path of ['/auth/login', '/auth/register', '/auth/forgot', '/auth/reset', '/auth/reset/verify', '/auth/login-recovery/send', '/auth/login-recovery/verify', '/webhooks/pay2s']) {
     assert.equal((await request(path, 'POST')).status, 200);
     assert.equal((await request(path, 'DELETE')).status, 401);
   }

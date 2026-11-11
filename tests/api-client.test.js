@@ -30,6 +30,18 @@ test('single-use recovery requests bypass refresh and are never replayed on 401'
   assert.deepEqual(calls, ['/api/auth/reset/verify']);
 });
 
+test('login recovery errors retain their code/cooldown, do not refresh/replay, and never accept tokens in the URL', async t => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push(url); assert.equal(options.headers.has('Authorization'), false);
+    return response({ error: 'Locked', code: 'RECOVERY_OTP_LOCKED', retry_after: 31536000 }, 429);
+  });
+  const { post, ApiError } = await client();
+  await assert.rejects(post('/auth/login-recovery/verify', { challenge: 'secret', code: '123456' }),
+    error => error instanceof ApiError && error.code === 'RECOVERY_OTP_LOCKED' && error.retryAfter === 31536000);
+  assert.deepEqual(calls, ['/api/auth/login-recovery/verify']);
+});
+
 test('public storefront loads without waiting for a slow session refresh', async t => {
   let release;
   let privateRequests = 0;

@@ -1,6 +1,7 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { AppError, decrypt, digest, encrypt, opaque } from "./security.js";
 import { createPasswordHistory } from './password-history.js';
+import { recoveryEmailHash } from './login-protection.js';
 
 const INVALID_LINK =
   "Liên kết đã hết hạn hoặc không hợp lệ. Hãy yêu cầu email khôi phục mới.";
@@ -8,20 +9,24 @@ const STORAGE_ERROR =
   "Không thể xác minh liên kết lúc này. Vui lòng thử lại sau.";
 
 function emailHash(email, key) {
-  return createHmac("sha256", Buffer.from(key, "hex"))
-    .update(email.trim().toLowerCase())
-    .digest("hex");
+  return recoveryEmailHash(email, key);
 }
 
 export function createSupabaseRecoveryRepository(store) {
   const table = (name) => store.client.from(name);
   return {
+    async claimOtp(hash, recoveryId) {
+      const { data, error } = await store.client.rpc('claim_recovery_otp_attempt', { p_email_hash: hash, p_recovery_id: recoveryId });
+      if (error) throw new AppError(STORAGE_ERROR, 503);
+      if (!data) throw new AppError('Mã OTP đã hết hạn hoặc vượt số lần thử. Hãy yêu cầu mã mới.', 401);
+    },
     async reserveSend(hash, recoveryId) {
       const { data, error } = await store.client.rpc('reserve_password_recovery', {
         p_email_hash: hash, p_recovery_id: recoveryId,
       });
       if (error) throw new AppError(STORAGE_ERROR, 503);
-      if (!data) throw new AppError('Vui lòng chờ 90 giây trước khi yêu cầu email mới.', 429);
+      if (!data) throw Object.assign(new AppError('Vui lòng chờ 90 giây trước khi yêu cầu email mới.', 429),
+        { code: 'RECOVERY_SEND_COOLDOWN', retry_after: 90 });
     },
     async finishSend(hash, recoveryId, sent) {
       const { data, error } = await store.client.rpc('finish_password_recovery', {
@@ -72,10 +77,46 @@ export function createPasswordRecovery({
   clock = () => Date.now(),
   logger = console,
   passwordHistory = createPasswordHistory(store),
+  loginProtection = null,
 }) {
+  const challengeKey = createHmac('sha256', Buffer.from(config.encryption, 'hex')).update('login-recovery-otp-v1').digest('hex');
   return {
+    async requestOtp(email) {
+      email = email.trim().toLowerCase();
+      await loginProtection.otpBudget(email, 'send');
+      const recoveryId = randomUUID(), hash = emailHash(email, config.encryption);
+      await repository.reserveSend(hash, recoveryId);
+      let error;
+      try { ({ error } = await makeAuthClient().auth.signInWithOtp({ email, options: { shouldCreateUser: false } })); }
+      catch (failure) { error = failure; }
+      await repository.finishSend(hash, recoveryId, !error);
+      if (error) throw new AppError('Chưa thể gửi OTP. Vui lòng thử lại sau.', 503);
+      return { challenge: encrypt(JSON.stringify({ email, recovery_id: recoveryId, expires: clock() + 600000 }), challengeKey), retry_after: 90 };
+    },
+    async redeemOtp(input) {
+      let challenge;
+      try {
+        if (typeof input.challenge !== 'string' || !/^[a-f0-9]{24}:(?:[a-f0-9]{2})+:[a-f0-9]{32}$/.test(input.challenge)) throw new Error();
+        challenge = JSON.parse(decrypt(input.challenge, challengeKey));
+        if (typeof challenge.email !== 'string' || typeof challenge.recovery_id !== 'string' || !(challenge.expires > clock())) throw new Error();
+      } catch { throw new AppError('Phiên xác minh đã hết hạn. Hãy yêu cầu OTP mới.', 401); }
+      await loginProtection.otpBudget(challenge.email, 'verify');
+      try {
+        const hash = emailHash(challenge.email, config.encryption);
+        await repository.claimOtp(hash, challenge.recovery_id);
+        const { data, error } = await makeAuthClient().auth.verifyOtp({ email: challenge.email, token: input.code, type: 'email' });
+        if (error && (!error.status || error.status >= 500)) throw new AppError(STORAGE_ERROR, 503);
+        if (error || !data?.session || data.user?.email?.toLowerCase() !== challenge.email)
+          throw new AppError('Mã OTP không đúng, đã dùng hoặc hết hạn.', 401);
+        return await this.redeem({ recovery_id: challenge.recovery_id }, data);
+      } catch (error) {
+        if (error.status === 401) await loginProtection.otpBudget(challenge.email, 'failure');
+        throw error;
+      }
+    },
     async request(email) {
       email = email.trim().toLowerCase();
+      await loginProtection?.assertPasswordAllowed(email);
       const recoveryId = randomUUID();
       const hash = emailHash(email, config.encryption);
       try {
@@ -112,9 +153,9 @@ export function createPasswordRecovery({
       await repository.finishSend(hash, recoveryId, true);
     },
 
-    async redeem(input) {
+    async redeem(input, verified = null) {
       const client = makeAuthClient({ timeoutMs: 15000 });
-      const { data, error } = await client.auth.verifyOtp({
+      const { data, error } = verified ? { data: verified, error: null } : await client.auth.verifyOtp({
         token_hash: input.token_hash,
         type: "recovery",
       });
@@ -123,6 +164,8 @@ export function createPasswordRecovery({
         if (error && (!error.status || error.status >= 500)) throw new AppError(STORAGE_ERROR, 503);
         throw new AppError(INVALID_LINK, 401);
       }
+
+      if (!verified) await loginProtection?.assertPasswordAllowed(data.user.email);
 
       const nowMs = clock();
       const now = new Date(nowMs).toISOString();

@@ -233,6 +233,14 @@ export function AdminCustomers() {
                     </td>
                     <td>
                       <div className="customer-actions">
+                        <button className="button button-outline" disabled={busy} onClick={async () => {
+                          setBusy(true); setError('');
+                          try {
+                            const result = await post<{ message: string }>(`/admin/customers/${u.id}/login-unlock`);
+                            setNotice(result.message);
+                          } catch (error) { setError((error as Error).message); }
+                          finally { setBusy(false); }
+                        }}><UnlockKeyhole size={14} /> Mở khóa OTP</button>
                         <button
                           className="button button-outline"
                           disabled={busy}

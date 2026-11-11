@@ -72,6 +72,9 @@ function memoryRepository(now) {
   const tickets = new Map();
   return {
     tickets,
+    async claimOtp(hash, id) {
+      if (!currentLink || currentLink.emailHash !== hash || currentLink.recoveryId !== id || currentLink.consumedAt) throw new AppError('Invalid OTP generation', 401);
+    },
     get currentLink() {
       return currentLink;
     },
@@ -128,6 +131,7 @@ function authClient({ verified = true, calls = [] } = {}) {
         calls.push(["resetPasswordForEmail", ...args]);
         return { error: null };
       },
+      signInWithOtp: async input => { calls.push(['signInWithOtp', input]); return { error: null }; },
       verifyOtp: async (input) => {
         calls.push(["verifyOtp", input]);
         return verified
@@ -318,4 +322,49 @@ test('reuse rejection preserves the reset ticket so another password can be ente
   await service.complete({ ticket, password: 'DifferentPassword123!' });
   assert.equal(calls.filter(([name]) => name === 'updateUser').length, 1);
   await assert.rejects(service.complete({ ticket, password: 'AnotherPassword123!' }), error => error.status === 401);
+});
+
+test('login OTP uses the existing code email without signup, binds email/generation, and grants only a single-use password reset ticket', async () => {
+  const now = Date.now(), repository = memoryRepository(now), calls = [], budgets = [];
+  const service = createPasswordRecovery({
+    config: { origin: 'https://keynest.store', encryption }, store: {}, repository, clock: () => now,
+    makeAuthClient: () => authClient({ calls }),
+    loginProtection: { otpBudget: async (email, action) => budgets.push([email,action]) },
+  });
+  const { challenge } = await service.requestOtp(' USER@example.com ');
+  assert.deepEqual(calls[0], ['signInWithOtp', { email: user.email, options: { shouldCreateUser: false } }]);
+  assert.ok(!challenge.includes(user.email));
+  await assert.rejects(service.redeemOtp({ challenge: challenge + 'x', code: '123456' }), error => error.status === 401);
+  assert.equal(calls.filter(([name]) => name === 'verifyOtp').length, 0);
+  const { ticket } = await service.redeemOtp({ challenge, code: '123456' });
+  assert.deepEqual(Object.keys(await repository.inspectTicket([...repository.tickets.keys()][0])), ['user_id']);
+  assert.deepEqual(calls.find(([name]) => name === 'verifyOtp'), ['verifyOtp', { email: user.email, token: '123456', type: 'email' }]);
+  assert.equal(calls.filter(([name]) => name === 'updateUser').length, 0);
+  await service.complete({ ticket, password: 'NewPassword123!' });
+  await assert.rejects(service.complete({ ticket, password: 'OtherPassword123!' }), error => error.status === 401);
+  await assert.rejects(service.redeemOtp({ challenge, code: '123456' }), error => error.status === 401);
+  assert.ok(budgets.some(([,action]) => action === 'failure'));
+});
+
+test('expired and superseded OTP challenges never reach provider verification; a provider email mismatch never creates a reset ticket', async () => {
+  let now = Date.now(); const repository = memoryRepository(now), calls = [];
+  let wrongIdentity = false;
+  const service = createPasswordRecovery({
+    config: { origin: 'https://keynest.store', encryption }, store: {}, repository, clock: () => now,
+    loginProtection: { otpBudget: async () => {} },
+    makeAuthClient: () => {
+      const client = authClient({ calls });
+      if (wrongIdentity) client.auth.verifyOtp = async () => ({ data: { user: { ...user, email: 'other@example.com' }, session } });
+      return client;
+    },
+  });
+  const old = await service.requestOtp(user.email);
+  const current = await service.requestOtp(user.email);
+  await assert.rejects(service.redeemOtp({ challenge: old.challenge, code: '123456' }), error => error.status === 401);
+  assert.equal(calls.filter(([name]) => name === 'verifyOtp').length, 0);
+  wrongIdentity = true;
+  await assert.rejects(service.redeemOtp({ challenge: current.challenge, code: '123456' }), error => error.status === 401);
+  assert.equal(repository.tickets.size, 0);
+  now += 600001;
+  await assert.rejects(service.redeemOtp({ challenge: current.challenge, code: '123456' }), error => error.status === 401);
 });

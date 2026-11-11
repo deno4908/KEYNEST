@@ -21,6 +21,8 @@ import { sellersRouter, createSellers } from './sellers.js';
 import { requireSeller } from './seller-accounting.js';
 import { requirePasswordSession } from "./accounts.js";
 import { createPasswordRecovery } from "./password-recovery.js";
+import { createLoginProtection, recoveryEmailHash } from './login-protection.js';
+import { loginRecoveryRouter } from './login-recovery.js';
 import { createPasswordTransport } from './password-transport.js';
 import { createSupabaseNonceStore } from './request-nonces.js';
 import { apiAccessGuard } from './api-access.js';
@@ -73,6 +75,9 @@ if (config.mode === 'supabase') {
   const names = await store.client.from('seller_name_requests').select('id,requested_name,status').limit(0)
     .abortSignal(AbortSignal.timeout(10000));
   if (names.error) throw new Error('Áp dụng migration 057_seller_name_approval.sql trước khi triển khai phiên bản này.');
+  const protection = await store.client.from('login_attempts').select('email_hash,otp_required,otp_blocked_until').limit(0)
+    .abortSignal(AbortSignal.timeout(10000));
+  if (protection.error) throw new Error('Áp dụng bước 058_login_protection trong supabase/database.sql trước khi triển khai.');
 }
 export const bankPayments = createBankPayments({
   config,
@@ -213,7 +218,9 @@ function demoSession(res, id) {
   res.cookie("kn_session", token, cookieOpts);
 }
 const adminOtp = createAdminOtp({ config, makeAuthClient });
-const passwordRecovery = createPasswordRecovery({ config, makeAuthClient, store });
+const loginProtection = createLoginProtection({ config, store });
+const passwordRecovery = createPasswordRecovery({ config, makeAuthClient, store, loginProtection });
+app.use('/api/auth/login-recovery', loginRecoveryRouter({ config, recovery: passwordRecovery }));
 app.post('/api/auth/refresh', sessionRefreshHandler({ config, makeAuthClient, store, operations, adminOtp, setAuth, clearAuth }));
 const authorized = Symbol('authorized-request');
 const auth = async (req, res, next) => {
@@ -570,21 +577,25 @@ app.post("/api/auth/login", async (req, res) => {
   const input = credentials.parse(req.body);
   let user;
   if (config.mode === "demo") {
-    const u = store.db.users.find((u) => u.email === input.email);
-    if (!u || !verifyPassword(input.password, u.password_hash))
-      throw new AppError("Email hoặc mật khẩu không đúng.", 401);
+    const u = await loginProtection.authenticate(input.email, async () => {
+      const candidate = store.db.users.find(u => u.email === input.email);
+      if (!candidate || !verifyPassword(input.password, candidate.password_hash)) throw new AppError('Email hoặc mật khẩu không đúng.', 401);
+      return candidate;
+    });
     await operations.checkAccess(u.id);
     adminOtp.clear(res);
     demoSession(res, u.id);
     user = store.profile(u.id);
   } else {
-    const { data, error } =
-      await makeAuthClient().auth.signInWithPassword(input);
-    if (error)
-      throw new AppError(
-        "Email/mật khẩu không đúng hoặc email chưa xác minh.",
-        401,
-      );
+    const { data } = await loginProtection.authenticate(input.email, async () => {
+      const client = makeAuthClient();
+      const result = await client.auth.signInWithPassword(input);
+      if (result.error) {
+        if (result.error.code === 'invalid_credentials') throw new AppError('Email hoặc mật khẩu không đúng.', 401);
+        throw new AppError('Chưa thể đăng nhập. Kiểm tra xác minh email hoặc thử lại sau.', result.error.status >= 500 ? 503 : 400);
+      }
+      return { data: result.data, client };
+    });
     await operations.checkAccess(data.user.id);
     adminOtp.clear(res);
     setAuth(res, data.session);
@@ -663,6 +674,21 @@ app.post("/api/auth/reset", async (req, res) => {
   res.json({ message: "Mật khẩu đã được cập nhật." });
 });
 app.get("/api/me", auth, async (req, res) => res.json(req.user));
+app.post('/api/admin/customers/:id/login-unlock', auth, admin, limiter(10, 15 * 60000, 'login-unlock'), async (req, res) => {
+  const id = z.string().uuid().parse(req.params.id);
+  const profile = await store.profile(id);
+  if (!profile?.email) throw new AppError('Không tìm thấy tài khoản.', 404);
+  const hash = recoveryEmailHash(profile.email, config.encryption);
+  if (config.mode === 'demo') {
+    if (store.db.login_attempts) delete store.db.login_attempts[hash];
+    store.db.audit.push({ id: opaque(), user_id: req.user.id, action: 'login_protection_unlocked', target: id, created_at: new Date().toISOString() });
+    store.save();
+  } else {
+    const { error } = await store.client.rpc('unlock_login_protection', { p_actor: req.user.id, p_user: id, p_email_hash: hash });
+    if (error) throw new AppError('Chưa thể mở khóa xác minh.', 503);
+  }
+  res.json({ message: 'Đã mở khóa bảo mật đăng nhập. Khách có thể thử đăng nhập lại.' });
+});
 app.get('/api/cart', auth, async (req, res) => {
   res.setHeader('Cache-Control', 'private, no-store');
   res.json({ user_id: req.user.id, items: await store.cart(req.user.id) });
@@ -1267,7 +1293,10 @@ app.use((err, req, res, next) => {
     return res.status(413).json({ error: "Dữ liệu quá lớn." });
   if (!(err instanceof AppError))
     console.error("Unexpected error:", err.message);
+  if (err instanceof AppError && err.retry_after) res.setHeader('Retry-After', String(err.retry_after));
   res.status(err.status || 500).json({
+    ...(err instanceof AppError && err.code ? { code: err.code } : {}),
+    ...(err instanceof AppError && err.retry_after ? { retry_after: err.retry_after } : {}),
     error:
       err instanceof AppError
         ? err.message

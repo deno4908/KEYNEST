@@ -13,7 +13,8 @@ import {
   Wallet,
 } from "lucide-react";
 import { Modal, useStore } from "./App";
-import { api, post } from "./api";
+import { api, ApiError, post } from "./api";
+import { LoginRecovery } from './LoginRecovery';
 import type { User } from "./types";
 import { GoogleIcon, DiscordIcon } from "./AuthProviders";
 import { Recaptcha } from './Recaptcha';
@@ -27,6 +28,7 @@ export function AuthModal({ close }: { close: () => void }) {
   const [tab, setTab] = useState<"login" | "register" | "forgot">("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState<string | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedData, setAcceptedData] = useState(false);
   const legal = { version: LEGAL_VERSION, terms: acceptedTerms, account_data: acceptedData };
@@ -81,7 +83,7 @@ export function AuthModal({ close }: { close: () => void }) {
     const observer = new ResizeObserver(measure);
     observer.observe(content);
     return () => observer.disconnect();
-  }, [tab, message]);
+  }, [tab, message, recoveryEmail]);
   const changeTab = (next: typeof tab) => {
     if (busy || tab === next) return;
     setDirection(next === "login" ? "backward" : "forward");
@@ -185,6 +187,10 @@ export function AuthModal({ close }: { close: () => void }) {
       }
     } catch (e) {
       setError((e as Error).message);
+      if (e instanceof ApiError && e.code === 'PASSWORD_RECOVERY_REQUIRED') {
+        setRecoveryEmail(email.trim().toLowerCase());
+        setStageHeight(undefined);
+      }
       if (tab === 'login' || tab === 'register') clearPasswords();
     } finally {
       setBusy(false);
@@ -272,6 +278,7 @@ export function AuthModal({ close }: { close: () => void }) {
           <div className="auth-mobile-brand">
             <span>//</span> KEYNEST
           </div>
+          {recoveryEmail ? <LoginRecovery email={recoveryEmail} captcha={captcha} close={close} back={() => { setRecoveryEmail(null); setError(''); resetCaptcha(); }} /> : <>
           {tab !== "forgot" && (
             <div
               className="auth-tabs"
@@ -580,6 +587,7 @@ export function AuthModal({ close }: { close: () => void }) {
               </p>
             </div>
           </div>
+          </>}
         </div>
       </div>
       {oauthBusy && (

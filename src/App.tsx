@@ -3,6 +3,7 @@ import { useLiveProducts } from "./useLiveProducts";
 import { NotificationProvider, NotificationBadge, NotificationsPage } from './Notifications';
 import { TwoFactor } from "./TwoFactor";
 import { PasswordChangeAnimation } from './PasswordChangeAnimation';
+import { readRecoveryTicket, clearRecoveryTicket } from './recovery-ticket';
 import { useDataRefresh } from './useDataRefresh';
 import { useChatLive } from './useChatLive';
 import { PreorderNote } from './PreorderNote';
@@ -2115,11 +2116,12 @@ function ResetPassword() {
     Boolean(tokens.token_hash) &&
     Boolean(tokens.recovery_id);
   const [busy, setBusy] = useState(false);
-  const [ticket, setTicket] = useState<string | null>(null);
+  const [ticket, setTicket] = useState<string | null>(() => validRecoveryLink ? null : readRecoveryTicket());
   const [checkingLink, setCheckingLink] = useState(validRecoveryLink);
   const [linkError, setLinkError] = useState('Liên kết thiếu thông tin hoặc đã được mở. Hãy yêu cầu email khôi phục mới từ website.');
   useEffect(() => {
     window.history.replaceState(null, "", window.location.pathname);
+    clearRecoveryTicket();
     if (!validRecoveryLink) return;
     let active = true;
     // Deferring one task lets React StrictMode cancel its first development-only
