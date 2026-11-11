@@ -28,6 +28,19 @@ test('real login route requires recovery on fifth failure and the next correct p
   }
   const correct = { email: 'student@keynest.local', password: 'Student123!' };
   assert.equal((await request('/auth/login', correct)).body.code, 'PASSWORD_RECOVERY_REQUIRED');
+  const gate = Object.values(store.db.login_attempts)[0];
+  gate.otp_blocked_until = new Date(Date.now() + 1800000).toISOString();
+  store.save();
+  for (const password of [correct.password, 'wrong-again']) {
+    const blocked = await request('/auth/login', { ...correct, password });
+    assert.equal(blocked.response.status, 429);
+    assert.equal(blocked.body.code, 'RECOVERY_OTP_LOCKED');
+    assert.ok(blocked.body.retry_after > 0 && blocked.body.retry_after <= 1800);
+    assert.equal(Number(blocked.response.headers.get('Retry-After')), blocked.body.retry_after);
+    assert.equal(blocked.cookie, '');
+  }
+  gate.otp_blocked_until = new Date(Date.now() - 1).toISOString();
+  assert.equal((await request('/auth/login', correct)).body.code, 'PASSWORD_RECOVERY_REQUIRED', 'expiry still requires OTP with the correct password');
   const id = store.db.users.find(user => user.email === correct.email).id;
   assert.equal((await request(`/admin/customers/${id}/login-unlock`)).response.status, 401);
   const admin = await request('/auth/login', { email: 'admin@keynest.local', password: 'Admin123!' });

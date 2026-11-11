@@ -202,6 +202,8 @@ Sai mật khẩu 5 lần trong 15 phút thì tài khoản bắt buộc xác minh
 
 Spam gửi hoặc nhập sai OTP vượt giới hạn sẽ khóa luồng OTP theo tài khoản: 30 phút, 1 giờ, 2 giờ và tiếp tục gấp đôi, tối đa **365 ngày**. Request trong thời gian khóa không gửi mail hoặc kéo dài thời điểm hết khóa. Sau khi hết hạn, đợt vi phạm tiếp theo tăng mức khóa; trở về trang đăng nhập vẫn cần OTP. Đây là khóa luồng xác minh, không phải vô hiệu hóa toàn bộ tài khoản. Admin có nút **Mở khóa OTP** trong danh sách khách hàng, có kiểm tra quyền và ghi audit log.
 
+Trong thời gian khóa OTP, gửi email/mật khẩu ở màn hình đăng nhập sẽ bị chặn ngay, kể cả mật khẩu đúng, và hiển thị thời điểm được thử lại. Hết thời gian khóa vẫn cần OTP + CAPTCHA; mật khẩu đúng không tự gỡ yêu cầu xác minh.
+
 Triển khai tính năng cần áp dụng bước `058_login_protection` trước khi cập nhật API và bật reCAPTCHA v2 với key hợp lệ. Email mã dùng mẫu Magic Link `otp.html` hiện có; không tạo user mới khi yêu cầu mã. OTP chỉ cấp vé đặt mật khẩu một lần, không cấp phiên đăng nhập cho trình duyệt trước khi đặt mật khẩu. Chức năng email này cần Supabase, không gửi mail trong demo.
 
 ### OAuth và Authenticator

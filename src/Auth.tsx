@@ -186,7 +186,9 @@ export function AuthModal({ close }: { close: () => void }) {
         showEmailWelcome();
       }
     } catch (e) {
-      setError((e as Error).message);
+      const until = e instanceof ApiError && e.code === 'RECOVERY_OTP_LOCKED' && e.retryAfter
+        ? ` Có thể thử lại lúc ${new Date(Date.now() + e.retryAfter * 1000).toLocaleString('vi-VN')}.` : '';
+      setError((e as Error).message + until);
       if (e instanceof ApiError && e.code === 'PASSWORD_RECOVERY_REQUIRED') {
         setRecoveryEmail(email.trim().toLowerCase());
         setStageHeight(undefined);

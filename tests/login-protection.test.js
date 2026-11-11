@@ -39,6 +39,32 @@ test('concurrent authentication is serialized, service failures do not count as 
   assert.equal(checked, false);
 });
 
+test('Supabase login reads the active OTP ban before checking a correct password, preserves the ban, and fails closed on status errors', async () => {
+  const now = Date.now(), until = new Date(now + 31536000000).toISOString();
+  let checks = 0, readError = false;
+  const client = {
+    rpc: async () => ({ data: { otp_required: true } }),
+    from(name) {
+      assert.equal(name, 'login_attempts');
+      return { select(columns) {
+        assert.equal(columns, 'otp_blocked_until');
+        return { eq(column, value) {
+          assert.equal(column, 'email_hash'); assert.match(value, /^[a-f0-9]{64}$/);
+          return { maybeSingle: async () => ({ data: { otp_blocked_until: until }, error: readError ? new Error('offline') : null }) };
+        } };
+      } };
+    },
+  };
+  const service = createLoginProtection({ config: { ...config, mode: 'supabase' }, store: { client }, clock: () => now });
+  await assert.rejects(service.authenticate('user@example.com', () => { checks++; return 'correct'; }),
+    error => error.code === 'RECOVERY_OTP_LOCKED' && error.retry_after === 31536000);
+  await assert.rejects(service.assertPasswordAllowed('user@example.com'), error => error.code === 'RECOVERY_OTP_LOCKED');
+  assert.equal(checks, 0);
+  readError = true;
+  await assert.rejects(service.authenticate('user@example.com', () => { checks++; }), error => error.status === 503);
+  assert.equal(checks, 0);
+});
+
 test('SQL persists the gate, enforces global OTP budgets, doubles bans up to 365 days, and resets only on password update/admin unlock', async () => {
   const db = new PGlite();
   const hash = 'ab'.repeat(32), uid = randomUUID(), admin = randomUUID(), actor = randomUUID();

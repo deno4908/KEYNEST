@@ -4,6 +4,8 @@ import { AppError } from './security.js';
 export const recoveryEmailHash = (email, key) => createHmac('sha256', Buffer.from(key, 'hex'))
   .update(email.trim().toLowerCase()).digest('hex');
 const unavailable = () => new AppError('Chưa thể kiểm tra bảo mật đăng nhập. Vui lòng thử lại sau.', 503);
+const locked = retryAfter => Object.assign(new AppError('Luồng OTP đang tạm khóa do quá nhiều lần thử. Vui lòng chờ hết thời gian hoặc liên hệ hỗ trợ.', 429),
+  { code: 'RECOVERY_OTP_LOCKED', retry_after: retryAfter });
 function required(state) {
   if (state?.otp_required) throw Object.assign(new AppError('Bạn đã nhập sai nhiều lần. Hãy xác minh OTP email và CAPTCHA để đặt mật khẩu mới.', 429),
     { code: 'PASSWORD_RECOVERY_REQUIRED' });
@@ -19,6 +21,23 @@ export function createLoginProtection({ config, store, clock = () => Date.now() 
     } catch { throw unavailable(); }
   }
   const memory = () => store.db.login_attempts ||= {};
+  async function enforce(state, hash) {
+    if (state?.otp_required) {
+      let protection;
+      if (config.mode === 'demo') protection = memory()[hash];
+      else {
+        try {
+          const { data, error } = await store.client.from('login_attempts')
+            .select('otp_blocked_until').eq('email_hash', hash).maybeSingle();
+          if (error) throw unavailable();
+          protection = data;
+        } catch { throw unavailable(); }
+      }
+      const remaining = Date.parse(protection?.otp_blocked_until || '') - clock();
+      if (remaining > 0) throw locked(Math.ceil(remaining / 1000));
+    }
+    required(state);
+  }
   async function begin(hash, attempt) {
     if (config.mode !== 'demo') return call('begin_login_attempt', { p_email_hash: hash, p_attempt: attempt });
     const now = clock(), rows = memory();
@@ -47,22 +66,21 @@ export function createLoginProtection({ config, store, clock = () => Date.now() 
   return {
     async assertPasswordAllowed(email) {
       const hash = recoveryEmailHash(email, config.encryption);
-      required(config.mode === 'demo' ? memory()[hash] : await call('login_protection_state', { p_email_hash: hash }));
+      await enforce(config.mode === 'demo' ? memory()[hash] : await call('login_protection_state', { p_email_hash: hash }), hash);
     },
     async otpBudget(email, action) {
       const state = await call('login_otp_budget', { p_email_hash: recoveryEmailHash(email, config.encryption), p_action: action });
       if (state.not_required) throw new AppError('Hãy đăng nhập hoặc dùng chức năng quên mật khẩu.', 400);
-      if (state.locked) throw Object.assign(new AppError('Luồng OTP đang tạm khóa do quá nhiều lần thử. Vui lòng chờ hết thời gian hoặc liên hệ hỗ trợ.', 429),
-        { code: 'RECOVERY_OTP_LOCKED', retry_after: state.retry_after });
+      if (state.locked) throw locked(state.retry_after);
     },
     async authenticate(email, check) {
       const hash = recoveryEmailHash(email, config.encryption), attempt = randomUUID();
-      required(await begin(hash, attempt));
+      await enforce(await begin(hash, attempt), hash);
       let result;
       try { result = await check(); }
       catch (error) {
         const state = await finish(hash, attempt, error.status === 401 ? 'failure' : 'error');
-        required(state);
+        await enforce(state, hash);
         throw error;
       }
       try { required(await finish(hash, attempt, 'success')); }

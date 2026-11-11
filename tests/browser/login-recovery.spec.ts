@@ -57,4 +57,16 @@ for (const mobile of [false, true]) test(`login recovery needs a fresh CAPTCHA w
   expect(await page.evaluate(() => sessionStorage.getItem('single-use-reset-ticket'))).toBeNull();
   await page.reload();
   await expect(page.getByLabel('Mật khẩu mới', { exact: true })).toHaveCount(0);
+  await page.unroute('**/api/auth/login');
+  await page.route('**/api/auth/login', route => route.fulfill({ status: 429, json: { code: 'RECOVERY_OTP_LOCKED', error: 'Luồng OTP đang tạm khóa do quá nhiều lần thử.', retry_after: 1800 } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Đăng nhập', exact: true }).first().click();
+  await dialog.locator('#auth-email').fill('user@example.com');
+  await dialog.locator('#auth-password').fill('CorrectPassword123!');
+  await dialog.getByRole('button', { name: 'Xác nhận CAPTCHA thử nghiệm' }).click();
+  await dialog.locator('button.auth-submit').click();
+  await expect(dialog.getByRole('alert')).toContainText('Có thể thử lại lúc');
+  await expect(dialog.locator('#auth-email')).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Xác minh để đặt lại mật khẩu' })).toHaveCount(0);
+  expect(sent).toBe(1); expect(checked).toBe(1);
 });
